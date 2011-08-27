@@ -1,0 +1,72 @@
+#!/usr/bin/env python
+"""
+# Simple password manager
+# Copyright (c) 2011 Michael Buesch <m@bues.ch>
+# Licensed under the GNU/GPL version 2 or later.
+"""
+
+import sys
+import getopt
+import pwman
+
+
+def testEscape(t):
+	t0 = t1 = '1-2x-y-a\tb c\\\\_ \\\\ x_-y\n_\tz\v__\\\\__\\-'
+	if t:
+		t0 = t1 = t
+	nrIter = 3
+	print "ORIG :", t0
+	for i in range(0, nrIter):
+		t1 = pwman.escapeCmd(t1)
+		print "ESC%d : %s" % (i, t1)
+	for i in range(0, nrIter):
+		t1 = pwman.unescapeCmd(t1)
+	print "UNESC:", t1
+	assert(t1 == t0)
+
+def usage():
+	print "Usage: %s [OPTIONS]" % sys.argv[0]
+	print ""
+	print "Options:"
+	print " -d|--database PATH      Use PATH as database file."
+	print "                         If not given, %s is used." %\
+						pwman.getDefaultDatabase()
+
+def main():
+	dbFile = None
+	try:
+		(opts, args) = getopt.getopt(sys.argv[1:],
+			"hd:",
+			[ "help", "database=", "escapetest=", ])
+		for (o, v) in opts:
+			if o in ("-h", "--help"):
+				usage()
+				return 0
+			if o in ("-d", "--database"):
+				dbFile = v
+			if o == "--escapetest":
+				testEscape(v)
+				return 0
+	except (getopt.GetoptError), e:
+		usage()
+		return 1
+	if not dbFile:
+		dbFile = pwman.getDefaultDatabase()
+	if not dbFile:
+		print "No database file specified"
+		return 1
+	print "Opening database '%s'..." % dbFile
+	passphrase = pwman.readPassphrase("Master passphrase",
+					  not pwman.fileExists(dbFile))
+	if passphrase is None:
+		return 1
+	try:
+		p = pwman.PWMan(dbFile, passphrase)
+		p.interactive()
+	except (pwman.PWMan.Error), e:
+		print "Error: " + str(e)
+		return 1
+	return 0
+
+if __name__ == "__main__":
+	sys.exit(main())
