@@ -157,6 +157,9 @@ class PWMan(CryptSQL, Cmd):
 	class Error(Exception): pass
 	class Quit(Exception): pass
 
+	DB_TYPE		= "PWMan database"
+	DB_VER		= "0"
+
 	def __init__(self, filename, passphrase):
 		try:
 			CryptSQL.__init__(self)
@@ -172,8 +175,24 @@ class PWMan(CryptSQL, Cmd):
 		self.open(filename, passphrase)
 		self.passphrase = passphrase
 		self.dirty = False
+		initialize = False
+		if self.sqlIsEmpty():
+			initialize = True
+		else:
+			dbType = self.__getInfoField("db_type")
+			dbVer = self.__getInfoField("db_version")
+			if dbType != self.DB_TYPE or\
+			   dbVer != self.DB_VER:
+				raise PWMan.Error("Unsupported database version '%s/%s'. "
+					"Expected '%s/%s'" %\
+					(str(dbType), str(dbVer), self.DB_TYPE, self.DB_VER))
+		self.sqlExec("CREATE TABLE IF NOT EXISTS "
+			"info(name TEXT, data TEXT);")
 		self.sqlExec("CREATE TABLE IF NOT EXISTS "
 			"pw(category TEXT, title TEXT, user TEXT, pw TEXT, bulk TEXT);")
+		if initialize:
+			self.__setInfoField("db_type", self.DB_TYPE)
+			self.__setInfoField("db_version", self.DB_VER)
 
 	def __err(self, source, message):
 		source = " " + source + ":" if source else ""
@@ -608,6 +627,18 @@ class PWMan(CryptSQL, Cmd):
 			raise self.Error("Entry does not exist")
 		self.__delEntry(entry)
 		self.setDirty()
+
+	def __getInfoField(self, name):
+		try:
+			d = self.sqlExec("SELECT data FROM info WHERE name=?;", (name,)).fetchOne()
+			return d[0] if d else None
+		except (sql.OperationalError), e:
+			return None
+
+	def __setInfoField(self, name, data):
+		self.sqlExec("DELETE FROM info WHERE name=?;", (name,))
+		self.sqlExec("INSERT INTO info(name, data) VALUES(?,?);",
+			     (name, data))
 
 	def setDirty(self, d=True):
 		self.dirty = d

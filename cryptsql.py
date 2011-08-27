@@ -138,11 +138,11 @@ class CryptSQLCursor(object):
 	def __init__(self, c):
 		self.c = c
 
-	def execute(self, code, params=[]):
+	def sqlExec(self, code, params=[]):
 		self.c.execute(code, params)
 		return self
 
-	def executeScript(self, code):
+	def sqlExecScript(self, code):
 		self.c.executescript(code)
 		return self
 
@@ -313,13 +313,18 @@ class CryptSQL(object):
 				e.strerror)
 
 	def sqlExec(self, code, params=[]):
-		return CryptSQLCursor(self.db.cursor()).execute(code, params)
+		return CryptSQLCursor(self.db.cursor()).sqlExec(code, params)
 
 	def sqlExecScript(self, code):
-		return CryptSQLCursor(self.db.cursor()).executeScript(code)
+		return CryptSQLCursor(self.db.cursor()).sqlExecScript(code)
 
 	def sqlCreateFunction(self, name, nrParams, func):
 		self.db.create_function(name, nrParams, func)
+
+	def sqlIsEmpty(self):
+		c = self.sqlExec("ANALYZE;")
+		tbl = c.sqlExec("SELECT tbl FROM sqlite_stat1;").fetchOne()
+		return not bool(tbl)
 
 if __name__ == "__main__":
 	databaseFile = sys.argv[1]
