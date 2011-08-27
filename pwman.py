@@ -179,6 +179,12 @@ class PWMan(CryptSQL, Cmd):
 		source = " " + source + ":" if source else ""
 		print "***%s %s\n" % (source, message)
 
+	def precmd(self, line):
+		first = self.__getParam(line, 0, False, False)
+		if first.endswith('?'):
+			return "help %s" % first[:-1]
+		return line
+
 	def default(self, line):
 		self.__err(None, "Unknown command: %s" % line)
 
@@ -240,7 +246,7 @@ class PWMan(CryptSQL, Cmd):
 		printCmdHelp(self.cmdHelpDatabase)
 		print "\nEditing/listing commands:"
 		printCmdHelp(self.cmdHelpEdit)
-		print "\nType 'help <command>' for more help on a command."
+		print "\nType 'command?' or 'help command' for more help on a command."
 	do_h = do_help
 
 	def do_quit(self, params):
@@ -520,12 +526,16 @@ class PWMan(CryptSQL, Cmd):
 		# given the character index into the line.
 		return len(filter(None, line[:charIndex].split())) - 1
 
-	def __getParam(self, line, paramIndex, lineIncludesCommand=False):
+	def __getParam(self, line, paramIndex,
+		       ignoreFirst=False, unescape=True):
 		# Returns the full parameter from the commandline
-		if lineIncludesCommand:
+		if ignoreFirst:
 			paramIndex += 1
 		try:
-			return unescapeCmd(line.split()[paramIndex])
+			p = line.split()[paramIndex]
+			if unescape:
+				p = unescapeCmd(p)
+			return p
 		except (IndexError), e:
 			return ""
 
