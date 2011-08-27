@@ -6,8 +6,6 @@
 
 import sys
 import os
-import tty
-import termios
 import errno
 import getpass
 import time
