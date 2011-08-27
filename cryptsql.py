@@ -7,12 +7,28 @@
 import sys
 import os
 import errno
-import Crypto.Hash.SHA256 as SHA256
-import Crypto.Hash.HMAC as HMAC
-import Crypto.Cipher.AES as AES
-from beaker.crypto.pbkdf2 import PBKDF2
 import zlib
-import sqlite3 as sql
+
+def missingMod(name, debpack):
+	print "Python '%s' module is not installed." % name
+	if debpack:
+		print "On Debian do:  aptitude install %s" % debpack
+	sys.exit(1)
+
+try:
+	import Crypto.Hash.SHA256 as SHA256
+	import Crypto.Hash.HMAC as HMAC
+	import Crypto.Cipher.AES as AES
+except (ImportError), e:
+	missingMod("Crypto", "python-crypto")
+try:
+	from beaker.crypto.pbkdf2 import PBKDF2
+except (ImportError), e:
+	missingMod("beaker", "python-beaker")
+try:
+	import sqlite3 as sql
+except (ImportError), e:
+	missingMod("sqlite3", "python-sqlite")
 
 
 CSQL_HEADER	= map(lambda c: ord(c), "CryptSQL v1")
