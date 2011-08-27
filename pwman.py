@@ -240,6 +240,7 @@ class PWMan(CryptSQL, Cmd):
 		("edit_pw", ("ep",), "Edit the 'password' field of an entry"),
 		("edit_bulk", ("eb",), "Edit the 'bulk' field of an entry"),
 		("remove", ("rm", "del"), "Remove and existing entry"),
+		("dbdump", (), "Dump the database"),
 	)
 
 	def do_help(self, params):
@@ -523,6 +524,25 @@ class PWMan(CryptSQL, Cmd):
 	complete_remove = __complete_category_title
 	complete_rm = complete_remove
 	complete_del = complete_remove
+
+	def do_dbdump(self, params):
+		"""--- Dump the SQL database as SQL script ---
+		Command: dbdump [filepath]\n
+		If filepath is given, the database is dumped
+		unencrypted to the file.
+		If filepath is omitted, the database is dumped
+		unencrypted to stdout.\n
+		Aliases: None"""
+		try:
+			if params:
+				fd = file(params, "wb")
+			else:
+				fd = sys.stdout
+			fd.write(self.sqlPlainDump() + "\n")
+			fd.flush()
+		except (IOError), e:
+			self.__err("dbdump", "Failed to write dump: %s" % e.strerror)
+			return
 
 	def __skipParams(self, line, count, lineIncludesCommand=False):
 		# Return a parameter string with the first 'count'

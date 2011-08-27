@@ -274,7 +274,7 @@ class CryptSQL(object):
 			raise CSQLError("Database is not open")
 		self.db.commit()
 		# Dump the database
-		payload = "\n".join(self.db.iterdump())
+		payload = self.sqlPlainDump()
 		# Compress payload
 		payload = zlib.compress(payload, 9)
 		# Encrypt payload
@@ -325,6 +325,9 @@ class CryptSQL(object):
 		c = self.sqlExec("ANALYZE;")
 		tbl = c.sqlExec("SELECT tbl FROM sqlite_stat1;").fetchOne()
 		return not bool(tbl)
+
+	def sqlPlainDump(self):
+		return "\n".join(self.db.iterdump())
 
 if __name__ == "__main__":
 	databaseFile = sys.argv[1]
