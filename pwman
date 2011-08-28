@@ -31,13 +31,15 @@ def usage():
 	print " -d|--database PATH      Use PATH as database file."
 	print "                         If not given, %s is used." %\
 						pwman.getDefaultDatabase()
+	print " -U|--commit-clear-undo  The commit command clears undo queue."
 
 def main():
 	dbFile = None
+	commitClearsUndo = False
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hd:",
-			[ "help", "database=", "escapetest=", ])
+			"hd:U",
+			[ "help", "database=", "escapetest=", "commit-clear-undo", ])
 		for (o, v) in opts:
 			if o in ("-h", "--help"):
 				usage()
@@ -47,6 +49,8 @@ def main():
 			if o == "--escapetest":
 				testEscape(v)
 				return 0
+			if o in ("-U", "--commit-clear-undo"):
+				commitClearsUndo = True
 	except (getopt.GetoptError), e:
 		usage()
 		return 1
@@ -61,7 +65,8 @@ def main():
 	if passphrase is None:
 		return 1
 	try:
-		p = pwman.PWMan(dbFile, passphrase)
+		p = pwman.PWMan(dbFile, passphrase,
+				commitClearsUndo=commitClearsUndo)
 		p.interactive()
 	except (pwman.PWMan.Error), e:
 		print "Error: " + str(e)
