@@ -1,0 +1,15 @@
+------------------------------------------------
+--  pwman - Lightweight password manager
+------
+
+Copyright (c) 2011 Michael Buesch <m@bues.ch>
+
+
+
+--- Install ---
+
+Execute the following commands to install the application:
+
+	./setup.py build
+	sudo -i  # Or any other command to become root
+	./setup.py install
