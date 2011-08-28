@@ -689,7 +689,7 @@ class PWMan(CryptSQL, Cmd):
 		sql = "SELECT title FROM pw WHERE category=?;"
 		titles = self.sqlExec(sql, (category,)).fetchAll()
 		if not titles:
-			return None
+			return []
 		titles = map(lambda t: t[0], titles)
 		titles.sort()
 		return titles
@@ -795,3 +795,13 @@ class PWMan(CryptSQL, Cmd):
 				stdout("\n")
 			except (CSQLError), e:
 				stdout("SQL error: %s\n" % str(e))
+
+	def runOneCommand(self, command):
+		try:
+			self.onecmd(command)
+		except (EscapeError, self.CommandError), e:
+			raise self.Error(str(e))
+		except (KeyboardInterrupt, EOFError), e:
+			raise self.Error("Interrupted")
+		except (CSQLError), e:
+			raise self.Error("SQL error: %s" % str(e))

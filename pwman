@@ -25,7 +25,12 @@ def testEscape(t):
 	assert(t1 == t0)
 
 def usage():
-	print "Usage: %s [OPTIONS]" % sys.argv[0]
+	print "pwman - lightweight password manager"
+	print ""
+	print "Usage: %s [OPTIONS] [COMMANDS]" % sys.argv[0]
+	print ""
+	print "If COMMANDS are given, run these commands."
+	print "Starts in interactive mode, otherwise."
 	print ""
 	print "Options:"
 	print " -d|--database PATH      Use PATH as database file."
@@ -54,6 +59,7 @@ def main():
 	except (getopt.GetoptError), e:
 		usage()
 		return 1
+	commands = args
 	if not dbFile:
 		dbFile = pwman.getDefaultDatabase()
 	if not dbFile:
@@ -67,7 +73,11 @@ def main():
 	try:
 		p = pwman.PWMan(dbFile, passphrase,
 				commitClearsUndo=commitClearsUndo)
-		p.interactive()
+		if commands:
+			for command in commands:
+				p.runOneCommand(command)
+		else:
+			p.interactive()
 	except (pwman.PWMan.Error), e:
 		print "Error: " + str(e)
 		return 1
