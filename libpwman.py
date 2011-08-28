@@ -14,6 +14,8 @@ import readline
 from cmd import Cmd
 from cryptsql import *
 
+VERSION = 0
+
 
 def getDefaultDatabase():
 	db = os.getenv("PWMAN_DATABASE")

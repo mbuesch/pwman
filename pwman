@@ -25,7 +25,7 @@ def testEscape(t):
 	assert(t1 == t0)
 
 def usage():
-	print "pwman - lightweight password manager"
+	print "pwman v%d - lightweight password manager" % pwman.VERSION
 	print ""
 	print "Usage: %s [OPTIONS] [COMMANDS]" % sys.argv[0]
 	print ""

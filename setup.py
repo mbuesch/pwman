@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
 from distutils.core import setup
+from libpwman import VERSION
 
 setup(
 	name		= "pwman",
-#	version		=
+	version		= "%d" % VERSION,
 	description	= "Lightweight password manager",
 	author		= "Michael Buesch",
 	author_email	= "m@bues.ch",

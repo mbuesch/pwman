@@ -358,6 +358,8 @@ def pwmImport(p, pwmFile):
 	pwmParseXml(p, data)
 
 def usage():
+	print "pwman v%d - 'PwManager' import" % pwman.VERSION
+	print ""
 	print "Usage: %s [OPTIONS] file.pwm" % sys.argv[0]
 	print ""
 	print "Options:"
