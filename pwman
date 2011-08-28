@@ -11,7 +11,7 @@ import libpwman as pwman
 
 
 def testEscape(t):
-	t0 = t1 = '1-2x-y-a\tb c\\\\_ \\\\ x_-y\n_\tz\v__\\\\__\\-'
+	t0 = t1 = '1-2x-y-a\tb c\\\\_ \\\\ x_-y\r\n_\tz\v__\\\\__\\-'
 	if t:
 		t0 = t1 = t
 	nrIter = 3

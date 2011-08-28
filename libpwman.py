@@ -38,8 +38,7 @@ def escapeCmd(s):
 		'\t'	: '\\t',
 		'\n'	: '\\n',
 		'\\'	: '\\\\',
-		' '	: '-',
-		'-'	: '\\-',
+		' '	: '\\ ',
 	}
 	ret = []
 	for c in s:
@@ -57,7 +56,6 @@ def unescapeCmd(s):
 		't'	: '\t',
 		'n'	: '\n',
 		'\\'	: '\\',
-		'-'	: '-',
 	}
 	ret = []
 	i = 0
@@ -67,14 +65,15 @@ def unescapeCmd(s):
 				if s[i + 1] == 'x':
 					ret.append(chr(int(s[i + 2 : i + 4], 16)))
 					i += 3
+				elif s[i + 1] == ' ':
+					ret.append(' ')
+					i += 1
 				else:
 					ret.append(slashSubst[s[i + 1]])
 					i += 1
 			except (IndexError, ValueError, KeyError):
 				raise EscapeError("Invalid backslash escape sequence "
 					"at character %d" % i)
-		elif s[i] == '-':
-			ret.append(' ')
 		else:
 			ret.append(s[i])
 		i += 1
@@ -268,7 +267,8 @@ class PWMan(CryptSQL, Cmd):
 
 	def __complete_category_title(self, text, line, begidx, endidx):
 		# Generic [category] [title] completion
-		paramIdx = self.__calcParamIndex(line, begidx)
+		paramIdx = self.__calcParamIndex(line, endidx)
+		text = self.__getParam(line, paramIdx, True)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
@@ -484,7 +484,8 @@ class PWMan(CryptSQL, Cmd):
 	do_eu = do_edit_user
 
 	def complete_edit_user(self, text, line, begidx, endidx):
-		paramIdx = self.__calcParamIndex(line, begidx)
+		paramIdx = self.__calcParamIndex(line, endidx)
+		text = self.__getParam(line, paramIdx, True)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
@@ -514,7 +515,8 @@ class PWMan(CryptSQL, Cmd):
 	do_ep = do_edit_pw
 
 	def complete_edit_pw(self, text, line, begidx, endidx):
-		paramIdx = self.__calcParamIndex(line, begidx)
+		paramIdx = self.__calcParamIndex(line, endidx)
+		text = self.__getParam(line, paramIdx, True)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
@@ -544,7 +546,8 @@ class PWMan(CryptSQL, Cmd):
 	do_eb = do_edit_bulk
 
 	def complete_edit_bulk(self, text, line, begidx, endidx):
-		paramIdx = self.__calcParamIndex(line, begidx)
+		paramIdx = self.__calcParamIndex(line, endidx)
+		text = self.__getParam(line, paramIdx, True)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
@@ -640,39 +643,68 @@ class PWMan(CryptSQL, Cmd):
 		self.__info("redo", cmd.undoCommand + "\nsuccessfully redone with\n" +\
 			    cmd.doCommand)
 
-	def __skipParams(self, line, count, lineIncludesCommand=False):
+	def __skipParams(self, line, count,
+			 lineIncludesCommand=False, unescape=True):
 		# Return a parameter string with the first 'count'
 		# parameters skipped.
+		sline = self.__sanitizeCmdline(line)
 		if lineIncludesCommand:
 			count += 1
 		i = 0
-		while i < len(line) and count > 0:
-			while i < len(line) and not line[i].isspace():
+		while i < len(sline) and count > 0:
+			while i < len(sline) and not sline[i].isspace():
 				i += 1
-			while i < len(line) and line[i].isspace():
+			while i < len(sline) and sline[i].isspace():
 				i += 1
 			count -= 1
-		if i >= len(line):
+		if i >= len(sline):
 			return ""
-		return line[i:]
+		s = line[i:]
+		if unescape:
+			s = unescapeCmd(s)
+		return s
 
-	def __calcParamIndex(self, line, charIndex):
-		# Returns the parameter index in a complete commandline
-		# given the character index into the line.
-		return len(filter(None, line[:charIndex].split())) - 1
+	def __calcParamIndex(self, line, endidx):
+		# Returns the parameter index into the commandline
+		# given the character end-index. This honors space-escape.
+		line = self.__sanitizeCmdline(line)
+		startidx = endidx - 1
+		while startidx > 0 and not line[startidx].isspace():
+			startidx -= 1
+		return len(filter(None, line[:startidx].split())) - 1
+
+	def __sanitizeCmdline(self, line):
+		# Sanitize a commandline for simple whitespace based splitting.
+		# We just replace the space escape sequence by a random
+		# non-whitespace string. The line remains the same size.
+		return line.replace('\\ ', '_S')
 
 	def __getParam(self, line, paramIndex,
 		       ignoreFirst=False, unescape=True):
 		# Returns the full parameter from the commandline
+		sline = self.__sanitizeCmdline(line)
 		if ignoreFirst:
 			paramIndex += 1
-		try:
-			p = line.split()[paramIndex]
-			if unescape:
-				p = unescapeCmd(p)
-			return p
-		except (IndexError), e:
+		inParam = False
+		idx = 0
+		for (startIndex, c) in enumerate(sline):
+			if c.isspace():
+				if inParam:
+					idx += 1
+				inParam = False
+			else:
+				inParam = True
+				if idx == paramIndex:
+					break
+		else:
 			return ""
+		endIndex = startIndex
+		while endIndex < len(sline) and not sline[endIndex].isspace():
+			endIndex += 1
+		p = line[startIndex : endIndex]
+		if unescape:
+			p = unescapeCmd(p)
+		return p
 
 	def getCategoryNames(self):
 		categories = self.sqlExec("SELECT category FROM pw;").fetchAll()
