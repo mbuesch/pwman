@@ -291,14 +291,18 @@ class PWMan(CryptSQL, Cmd):
 		("masterp", (), "Change the master passphrase"),
 	)
 
-	cmdHelpEdit = (
+	cmdHelpShow = (
 		("list", ("ls",), "Print entry contents"),
+		("find", ("f",), "Search the database for patterns"),
+		("dbdump", (), "Dump the database"),
+	)
+
+	cmdHelpEdit = (
 		("new", ("n", "add"), "Create new entry"),
 		("edit_user", ("eu",), "Edit the 'user' field of an entry"),
 		("edit_pw", ("ep",), "Edit the 'password' field of an entry"),
 		("edit_bulk", ("eb",), "Edit the 'bulk' field of an entry"),
 		("remove", ("rm", "del"), "Remove and existing entry"),
-		("dbdump", (), "Dump the database"),
 	)
 
 	cmdHelpHist = (
@@ -327,7 +331,9 @@ class PWMan(CryptSQL, Cmd):
 		printCmdHelp(self.cmdHelpMisc)
 		print "\nDatabase commands:"
 		printCmdHelp(self.cmdHelpDatabase)
-		print "\nEditing/listing commands:"
+		print "\nSearching/listing commands:"
+		printCmdHelp(self.cmdHelpShow)
+		print "\nEditing commands:"
 		printCmdHelp(self.cmdHelpEdit)
 		print "\nHistory commands:"
 		printCmdHelp(self.cmdHelpHist)
@@ -612,6 +618,35 @@ class PWMan(CryptSQL, Cmd):
 		except (IOError), e:
 			self.__err("dbdump", "Failed to write dump: %s" % e.strerror)
 
+	def do_find(self, params):
+		"""--- Search the database ---
+		Command: find [category] PATTERN\n
+		Searches the database for patterns. If 'category' is given, only search
+		in the specified category. PATTERN may use unix globbing wildcards.\n
+		Aliases: f"""
+		p0 = self.__getParam(params, 0)
+		p1 = self.__getParam(params, 1)
+		if not p0 and not p1:
+			self.__err("find", "Invalid parameters.")
+		category = p0 if p1 else None
+		pattern = p1 if p1 else p0
+		entries = self.findEntries(pattern, inCategory=category, matchTitle=True,
+					   matchUser=True, matchPw=True, matchBulk=True)
+		if not entries:
+			self.__err("find", "'%s' not found" % params)
+		for entry in entries:
+			stdout(entry.dump(prefix="\t") + "\n\n")
+	do_f = do_find
+
+	def complete_find(self, text, line, begidx, endidx):
+		paramIdx = self.__calcParamIndex(line, endidx)
+		text = self.__getParam(line, paramIdx, True)
+		if paramIdx == 0:
+			# Category completion
+			return self.__getCategoryCompletions(text)
+		return []
+	complete_f = complete_find
+
 	def do_undo(self, params):
 		"""--- Undo the last command ---
 		Command: undo\n
@@ -740,6 +775,38 @@ class PWMan(CryptSQL, Cmd):
 		if not data:
 			return None
 		return PWManEntry(data[0], data[1], data[2], data[3], data[4])
+
+	def findEntries(self, pattern, leftAnchor=False, rightAnchor=False,
+			inCategory=None, matchTitle=False,
+			matchUser=False, matchPw=False, matchBulk=False):
+		if not leftAnchor:
+			pattern = "*" + pattern
+		if not rightAnchor:
+			pattern = pattern + "*"
+		conditions = []
+		if matchTitle:
+			conditions.append( ("title GLOB ?", pattern) )
+		if matchUser:
+			conditions.append( ("user GLOB ?", pattern) )
+		if matchPw:
+			conditions.append( ("pw GLOB ?", pattern) )
+		if matchBulk:
+			conditions.append( ("bulk GLOB ?", pattern) )
+		if not conditions:
+			return []
+		condStr = " OR ".join(map(lambda c: c[0], conditions))
+		params = map(lambda c: c[1], conditions)
+		sql = "SELECT category, title, user, pw, bulk FROM pw"
+		if inCategory:
+			sql += " WHERE category = ? AND ( " + condStr + " );"
+			params.insert(0, inCategory)
+		else:
+			sql += " WHERE " + condStr + ";"
+		dataSet = self.sqlExec(sql, params).fetchAll()
+		if not dataSet:
+			return []
+		return map(lambda data: PWManEntry(data[0], data[1], data[2], data[3], data[4]),
+			   dataSet)
 
 	def __delEntry(self, entry):
 		self.sqlExec("DELETE FROM pw WHERE category=? AND title=?;",
