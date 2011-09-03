@@ -191,17 +191,17 @@ class PWManEntry(object):
 		if self.bulk is self.Undefined:
 			self.bulk = fromEntry.bulk
 
-	def dump(self, prefix=""):
-		res = [ ]
-		res.append("Category:\t" + self.category)
-		res.append("Title:\t\t" + self.title)
+	def dump(self):
+		res = []
+		res.append("===  %s  ===" % self.category)
+		res.append("\t---  %s  ---" % self.title)
 		if self.user:
-			res.append("User:\t\t" + self.user)
+			res.append("\tUser:\t\t%s" % self.user)
 		if self.pw:
-			res.append("Password:\t" + self.pw)
+			res.append("\tPassword:\t%s" % self.pw)
 		if self.bulk:
-			res.append("Bulk data:\t" + self.bulk)
-		return prefix + ("\n" + prefix).join(res)
+			res.append("\tBulk data:\t%s" % self.bulk)
+		return "\n".join(res) + "\n"
 
 class PWMan(CryptSQL, Cmd):
 	class Error(Exception): pass
@@ -406,12 +406,12 @@ class PWMan(CryptSQL, Cmd):
 			stdout("Categories:\n\t")
 			stdout("\n\t".join(self.getCategoryNames()) + "\n")
 		elif category and not title:
-			stdout("Entries in category '%s'\n\t" % category)
+			stdout("Entries in category '%s':\n\t" % category)
 			stdout("\n\t".join(self.getEntryTitles(category)) + "\n")
 		elif category and title:
 			entry = self.getEntry(PWManEntry(category, title))
 			if entry:
-				stdout(entry.dump(prefix="\t") + "\n")
+				stdout(entry.dump())
 			else:
 				self.__err("list", "'%s/%s' not found" % (category, title))
 		else:
@@ -658,7 +658,7 @@ class PWMan(CryptSQL, Cmd):
 		if not entries:
 			self.__err("find", "'%s' not found" % pattern)
 		for entry in entries:
-			stdout(entry.dump(prefix="\t") + "\n\n")
+			stdout(entry.dump() + "\n\n")
 	do_f = do_find
 
 	def complete_find(self, text, line, begidx, endidx):
