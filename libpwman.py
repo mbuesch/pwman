@@ -620,20 +620,43 @@ class PWMan(CryptSQL, Cmd):
 
 	def do_find(self, params):
 		"""--- Search the database ---
-		Command: find [category] PATTERN\n
+		Command: find [OPTS] [category] PATTERN\n
 		Searches the database for patterns. If 'category' is given, only search
 		in the specified category. PATTERN may use unix globbing wildcards.\n
+		OPTS may be one or multiple of:
+		  -t   Only match 'title'
+		  -u   Only match 'user'
+		  -p   Only match 'password'
+		  -b   Only match 'bulk'\n
 		Aliases: f"""
-		p0 = self.__getParam(params, 0)
-		p1 = self.__getParam(params, 1)
-		if not p0 and not p1:
+		(p, i) = ([], 0)
+		(mTitle, mUser, mPw, mBulk) = (False,) * 4
+		while True:
+			param = self.__getParam(params, i)
+			if not param:
+				break
+			if param == "-t":
+				mTitle = True
+			elif param == "-u":
+				mUser = True
+			elif param == "-p":
+				mPw = True
+			elif param == "-b":
+				mBulk = True
+			else:
+				p.append(param)
+			i += 1
+		if len(p) <= 0 or len(p) > 2:
 			self.__err("find", "Invalid parameters.")
-		category = p0 if p1 else None
-		pattern = p1 if p1 else p0
-		entries = self.findEntries(pattern, inCategory=category, matchTitle=True,
-					   matchUser=True, matchPw=True, matchBulk=True)
+		category = p[0] if len(p) > 1 else None
+		pattern = p[1] if len(p) > 1 else p[0]
+		if not any( (mTitle, mUser, mPw, mBulk) ):
+			(mTitle, mUser, mPw, mBulk) = (True,) * 4
+		entries = self.findEntries(pattern, inCategory=category,
+					   matchTitle=mTitle, matchUser=mUser,
+					   matchPw=mPw, matchBulk=mBulk)
 		if not entries:
-			self.__err("find", "'%s' not found" % params)
+			self.__err("find", "'%s' not found" % pattern)
 		for entry in entries:
 			stdout(entry.dump(prefix="\t") + "\n\n")
 	do_f = do_find
