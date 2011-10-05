@@ -10,10 +10,8 @@ import getopt
 import libpwman as pwman
 
 
-def testEscape(t):
+def testEscape():
 	t0 = t1 = '1-2x-y-a\tb c\\\\_ \\\\ x_-y\r\n_\tz\v__\\\\__\\-'
-	if t:
-		t0 = t1 = t
 	nrIter = 3
 	print "ORIG :", t0
 	for i in range(0, nrIter):
@@ -44,15 +42,15 @@ def main():
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
 			"hd:U",
-			[ "help", "database=", "escapetest=", "commit-clear-undo", ])
+			[ "help", "database=", "test", "commit-clear-undo", ])
 		for (o, v) in opts:
 			if o in ("-h", "--help"):
 				usage()
 				return 0
 			if o in ("-d", "--database"):
 				dbFile = v
-			if o == "--escapetest":
-				testEscape(v)
+			if o == "--test":
+				testEscape()
 				return 0
 			if o in ("-U", "--commit-clear-undo"):
 				commitClearsUndo = True
