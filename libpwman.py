@@ -12,6 +12,7 @@ import time
 import re
 import readline
 import signal
+import curses
 from cmd import Cmd
 from cryptsql import *
 
@@ -88,6 +89,11 @@ def stdout(text, flush=True):
 		sys.stdout.flush()
 
 def clearScreen():
+	try:
+		stdscr = curses.initscr()
+		stdscr.clear()
+	finally:
+		curses.endwin()
 	stdout("\x1B[2J\x1B[0;0f")
 
 def readPassphrase(prompt, verify=False):
