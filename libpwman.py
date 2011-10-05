@@ -11,6 +11,7 @@ import getpass
 import time
 import re
 import readline
+import signal
 from cmd import Cmd
 from cryptsql import *
 
@@ -103,7 +104,7 @@ def readPassphrase(prompt, verify=False):
 			if p0 == p1:
 				return p0
 			print "Passwords don't match. Try again..."
-	except (EOFError), e:
+	except (EOFError, KeyboardInterrupt), e:
 		print ""
 		return None
 	except (getpass.GetPassWarning), e:
@@ -118,6 +119,20 @@ def fileExists(path):
 			return False
 		raise CSQLError("fileExists(): " + str(e))
 	return True
+
+class PWManTimeout(Exception):
+	def __init__(self, seconds):
+		self.seconds = seconds
+		if seconds > 0:
+			signal.signal(signal.SIGALRM, self.__timeout)
+			self.poke()
+
+	def poke(self):
+		if self.seconds > 0:
+			signal.alarm(self.seconds)
+
+	def __timeout(self, signum, frame):
+		raise self
 
 class UndoCommand(object):
 	def __init__(self, doCommand, undoCommand):
@@ -211,13 +226,15 @@ class PWMan(CryptSQL, Cmd):
 	DB_TYPE		= "PWMan database"
 	DB_VER		= "0"
 
-	def __init__(self, filename, passphrase, commitClearsUndo=False):
+	def __init__(self, filename, passphrase,
+		     commitClearsUndo=False, timeout=-1):
 		try:
 			CryptSQL.__init__(self)
 
 			Cmd.__init__(self)
 			self.prompt = "pwman$ "
 
+			self.timeout = PWManTimeout(timeout)
 			self.commitClearsUndo = commitClearsUndo
 			self.undo = UndoStack()
 			self.__openFile(filename, passphrase)
@@ -256,19 +273,25 @@ class PWMan(CryptSQL, Cmd):
 		print "+++%s %s\n" % (source, message)
 
 	def precmd(self, line):
+		self.timeout.poke()
 		first = self.__getParam(line, 0, False, False)
 		if first.endswith('?'):
 			return "help %s" % first[:-1]
 		return line
 
+	def postcmd(self, stop, line):
+		self.timeout.poke()
+
 	def default(self, line):
 		self.__err(None, "Unknown command: %s\nType 'help' for more help." % line)
 
 	def emptyline(self):
-		pass
+		self.timeout.poke()
+		# Don't repeat the last command
 
 	def __complete_category_title(self, text, line, begidx, endidx):
 		# Generic [category] [title] completion
+		self.timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
 		text = self.__getParam(line, paramIdx, True)
 		if paramIdx == 0:
@@ -492,6 +515,7 @@ class PWMan(CryptSQL, Cmd):
 	do_eu = do_edit_user
 
 	def complete_edit_user(self, text, line, begidx, endidx):
+		self.timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
 		text = self.__getParam(line, paramIdx, True)
 		if paramIdx == 0:
@@ -523,6 +547,7 @@ class PWMan(CryptSQL, Cmd):
 	do_ep = do_edit_pw
 
 	def complete_edit_pw(self, text, line, begidx, endidx):
+		self.timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
 		text = self.__getParam(line, paramIdx, True)
 		if paramIdx == 0:
@@ -554,6 +579,7 @@ class PWMan(CryptSQL, Cmd):
 	do_eb = do_edit_bulk
 
 	def complete_edit_bulk(self, text, line, begidx, endidx):
+		self.timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
 		text = self.__getParam(line, paramIdx, True)
 		if paramIdx == 0:
@@ -662,6 +688,7 @@ class PWMan(CryptSQL, Cmd):
 	do_f = do_find
 
 	def complete_find(self, text, line, begidx, endidx):
+		self.timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
 		text = self.__getParam(line, paramIdx, True)
 		if paramIdx == 0:

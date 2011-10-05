@@ -35,14 +35,17 @@ def usage():
 	print "                         If not given, %s is used." %\
 						pwman.getDefaultDatabase()
 	print " -U|--commit-clear-undo  The commit command clears undo queue."
+	print " -t|--timeout SECONDS    Sets the session timeout. Default is 120."
 
 def main():
 	dbFile = None
 	commitClearsUndo = False
+	timeout = 120
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hd:U",
-			[ "help", "database=", "test", "commit-clear-undo", ])
+			"hd:Ut:",
+			[ "help", "database=", "test", "commit-clear-undo",
+			  "timeout=", ])
 		for (o, v) in opts:
 			if o in ("-h", "--help"):
 				usage()
@@ -54,7 +57,9 @@ def main():
 				return 0
 			if o in ("-U", "--commit-clear-undo"):
 				commitClearsUndo = True
-	except (getopt.GetoptError), e:
+			if o in ("-t", "--timeout"):
+				timeout = int(v)
+	except (getopt.GetoptError, ValueError), e:
 		usage()
 		return 1
 	commands = args
@@ -70,7 +75,8 @@ def main():
 		return 1
 	try:
 		p = pwman.PWMan(dbFile, passphrase,
-				commitClearsUndo=commitClearsUndo)
+				commitClearsUndo=commitClearsUndo,
+				timeout=timeout)
 		if commands:
 			for command in commands:
 				p.runOneCommand(command)
@@ -78,6 +84,11 @@ def main():
 			p.interactive()
 	except (pwman.PWMan.Error), e:
 		print "Error: " + str(e)
+		return 1
+	except (pwman.PWManTimeout), e:
+		pwman.clearScreen()
+		print "pwman session timeout after %d seconds of inactivity." % e.seconds
+		print "exiting..."
 		return 1
 	return 0
 
