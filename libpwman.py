@@ -38,6 +38,10 @@ class EscapeError(Exception): pass
 
 def escapeCmd(s):
 	# Commandline escape
+	if s is None:
+		return "\\-"
+	if not s:
+		return "\\~"
 	subst = {
 		'\t'	: '\\t',
 		'\n'	: '\\n',
@@ -56,6 +60,10 @@ def escapeCmd(s):
 
 def unescapeCmd(s):
 	# Commandline unescape
+	if s == '\\-':
+		return None
+	if s == '\\~':
+		return ""
 	slashSubst = {
 		't'	: '\t',
 		'n'	: '\n',
@@ -686,7 +694,8 @@ class PWMan(CryptSQL, Cmd):
 			(mTitle, mUser, mPw, mBulk) = (True,) * 4
 		entries = self.findEntries(pattern, inCategory=category,
 					   matchTitle=mTitle, matchUser=mUser,
-					   matchPw=mPw, matchBulk=mBulk)
+					   matchPw=mPw, matchBulk=mBulk,
+					   doGlobMatch=True)
 		if not entries:
 			self.__err("find", "'%s' not found" % pattern)
 		for entry in entries:
@@ -834,20 +843,22 @@ class PWMan(CryptSQL, Cmd):
 
 	def findEntries(self, pattern, leftAnchor=False, rightAnchor=False,
 			inCategory=None, matchTitle=False,
-			matchUser=False, matchPw=False, matchBulk=False):
+			matchUser=False, matchPw=False, matchBulk=False,
+			doGlobMatch=False):
 		if not leftAnchor:
 			pattern = "*" + pattern
 		if not rightAnchor:
 			pattern = pattern + "*"
 		conditions = []
+		operator = "GLOB" if doGlobMatch else "="
 		if matchTitle:
-			conditions.append( ("title GLOB ?", pattern) )
+			conditions.append( ("title %s ?" % operator, pattern) )
 		if matchUser:
-			conditions.append( ("user GLOB ?", pattern) )
+			conditions.append( ("user %s ?" % operator, pattern) )
 		if matchPw:
-			conditions.append( ("pw GLOB ?", pattern) )
+			conditions.append( ("pw %s ?" % operator, pattern) )
 		if matchBulk:
-			conditions.append( ("bulk GLOB ?", pattern) )
+			conditions.append( ("bulk %s ?" % operator, pattern) )
 		if not conditions:
 			return []
 		condStr = " OR ".join(map(lambda c: c[0], conditions))
