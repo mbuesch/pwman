@@ -88,6 +88,7 @@ def main():
 	except (pwman.PWManTimeout), e:
 		pwman.clearScreen()
 		print "pwman session timeout after %d seconds of inactivity." % e.seconds
+		p.flunkDirty()
 		print "exiting..."
 		return 1
 	return 0
