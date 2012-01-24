@@ -40,7 +40,7 @@ def usage():
 def main():
 	dbFile = None
 	commitClearsUndo = False
-	timeout = 120
+	timeout = 600
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
 			"hd:Ut:",
