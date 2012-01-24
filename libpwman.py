@@ -932,7 +932,7 @@ class PWMan(CryptSQL, Cmd):
 
 	def flunkDirty(self):
 		if self.isDirty():
-			print "Warning: Dropping uncommitted data"
+			print "WARNING: Dropping uncommitted data"
 			self.setDirty(False)
 
 	def commit(self):
