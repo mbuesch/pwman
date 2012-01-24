@@ -35,7 +35,7 @@ def usage():
 	print "                         If not given, %s is used." %\
 						pwman.getDefaultDatabase()
 	print " -U|--commit-clear-undo  The commit command clears undo queue."
-	print " -t|--timeout SECONDS    Sets the session timeout. Default is 120."
+	print " -t|--timeout SECONDS    Sets the session timeout. Default is 10 minutes."
 
 def main():
 	dbFile = None
