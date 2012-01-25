@@ -329,7 +329,7 @@ class PWMan(CryptSQL, Cmd):
 	)
 
 	cmdHelpShow = (
-		("list", ("ls",), "Print entry contents"),
+		("list", ("ls", "cat"), "List/print entry contents"),
 		("find", ("f",), "Search the database for patterns"),
 		("dbdump", (), "Dump the database"),
 	)
@@ -436,7 +436,7 @@ class PWMan(CryptSQL, Cmd):
 		If a category is given as parameter, list the 
 		contents of the category. If category and entry
 		are given, list the contents of the entry.\n
-		Aliases: ls"""
+		Aliases: ls cat"""
 		category = self.__getParam(params, 0)
 		title = self.__getParam(params, 1)
 		if not category and not title:
@@ -454,9 +454,11 @@ class PWMan(CryptSQL, Cmd):
 		else:
 			self.__err("list", "Invalid parameter")
 	do_ls = do_list
+	do_cat = do_list
 
 	complete_list = __complete_category_title
 	complete_ls = complete_list
+	complete_cat = complete_list
 
 	def do_new(self, params):
 		"""--- Create a new entry ---
