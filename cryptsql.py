@@ -118,10 +118,12 @@ class FileObjCollection(object):
 	def get(self, name):
 		return filter(lambda o: o.name == name, self.objects)
 
-	def getOne(self, name, errorMsg):
+	def getOne(self, name, errorMsg=None):
 		objs = self.get(name)
 		if len(objs) != 1:
-			raise CSQLError(errorMsg)
+			if errorMsg:
+				raise CSQLError(errorMsg)
+			return None
 		return objs[0]
 
 	@staticmethod
@@ -159,7 +161,6 @@ class CryptSQL(object):
 	def __reset(self):
 		self.db = None
 		self.filename = None
-		self.salt = None
 
 	def __parseFileData(self, rawdata, passphrase):
 		fc = FileObjCollection.parseRaw(rawdata)
@@ -168,6 +169,9 @@ class CryptSQL(object):
 			raise CSQLError("Invalid file header")
 		cipher = fc.getOne("CIPHER", "Invalid CYPHER object").getDataString()
 		cipherMode = fc.getOne("CIPHER_MODE", "Invalid CYPHER_MODE object").getDataString()
+		cipherIV = fc.getOne("CIPHER_IV")
+		if cipherIV:
+			cipherIV = cipherIV.getDataString()
 		keyLen = fc.getOne("KEY_LEN", "Invalid KEY_LEN object").getDataString()
 		kdfMethod = fc.getOne("KDF_METHOD", "Invalid KDF_METHOD object").getDataString()
 		kdfSalt = fc.getOne("KDF_SALT", "Invalid KDF_SALT object").getDataString()
@@ -178,13 +182,16 @@ class CryptSQL(object):
 		payload = fc.getOne("PAYLOAD", "Invalid PAYLOAD object").getDataString()
 		if cipher == "AES":
 			cipher = AES
-			cipherIV = b"\x00" * 16 #TODO
 		else:
 			raise CSQLError("Unknown cipher: %s" % cipher)
 		if cipherMode == "CBC":
 			cipherMode = AES.MODE_CBC
 		else:
 			raise CSQLError("Unknown cipher mode: %s" % cipherMode)
+		if not cipherIV:
+			cipherIV = b'\x00' * cipher.block_size
+		if len(cipherIV) != cipher.block_size:
+			raise CSQLError("Invalid IV len: %d" % len(cipherIV))
 		if keyLen == "256":
 			keyLen = 256 // 8
 		else:
@@ -216,7 +223,8 @@ class CryptSQL(object):
 			kdf = kdfMethod(passphrase, kdfSalt, kdfIter,
 					kdfHash, kdfMac)
 			key = kdf.read(keyLen)
-			cipher = cipher.new(key, cipherMode, cipherIV)
+			cipher = cipher.new(key, mode = cipherMode,
+					    IV = cipherIV)
 			payload = cipher.decrypt(payload)
 			payload = self.__unpadData(payload)
 			# Decompress payload
@@ -226,7 +234,6 @@ class CryptSQL(object):
 		except (CSQLError, zlib.error, sql.Error), e:
 			raise CSQLError("Failed to decrypt database. "
 				"Wrong passphrase?")
-		self.salt = kdfSalt
 
 	def isOpen(self):
 		return bool(self.db)
@@ -270,6 +277,10 @@ class CryptSQL(object):
 			raise CSQLError("unpadData: error")
 		return data[:-1]
 
+	@staticmethod
+	def __random(nrBytes):
+		return os.urandom(nrBytes)
+
 	def commit(self, passphrase):
 		if not self.db or not self.filename:
 			raise CSQLError("Database is not open")
@@ -279,13 +290,13 @@ class CryptSQL(object):
 		# Compress payload
 		payload = zlib.compress(payload, 9)
 		# Encrypt payload
-		if not self.salt:
-			self.salt = os.urandom(34)
+		kdfSalt = self.__random(34)
 		kdfIter = 1187
-		kdf = PBKDF2(passphrase, self.salt, kdfIter, SHA256, HMAC)
+		kdf = PBKDF2(passphrase, kdfSalt, kdfIter, SHA256, HMAC)
 		key = kdf.read(256 // 8)
-		cipherIV = b"\x00" * 16 #TODO
-		aes = AES.new(key, AES.MODE_CBC, cipherIV)
+		cipherIV = self.__random(16)
+		aes = AES.new(key, mode = AES.MODE_CBC,
+			      IV = cipherIV)
 		payload = aes.encrypt(self.__padData(payload, aes.block_size))
 		# Assemble file objects
 		fc = FileObjCollection(
@@ -293,9 +304,10 @@ class CryptSQL(object):
 				FileObj("HEAD", CSQL_HEADER),
 				FileObj("CIPHER", "AES"),
 				FileObj("CIPHER_MODE", "CBC"),
+				FileObj("CIPHER_IV", cipherIV),
 				FileObj("KEY_LEN", "256"),
 				FileObj("KDF_METHOD", "PBKDF2"),
-				FileObj("KDF_SALT", self.salt),
+				FileObj("KDF_SALT", kdfSalt),
 				FileObj("KDF_ITER", str(kdfIter)),
 				FileObj("KDF_HASH", "SHA256"),
 				FileObj("KDF_MAC", "HMAC"),
