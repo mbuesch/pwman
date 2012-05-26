@@ -178,6 +178,7 @@ class CryptSQL(object):
 		payload = fc.getOne("PAYLOAD", "Invalid PAYLOAD object").getDataString()
 		if cipher == "AES":
 			cipher = AES
+			cipherIV = b"\x00" * 16 #TODO
 		else:
 			raise CSQLError("Unknown cipher: %s" % cipher)
 		if cipherMode == "CBC":
@@ -215,7 +216,7 @@ class CryptSQL(object):
 			kdf = kdfMethod(passphrase, kdfSalt, kdfIter,
 					kdfHash, kdfMac)
 			key = kdf.read(keyLen)
-			cipher = cipher.new(key, cipherMode)
+			cipher = cipher.new(key, cipherMode, cipherIV)
 			payload = cipher.decrypt(payload)
 			payload = self.__unpadData(payload)
 			# Decompress payload
@@ -283,7 +284,8 @@ class CryptSQL(object):
 		kdfIter = 1187
 		kdf = PBKDF2(passphrase, self.salt, kdfIter, SHA256, HMAC)
 		key = kdf.read(256 // 8)
-		aes = AES.new(key, AES.MODE_CBC)
+		cipherIV = b"\x00" * 16 #TODO
+		aes = AES.new(key, AES.MODE_CBC, cipherIV)
 		payload = aes.encrypt(self.__padData(payload, aes.block_size))
 		# Assemble file objects
 		fc = FileObjCollection(
