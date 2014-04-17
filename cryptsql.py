@@ -291,7 +291,7 @@ class CryptSQL(object):
 		# Dump the database
 		payload = self.sqlPlainDump()
 		# Compress payload
-		payload = zlib.compress(payload, 9)
+		payload = zlib.compress(payload, 1)
 		# Encrypt payload
 		kdfSalt = self.__random(34)
 		kdfIter = 40003
