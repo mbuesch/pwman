@@ -9,7 +9,7 @@ setup(
 	description	= "Lightweight password manager",
 	author		= "Michael Buesch",
 	author_email	= "m@bues.ch",
-	url		= "git://git.bu3sch.de/pwman.git",
+	url		= "git://git.bues.ch/pwman.git",
 	py_modules	= [ "libpwman", "cryptsql", ],
-	scripts		= [ "pwman", "pwman-import-pwmanager", ]
+	scripts		= [ "pwman", ]
 )
