@@ -1,6 +1,6 @@
 """
 # Simple password manager
-# Copyright (c) 2011 Michael Buesch <m@bues.ch>
+# Copyright (c) 2011-2014 Michael Buesch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
