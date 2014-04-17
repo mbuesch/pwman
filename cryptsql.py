@@ -272,10 +272,10 @@ class CryptSQL(object):
 
 	@staticmethod
 	def __unpadData(data):
-		data = data.rstrip("\x00")
-		if len(data) < 1 or data[-1] != "\xFF":
+		index = data.rfind("\xFF")
+		if index < 0 or index >= len(data):
 			raise CSQLError("unpadData: error")
-		return data[:-1]
+		return data[:index]
 
 	@staticmethod
 	def __random(nrBytes):
