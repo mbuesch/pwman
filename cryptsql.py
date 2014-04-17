@@ -17,6 +17,7 @@ def missingMod(name, debpack):
 
 try:
 	import Crypto.Hash.SHA256 as SHA256
+	import Crypto.Hash.SHA512 as SHA512
 	import Crypto.Hash.HMAC as HMAC
 	import Crypto.Cipher.AES as AES
 except (ImportError), e:
@@ -208,6 +209,8 @@ class CryptSQL(object):
 			raise CSQLError("Unknown kdf-iter: %s" % kdfIter)
 		if kdfHash == "SHA256":
 			kdfHash = SHA256
+		elif kdfHash == "SHA512":
+			kdfHash = SHA512
 		else:
 			raise CSQLError("Unknown kdf-hash: %s" % kdfHash)
 		if kdfMac == "HMAC":
@@ -292,7 +295,7 @@ class CryptSQL(object):
 		# Encrypt payload
 		kdfSalt = self.__random(34)
 		kdfIter = 4003
-		kdf = PBKDF2(passphrase, kdfSalt, kdfIter, SHA256, HMAC)
+		kdf = PBKDF2(passphrase, kdfSalt, kdfIter, SHA512, HMAC)
 		key = kdf.read(256 // 8)
 		cipherIV = self.__random(16)
 		aes = AES.new(key, mode = AES.MODE_CBC,
@@ -309,7 +312,7 @@ class CryptSQL(object):
 				FileObj("KDF_METHOD", "PBKDF2"),
 				FileObj("KDF_SALT", kdfSalt),
 				FileObj("KDF_ITER", str(kdfIter)),
-				FileObj("KDF_HASH", "SHA256"),
+				FileObj("KDF_HASH", "SHA512"),
 				FileObj("KDF_MAC", "HMAC"),
 				FileObj("COMPRESS", "ZLIB"),
 				FileObj("PAYLOAD", payload),
