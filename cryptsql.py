@@ -20,6 +20,7 @@ try:
 	import Crypto.Hash.SHA512 as SHA512
 	import Crypto.Hash.HMAC as HMAC
 	from Crypto.Protocol.KDF import PBKDF2
+	import Crypto.Random
 	import Crypto.Cipher.AES as AES
 except (ImportError), e:
 	missingMod("Crypto", "python-crypto")
@@ -157,6 +158,7 @@ class CryptSQL(object):
 		self.__reset()
 
 	def __reset(self):
+		self.__rng = Crypto.Random.new()
 		self.db = None
 		self.filename = None
 
@@ -277,9 +279,8 @@ class CryptSQL(object):
 			raise CSQLError("unpadData: error")
 		return data[:index]
 
-	@staticmethod
-	def __random(nrBytes):
-		return os.urandom(nrBytes)
+	def __random(self, nrBytes):
+		return self.__rng.read(nrBytes)
 
 	def commit(self, passphrase):
 		if not self.db or not self.filename:
