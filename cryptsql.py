@@ -294,7 +294,7 @@ class CryptSQL(object):
 		payload = zlib.compress(payload, 9)
 		# Encrypt payload
 		kdfSalt = self.__random(34)
-		kdfIter = 4003
+		kdfIter = 40003
 		kdf = PBKDF2(passphrase, kdfSalt, kdfIter, SHA512, HMAC)
 		key = kdf.read(256 // 8)
 		cipherIV = self.__random(16)
