@@ -19,13 +19,10 @@ try:
 	import Crypto.Hash.SHA256 as SHA256
 	import Crypto.Hash.SHA512 as SHA512
 	import Crypto.Hash.HMAC as HMAC
+	from Crypto.Protocol.KDF import PBKDF2
 	import Crypto.Cipher.AES as AES
 except (ImportError), e:
 	missingMod("Crypto", "python-crypto")
-try:
-	from beaker.crypto.pbkdf2 import PBKDF2
-except (ImportError), e:
-	missingMod("beaker", "python-beaker")
 try:
 	import sqlite3 as sql
 except (ImportError), e:
@@ -223,9 +220,9 @@ class CryptSQL(object):
 			raise CSQLError("Unknown compression: %s" % compress)
 		try:
 			# Decrypt payload
-			kdf = kdfMethod(passphrase, kdfSalt, kdfIter,
-					kdfHash, kdfMac)
-			key = kdf.read(keyLen)
+			prf = lambda p, s: kdfMac.new(p, s, kdfHash).digest()
+			key = kdfMethod(passphrase, kdfSalt, keyLen,
+					kdfIter, prf)
 			cipher = cipher.new(key, mode = cipherMode,
 					    IV = cipherIV)
 			payload = cipher.decrypt(payload)
@@ -295,8 +292,9 @@ class CryptSQL(object):
 		# Encrypt payload
 		kdfSalt = self.__random(34)
 		kdfIter = 40003
-		kdf = PBKDF2(passphrase, kdfSalt, kdfIter, SHA512, HMAC)
-		key = kdf.read(256 // 8)
+		prf = lambda p, s: HMAC.new(p, s, SHA512).digest()
+		key = PBKDF2(passphrase, kdfSalt, 256 // 8,
+			     kdfIter, prf)
 		cipherIV = self.__random(16)
 		aes = AES.new(key, mode = AES.MODE_CBC,
 			      IV = cipherIV)
