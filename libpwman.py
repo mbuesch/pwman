@@ -16,7 +16,7 @@ import curses
 from cmd import Cmd
 from cryptsql import *
 
-VERSION = 0
+VERSION = 1
 
 
 def getDefaultDatabase():
