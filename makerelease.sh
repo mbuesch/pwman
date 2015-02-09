@@ -1,59 +1,23 @@
-#!/bin/bash
-set -e
+#!/bin/sh
 
-project="pwman"
+srcdir="$(dirname "$0")"
+[ "$(echo "$srcdir" | cut -c1)" = '/' ] || srcdir="$PWD/$srcdir"
 
-basedir="$(dirname "$0")"
-[ "${basedir:0:1}" = "/" ] || basedir="$PWD/$basedir"
+die() { echo "$*"; exit 1; }
 
-origin="$basedir"
+# Import the makerelease.lib
+# http://bues.ch/gitweb?p=misc.git;a=blob_plain;f=makerelease.lib;hb=HEAD
+for path in $(echo "$PATH" | tr ':' ' '); do
+	[ -f "$MAKERELEASE_LIB" ] && break
+	MAKERELEASE_LIB="$path/makerelease.lib"
+done
+[ -f "$MAKERELEASE_LIB" ] && . "$MAKERELEASE_LIB" || die "makerelease.lib not found."
 
-do_git_tag=1
-[ "$1" = "--notag" ] && do_git_tag=0
+hook_get_version()
+{
+	version="$(cat libpwman.py | grep -e VERSION | head -n1 | cut -d'=' -f2 | tr -d ' ')"
+}
 
-version="$(cat libpwman.py | grep -e VERSION | head -n1 | cut -d'=' -f2 | tr -d ' ')"
-if [ -z "$version" ]; then
-	echo "Could not determine version!"
-	exit 1
-fi
-release_name="$project-$version"
-tarball="$release_name.tar.bz2"
-tagname="release-$version"
-tagmsg="$project-$version release"
-
-export GIT_DIR="$origin/.git"
-
-cd /tmp/
-rm -Rf "$release_name" "$tarball"
-echo "Creating target directory"
-mkdir "$release_name"
-cd "$release_name"
-echo "git checkout"
-git checkout -f
-
-rm .gitignore makerelease.sh
-
-echo "creating tarball"
-cd ..
-tar cjf "$tarball" "$release_name"
-mv "$tarball" "$origin"
-
-echo "running testbuild"
-cd "$release_name"
-./setup.py build
-./pwman --help >/dev/null
-./pwman-import-pwmanager --help >/dev/null
-
-echo "removing testbuild"
-cd ..
-rm -R "$release_name"
-
-
-if [ "$do_git_tag" -ne 0 ]; then
-	echo "Tagging GIT"
-	cd "$origin"
-	git tag -m "$tagmsg" -a "$tagname"
-fi
-
-echo
-echo "built release $version"
+project=pwman
+default_archives=py-sdist
+makerelease "$@"
