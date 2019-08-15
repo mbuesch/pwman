@@ -22,6 +22,7 @@ try:
 	import Crypto.Hash.HMAC as HMAC
 	from Crypto.Protocol.KDF import PBKDF2
 	import Crypto.Random
+	import Crypto.Random.random
 	import Crypto.Cipher.AES as AES
 except (ImportError) as e:
 	missingMod("Crypto", "python3-crypto")
@@ -300,7 +301,20 @@ class CryptSQL(object):
 		return data[:index]
 
 	def __random(self, nrBytes):
-		return self.__rng.read(nrBytes)
+		if nrBytes <= 0:
+			raise CSQLError("__random(): Invalid number of random bytes.")
+		data = self.__rng.read(nrBytes)
+		if len(data) != nrBytes:
+			raise CSQLError("__random(): Sanity check failed.")
+		return data
+
+	def __randomInt(self, minVal, maxVal):
+		if minVal >= maxVal:
+			raise CSQLError("__randomInt(): Invalid range.")
+		val = Crypto.Random.random.randint(minVal, maxVal)
+		if not (minVal <= val <= maxVal):
+			raise CSQLError("__randomInt(): Sanity check failed.")
+		return val
 
 	def commit(self, passphrase):
 		assert isinstance(passphrase, str),\
@@ -316,7 +330,7 @@ class CryptSQL(object):
 		payload = self.sqlPlainDump()
 		# Encrypt payload
 		kdfSalt = self.__random(34)
-		kdfIter = 40003
+		kdfIter = self.__randomInt(140000, 150000)
 		prf = lambda p, s: HMAC.new(p, s, SHA512).digest()
 		key = PBKDF2(password=passphrase,
 			     salt=kdfSalt,
