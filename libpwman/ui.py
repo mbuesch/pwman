@@ -5,7 +5,6 @@
 # Licensed under the GNU/GPL version 2 or later.
 """
 
-from libpwman.cryptsql import *
 from libpwman.database import *
 from libpwman.exception import *
 from libpwman.util import *
@@ -144,50 +143,20 @@ class UndoStack(object):
 		self.frozen -= 1
 		assert(self.frozen >= 0)
 
-class PWMan(CryptSQL, Cmd):
+class PWMan(Cmd):
 	class CommandError(Exception): pass
 	class Quit(Exception): pass
 
-	DB_TYPE		= "PWMan database"
-	DB_VER		= "0"
-
 	def __init__(self, filename, passphrase,
 		     commitClearsUndo=False, timeout=-1):
-		try:
-			CryptSQL.__init__(self)
+		Cmd.__init__(self)
 
-			Cmd.__init__(self)
-			self.prompt = "pwman$ "
+		self.__db = PWManDatabase(filename, passphrase)
+		self.prompt = "pwman$ "
 
-			self.timeout = PWManTimeout(timeout)
-			self.commitClearsUndo = commitClearsUndo
-			self.undo = UndoStack()
-			self.__openFile(filename, passphrase)
-		except (CSQLError) as e:
-			raise PWManError(str(e))
-
-	def __openFile(self, filename, passphrase):
-		self.open(filename, passphrase)
-		self.passphrase = passphrase
-		self.dirty = False
-		initialize = False
-		if self.sqlIsEmpty():
-			initialize = True
-		else:
-			dbType = self.__getInfoField("db_type")
-			dbVer = self.__getInfoField("db_version")
-			if dbType != self.DB_TYPE or\
-			   dbVer != self.DB_VER:
-				raise PWManError("Unsupported database version '%s/%s'. "
-					"Expected '%s/%s'" %\
-					(str(dbType), str(dbVer), self.DB_TYPE, self.DB_VER))
-		self.sqlExec("CREATE TABLE IF NOT EXISTS "
-			"info(name TEXT, data TEXT);")
-		self.sqlExec("CREATE TABLE IF NOT EXISTS "
-			"pw(category TEXT, title TEXT, user TEXT, pw TEXT, bulk TEXT);")
-		if initialize:
-			self.__setInfoField("db_type", self.DB_TYPE)
-			self.__setInfoField("db_version", self.DB_VER)
+		self.timeout = PWManTimeout(timeout)
+		self.commitClearsUndo = commitClearsUndo
+		self.undo = UndoStack()
 
 	def __err(self, source, message):
 		source = " " + source + ":" if source else ""
@@ -294,7 +263,7 @@ class PWMan(CryptSQL, Cmd):
 		Use the exclamation mark to force quit and discard changes.\n
 		Aliases: q exit ^D"""
 		if params == "!":
-			self.flunkDirty()
+			self.__db.flunkDirty()
 		raise self.Quit()
 	do_q = do_quit
 	do_exit = do_quit
@@ -314,7 +283,7 @@ class PWMan(CryptSQL, Cmd):
 		"""--- Write changes to the database file ---\n
 		Command: commit\n
 		Aliases: c w"""
-		self.commit()
+		self.__db.commit()
 		if self.commitClearsUndo:
 			self.undo.clear()
 	do_c = do_commit
@@ -325,7 +294,7 @@ class PWMan(CryptSQL, Cmd):
 		Command: masterp\n
 		Aliases: None"""
 		p = readPassphrase("Current master passphrase")
-		if p != self.passphrase:
+		if p != self.__db.getPassphrase():
 			stdout("Passphrase mismatch! ")
 			for i in range(3):
 				stdout(".")
@@ -336,9 +305,8 @@ class PWMan(CryptSQL, Cmd):
 		if p is None:
 			print("Passphrase not changed.")
 			return
-		if p != self.passphrase:
-			self.passphrase = p
-			self.setDirty()
+		if p != self.__db.getPassphrase():
+			self.__db.setPassphrase(p)
 			self.undo.clear()
 
 	def do_list(self, params):
@@ -352,12 +320,12 @@ class PWMan(CryptSQL, Cmd):
 		title = self.__getParam(params, 1)
 		if not category and not title:
 			stdout("Categories:\n\t")
-			stdout("\n\t".join(self.getCategoryNames()) + "\n")
+			stdout("\n\t".join(self.__db.getCategoryNames()) + "\n")
 		elif category and not title:
 			stdout("Entries in category '%s':\n\t" % category)
-			stdout("\n\t".join(self.getEntryTitles(category)) + "\n")
+			stdout("\n\t".join(self.__db.getEntryTitles(category)) + "\n")
 		elif category and title:
-			entry = self.getEntry(PWManEntry(category, title))
+			entry = self.__db.getEntry(PWManEntry(category, title))
 			if entry:
 				stdout(entry.dump())
 			else:
@@ -395,7 +363,7 @@ class PWMan(CryptSQL, Cmd):
 				"Need to supply category and title.")
 		entry = PWManEntry(category, title, user, pw, bulk)
 		try:
-			self.addEntry(entry)
+			self.__db.addEntry(entry)
 		except (PWManError) as e:
 			self.__err("new", str(e))
 		self.undo.do("new %s" % params,
@@ -414,12 +382,12 @@ class PWMan(CryptSQL, Cmd):
 		if not category or not title:
 			self.__err(commandName, "Invalid parameters. "
 				"Need to supply category and title.")
-		oldEntry = self.getEntry(PWManEntry(category, title))
+		oldEntry = self.__db.getEntry(PWManEntry(category, title))
 		if not oldEntry:
 			self.__err(commandName, "Entry does not exist")
 		newData = self.__skipParams(params, 2).strip()
 		try:
-			self.editEntry(data2entry(category, title, newData))
+			self.__db.editEntry(data2entry(category, title, newData))
 		except (PWManError) as e:
 			self.__err(commandName, str(e))
 		self.undo.do("%s %s" % (commandName, params),
@@ -454,8 +422,8 @@ class PWMan(CryptSQL, Cmd):
 							       text)
 		elif paramIdx == 2:
 			# User data
-			entry = self.getEntry(PWManEntry(self.__getParam(line, 0, True),
-							 self.__getParam(line, 1, True)))
+			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, True),
+							      self.__getParam(line, 1, True)))
 			return [ escapeCmd(entry.user) ]
 		return []
 	complete_eu = complete_edit_user
@@ -486,8 +454,8 @@ class PWMan(CryptSQL, Cmd):
 							       text)
 		elif paramIdx == 2:
 			# Password data
-			entry = self.getEntry(PWManEntry(self.__getParam(line, 0, True),
-							 self.__getParam(line, 1, True)))
+			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, True),
+							      self.__getParam(line, 1, True)))
 			return [ escapeCmd(entry.pw) ]
 		return []
 	complete_ep = complete_edit_pw
@@ -518,8 +486,8 @@ class PWMan(CryptSQL, Cmd):
 							       text)
 		elif paramIdx == 2:
 			# Bulk data
-			entry = self.getEntry(PWManEntry(self.__getParam(line, 0, True),
-							 self.__getParam(line, 1, True)))
+			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, True),
+							      self.__getParam(line, 1, True)))
 			return [ escapeCmd(entry.bulk) ]
 		return []
 	complete_eb = complete_edit_bulk
@@ -534,11 +502,11 @@ class PWMan(CryptSQL, Cmd):
 		if not category or not title:
 			self.__err("remove", "Invalid parameters. "
 				"Need to supply category and title.")
-		oldEntry = self.getEntry(PWManEntry(category, title))
+		oldEntry = self.__db.getEntry(PWManEntry(category, title))
 		if not oldEntry:
 			self.__err("remove", "Entry does not exist")
 		try:
-			self.delEntry(PWManEntry(category, title))
+			self.__db.delEntry(PWManEntry(category, title))
 		except (PWManError) as e:
 			self.__err("remove", str(e))
 		self.undo.do("remove %s" % params,
@@ -562,13 +530,12 @@ class PWMan(CryptSQL, Cmd):
 		unencrypted to stdout.\n
 		Aliases: None"""
 		try:
-			dump = self.sqlPlainDump() + b"\n"
+			dump = self.__db.sqlPlainDump() + b"\n"
 			if params:
 				with open(params, "wb") as f:
 					f.write(dump)
 			else:
-				sys.stdout.buffer.write(dump)
-				sys.stdout.buffer.flush()
+				stdout(dump)
 		except (IOError) as e:
 			self.__err("dbdump", "Failed to write dump: %s" % e.strerror)
 
@@ -606,10 +573,10 @@ class PWMan(CryptSQL, Cmd):
 		pattern = p[1] if len(p) > 1 else p[0]
 		if not any( (mTitle, mUser, mPw, mBulk) ):
 			(mTitle, mUser, mPw, mBulk) = (True,) * 4
-		entries = self.findEntries(pattern, inCategory=category,
-					   matchTitle=mTitle, matchUser=mUser,
-					   matchPw=mPw, matchBulk=mBulk,
-					   doGlobMatch=True)
+		entries = self.__db.findEntries(pattern, inCategory=category,
+						matchTitle=mTitle, matchUser=mUser,
+						matchPw=mPw, matchBulk=mBulk,
+						doGlobMatch=True)
 		if not entries:
 			self.__err("find", "'%s' not found" % pattern)
 		for entry in entries:
@@ -722,136 +689,16 @@ class PWMan(CryptSQL, Cmd):
 			p = unescapeCmd(p)
 		return p
 
-	def getCategoryNames(self):
-		categories = self.sqlExec("SELECT category FROM pw;").fetchAll()
-		if not categories:
-			return []
-		return uniq([c[0] for c in categories])
-
 	def __getCategoryCompletions(self, text):
-		catNames = [n for n in self.getCategoryNames() if n.lower().startswith(text.lower())]
+		catNames = [n for n in self.__db.getCategoryNames() if n.lower().startswith(text.lower())]
 		return [escapeCmd(n) + " " for n in catNames]
 
-	def getEntryTitles(self, category):
-		sql = "SELECT title FROM pw WHERE category=?;"
-		titles = self.sqlExec(sql, (category,)).fetchAll()
-		if not titles:
-			return []
-		titles = [t[0] for t in titles]
-		titles.sort()
-		return titles
-
 	def __getEntryTitleCompletions(self, category, text):
-		titles = [t for t in self.getEntryTitles(category) if t.lower().startswith(text.lower())]
+		titles = [t for t in self.__db.getEntryTitles(category) if t.lower().startswith(text.lower())]
 		return [escapeCmd(t) + " " for t in titles]
 
-	def getEntry(self, entry):
-		sql = "SELECT category, title, user, pw, bulk FROM pw "\
-			"WHERE category=? AND title=?;"
-		data = self.sqlExec(sql, (entry.category, entry.title)).fetchOne()
-		if not data:
-			return None
-		return PWManEntry(data[0], data[1], data[2], data[3], data[4])
-
-	def findEntries(self, pattern, leftAnchor=False, rightAnchor=False,
-			inCategory=None, matchTitle=False,
-			matchUser=False, matchPw=False, matchBulk=False,
-			doGlobMatch=False):
-		if not leftAnchor:
-			pattern = "*" + pattern
-		if not rightAnchor:
-			pattern = pattern + "*"
-		conditions = []
-		operator = "GLOB" if doGlobMatch else "="
-		if matchTitle:
-			conditions.append( ("title %s ?" % operator, pattern) )
-		if matchUser:
-			conditions.append( ("user %s ?" % operator, pattern) )
-		if matchPw:
-			conditions.append( ("pw %s ?" % operator, pattern) )
-		if matchBulk:
-			conditions.append( ("bulk %s ?" % operator, pattern) )
-		if not conditions:
-			return []
-		condStr = " OR ".join([c[0] for c in conditions])
-		params = [c[1] for c in conditions]
-		sql = "SELECT category, title, user, pw, bulk FROM pw"
-		if inCategory:
-			sql += " WHERE category = ? AND ( " + condStr + " );"
-			params.insert(0, inCategory)
-		else:
-			sql += " WHERE " + condStr + ";"
-		dataSet = self.sqlExec(sql, params).fetchAll()
-		if not dataSet:
-			return []
-		return [PWManEntry(data[0], data[1], data[2], data[3], data[4]) for data in dataSet]
-
-	def __delEntry(self, entry):
-		self.sqlExec("DELETE FROM pw WHERE category=? AND title=?;",
-			     (entry.category, entry.title))
-
-	def __editEntry(self, oldEntry, newEntry):
-		if oldEntry:
-			assert(oldEntry.category == newEntry.category)
-			assert(oldEntry.title == newEntry.title)
-			newEntry.copyUndefined(oldEntry)
-			self.__delEntry(oldEntry)
-		self.sqlExec("INSERT INTO pw(category, title, user, pw, bulk) "
-			     "VALUES(?,?,?,?,?);",
-			     (newEntry.category, newEntry.title, newEntry.user,
-			      newEntry.pw, newEntry.bulk))
-
-	def entryExists(self, entry):
-		return bool(self.getEntry(entry))
-
-	def addEntry(self, entry):
-		if self.entryExists(entry):
-			raise PWManError("Entry does already exist")
-		self.__editEntry(None, entry)
-		self.setDirty()
-
-	def editEntry(self, entry):
-		oldEntry = self.getEntry(entry)
-		if not oldEntry:
-			raise PWManError("Entry does not exist")
-		self.__editEntry(oldEntry, entry)
-		self.setDirty()
-
-	def delEntry(self, entry):
-		if not self.entryExists(entry):
-			raise PWManError("Entry does not exist")
-		self.__delEntry(entry)
-		self.setDirty()
-
-	def __getInfoField(self, name):
-		try:
-			d = self.sqlExec("SELECT data FROM info WHERE name=?;", (name,)).fetchOne()
-			return d[0] if d else None
-		except (sql.OperationalError) as e:
-			return None
-
-	def __setInfoField(self, name, data):
-		self.sqlExec("DELETE FROM info WHERE name=?;", (name,))
-		self.sqlExec("INSERT INTO info(name, data) VALUES(?,?);",
-			     (name, data))
-
-	def setDirty(self, d=True):
-		self.dirty = d
-
-	def isDirty(self):
-		return self.dirty
-
-	def flunkDirty(self):
-		if self.isDirty():
-			print("WARNING: Dropping uncommitted data")
-			self.setDirty(False)
-
-	def commit(self):
-		CryptSQL.commit(self, self.passphrase)
-		self.setDirty(False)
-
 	def __mayQuit(self):
-		if self.isDirty():
+		if self.__db.isDirty():
 			print("Warning: Uncommitted changes. " \
 				"Operation not performed. Use command 'commit' " \
 				"to write the changes to the database. Use " \

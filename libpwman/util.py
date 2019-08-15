@@ -16,6 +16,7 @@ __all__ = [
 	"uniq",
 	"stdout",
 	"clearScreen",
+	"readPassphrase",
 ]
 
 def fileExists(path):
@@ -34,9 +35,13 @@ def uniq(l, sort=True):
 	return l
 
 def stdout(text, flush=True):
-	sys.stdout.write(text)
+	if isinstance(text, str):
+		stream = sys.stdout
+	else:
+		stream = sys.stdout.buffer
+	stream.write(text)
 	if flush:
-		sys.stdout.flush()
+		stream.flush()
 
 def clearScreen():
 	try:
