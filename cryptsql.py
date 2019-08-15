@@ -106,7 +106,7 @@ class FileObj(object):
 		return (FileObj(name, data), off)
 
 class FileObjCollection(object):
-	def __init__(self, objects):
+	def __init__(self, *objects):
 		self.objects = objects
 
 	def getRaw(self):
@@ -136,7 +136,7 @@ class FileObjCollection(object):
 			(obj, objLen) = FileObj.parseRaw(raw[offset:])
 			objects.append(obj)
 			offset += objLen
-		return FileObjCollection(objects)
+		return FileObjCollection(*objects)
 
 class CryptSQLCursor(object):
 	def __init__(self, c):
@@ -305,20 +305,18 @@ class CryptSQL(object):
 		payload = aes.encrypt(self.__padData(payload, aes.block_size))
 		# Assemble file objects
 		fc = FileObjCollection(
-			(
-				FileObj(b"HEAD", CSQL_HEADER),
-				FileObj(b"CIPHER", b"AES"),
-				FileObj(b"CIPHER_MODE", b"CBC"),
-				FileObj(b"CIPHER_IV", cipherIV),
-				FileObj(b"KEY_LEN", b"256"),
-				FileObj(b"KDF_METHOD", b"PBKDF2"),
-				FileObj(b"KDF_SALT", kdfSalt),
-				FileObj(b"KDF_ITER", str(kdfIter).encode("UTF-8")),
-				FileObj(b"KDF_HASH", b"SHA512"),
-				FileObj(b"KDF_MAC", b"HMAC"),
-				FileObj(b"COMPRESS", b"ZLIB"),
-				FileObj(b"PAYLOAD", payload),
-			)
+			FileObj(b"HEAD", CSQL_HEADER),
+			FileObj(b"CIPHER", b"AES"),
+			FileObj(b"CIPHER_MODE", b"CBC"),
+			FileObj(b"CIPHER_IV", cipherIV),
+			FileObj(b"KEY_LEN", b"256"),
+			FileObj(b"KDF_METHOD", b"PBKDF2"),
+			FileObj(b"KDF_SALT", kdfSalt),
+			FileObj(b"KDF_ITER", str(kdfIter).encode("UTF-8")),
+			FileObj(b"KDF_HASH", b"SHA512"),
+			FileObj(b"KDF_MAC", b"HMAC"),
+			FileObj(b"COMPRESS", b"ZLIB"),
+			FileObj(b"PAYLOAD", payload),
 		)
 		# Write to the file
 		rawdata = fc.getRaw()
