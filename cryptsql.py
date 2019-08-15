@@ -31,6 +31,12 @@ except (ImportError) as e:
 	missingMod("sqlite3")
 
 
+__all__ = [
+	"CSQLError",
+	"CryptSQL",
+]
+
+
 CSQL_HEADER = b"CryptSQL v1"
 
 

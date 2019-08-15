@@ -20,6 +20,14 @@ import curses
 from cmd import Cmd
 from cryptsql import *
 
+__all__ = [
+	"VERSION",
+	"PWMan",
+	"PWManTimeout",
+	"getDefaultDatabase",
+	"readPassphrase",
+]
+
 VERSION = 1
 
 def getDefaultDatabase():
