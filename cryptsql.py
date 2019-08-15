@@ -304,9 +304,10 @@ class CryptSQL(object):
 		prf = lambda p, s: HMAC.new(p, s, SHA512).digest()
 		key = PBKDF2(passphrase, kdfSalt, 256 // 8,
 			     kdfIter, prf)
-		cipherIV = self.__random(16)
-		aes = AES.new(key, mode = AES.MODE_CBC,
-			      IV = cipherIV)
+		cipherIV = self.__random(AES.block_size)
+		aes = AES.new(key,
+			      mode=AES.MODE_CBC,
+			      IV=cipherIV)
 		payload = aes.encrypt(self.__padData(payload, aes.block_size))
 		# Assemble file objects
 		fc = FileObjCollection(
