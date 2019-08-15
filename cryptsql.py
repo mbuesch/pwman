@@ -324,7 +324,7 @@ class CryptSQL(object):
 		# Encrypt payload
 		kdfHash = "SHA512"
 		kdfSalt = self.__random(34)
-		kdfIter = self.__randomInt(140000, 150000)
+		kdfIter = self.__randomInt(1000000, 1010000)
 		keyLen = 256 // 8
 		key = hashlib.pbkdf2_hmac(hash_name=kdfHash,
 					  password=passphrase,
