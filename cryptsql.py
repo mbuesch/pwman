@@ -171,6 +171,13 @@ class CryptSQL(object):
 		self.filename = None
 
 	def __parseFileData(self, rawdata, passphrase):
+		assert isinstance(passphrase, str),\
+		       "CryptSQL: Passphrase is not 'str'."
+		try:
+			passphrase = passphrase.encode("UTF-8")
+		except UnicodeError as e:
+			raise CSQLError("Cannot UTF-8-encode passphrase.")
+
 		fc = FileObjCollection.parseRaw(rawdata)
 		head = fc.getOne(b"HEAD", "Invalid file header object")
 		if head.getData() != CSQL_HEADER:
@@ -233,8 +240,11 @@ class CryptSQL(object):
 		try:
 			# Decrypt payload
 			prf = lambda p, s: kdfMac.new(p, s, kdfHash).digest()
-			key = kdfMethod(passphrase, kdfSalt, keyLen,
-					kdfIter, prf)
+			key = kdfMethod(password=passphrase,
+					salt=kdfSalt,
+					dkLen=keyLen,
+					count=kdfIter,
+					prf=prf)
 			cipher = cipher.new(key, mode = cipherMode,
 					    IV = cipherIV)
 			payload = cipher.decrypt(payload)
@@ -293,6 +303,12 @@ class CryptSQL(object):
 		return self.__rng.read(nrBytes)
 
 	def commit(self, passphrase):
+		assert isinstance(passphrase, str),\
+		       "CryptSQL: Passphrase is not 'str'."
+		try:
+			passphrase = passphrase.encode("UTF-8")
+		except UnicodeError as e:
+			raise CSQLError("Cannot UTF-8-encode passphrase.")
 		if not self.db or not self.filename:
 			raise CSQLError("Database is not open")
 		self.db.commit()
@@ -302,8 +318,11 @@ class CryptSQL(object):
 		kdfSalt = self.__random(34)
 		kdfIter = 40003
 		prf = lambda p, s: HMAC.new(p, s, SHA512).digest()
-		key = PBKDF2(passphrase, kdfSalt, 256 // 8,
-			     kdfIter, prf)
+		key = PBKDF2(password=passphrase,
+			     salt=kdfSalt,
+			     dkLen=(256 // 8),
+			     count=kdfIter,
+			     prf=prf)
 		cipherIV = self.__random(AES.block_size)
 		aes = AES.new(key,
 			      mode=AES.MODE_CBC,
