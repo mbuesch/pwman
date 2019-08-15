@@ -196,11 +196,11 @@ class CryptSQL(object):
 		if cipher == b"AES":
 			cipher = AES
 		else:
-			raise CSQLError("Unknown cipher: %s" % cipher)
+			raise CSQLError("Unknown cipher: %s" % cipher.decode("UTF-8", "ignore"))
 		if cipherMode == b"CBC":
 			cipherMode = AES.MODE_CBC
 		else:
-			raise CSQLError("Unknown cipher mode: %s" % cipherMode)
+			raise CSQLError("Unknown cipher mode: %s" % cipherMode.decode("UTF-8", "ignore"))
 		if not cipherIV:
 			cipherIV = b'\x00' * cipher.block_size
 		if len(cipherIV) != cipher.block_size:
@@ -208,17 +208,17 @@ class CryptSQL(object):
 		if keyLen == b"256":
 			keyLen = 256 // 8
 		else:
-			raise CSQLError("Unknown key len: %s" % keyLen)
+			raise CSQLError("Unknown key len: %s" % keyLen.decode("UTF-8", "ignore"))
 		if kdfHash in (b"SHA256", b"SHA512"):
 			kdfHash = kdfHash.decode("UTF-8")
 		else:
-			raise CSQLError("Unknown kdf-hash: %s" % kdfHash)
+			raise CSQLError("Unknown kdf-hash: %s" % kdfHash.decode("UTF-8", "ignore"))
 		if len(kdfSalt) < 32:
 			raise CSQLError("Invalid salt len: %d" % len(kdfSalt))
 		try:
 			kdfIter = int(kdfIter.decode("UTF-8"), 10)
 		except (ValueError, UnicodeError) as e:
-			raise CSQLError("Unknown kdf-iter: %s" % kdfIter)
+			raise CSQLError("Unknown kdf-iter: %s" % kdfIter.decode("UTF-8", "ignore"))
 		if kdfMethod == b"PBKDF2":
 			if kdfMac != b"HMAC":
 				raise CSQLError("Unknown kdf-mac: %s" % kdfMac)
