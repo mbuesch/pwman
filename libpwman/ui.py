@@ -5,47 +5,26 @@
 # Licensed under the GNU/GPL version 2 or later.
 """
 
-import sys
-if sys.version_info.major <= 2:
-	raise Exception("Python 2 is not supported.")
+from libpwman.cryptsql import *
+from libpwman.database import *
+from libpwman.exception import *
+from libpwman.util import *
 
-import os
-import errno
-import getpass
+import sys
 import time
 import re
 import readline
 import signal
-import curses
 from cmd import Cmd
-from cryptsql import *
 
 __all__ = [
-	"VERSION",
 	"PWMan",
 	"PWManTimeout",
-	"getDefaultDatabase",
-	"readPassphrase",
 ]
 
-VERSION = 1
 
-def getDefaultDatabase():
-	db = os.getenv("PWMAN_DATABASE")
-	if db:
-		return db
-	home = os.getenv("HOME")
-	if home:
-		return home + "/.pwman.db"
-	return None
-
-def uniq(l, sort=True):
-	l = list(set(l))
-	if sort:
-		l.sort()
-	return l
-
-class EscapeError(Exception): pass
+class EscapeError(Exception):
+	pass
 
 def escapeCmd(s):
 	# Commandline escape
@@ -101,49 +80,6 @@ def unescapeCmd(s):
 			ret.append(s[i])
 		i += 1
 	return "".join(ret)
-
-def stdout(text, flush=True):
-	sys.stdout.write(text)
-	if flush:
-		sys.stdout.flush()
-
-def clearScreen():
-	try:
-		stdscr = curses.initscr()
-		stdscr.clear()
-	finally:
-		curses.endwin()
-	stdout("\x1B[2J\x1B[0;0f")
-
-def readPassphrase(prompt, verify=False):
-	if verify:
-		prompt = "[New] " + prompt
-	try:
-		while True:
-			p0 = getpass.getpass(prompt + ": ")
-			if not p0:
-				continue
-			if not verify:
-				return p0
-			p1 = getpass.getpass(prompt + " (verify): ")
-			if p0 == p1:
-				return p0
-			print("Passwords don't match. Try again...")
-	except (EOFError, KeyboardInterrupt) as e:
-		print("")
-		return None
-	except (getpass.GetPassWarning) as e:
-		print(str(e))
-		return None
-
-def fileExists(path):
-	try:
-		os.stat(path)
-	except (OSError) as e:
-		if e.errno == errno.ENOENT:
-			return False
-		raise CSQLError("fileExists(): " + str(e))
-	return True
 
 class PWManTimeout(Exception):
 	def __init__(self, seconds):
@@ -208,45 +144,7 @@ class UndoStack(object):
 		self.frozen -= 1
 		assert(self.frozen >= 0)
 
-class PWManEntry(object):
-	Undefined = None
-
-	def __init__(self,
-		     category,
-		     title,
-		     user=Undefined,
-		     pw=Undefined,
-		     bulk=Undefined):
-		self.category = category
-		self.title = title
-		self.user = user
-		self.pw = pw
-		self.bulk = bulk
-
-	def copyUndefined(self, fromEntry):
-		assert(self.category is not self.Undefined)
-		assert(self.title is not self.Undefined)
-		if self.user is self.Undefined:
-			self.user = fromEntry.user
-		if self.pw is self.Undefined:
-			self.pw = fromEntry.pw
-		if self.bulk is self.Undefined:
-			self.bulk = fromEntry.bulk
-
-	def dump(self):
-		res = []
-		res.append("===  %s  ===" % self.category)
-		res.append("\t---  %s  ---" % self.title)
-		if self.user:
-			res.append("\tUser:\t\t%s" % self.user)
-		if self.pw:
-			res.append("\tPassword:\t%s" % self.pw)
-		if self.bulk:
-			res.append("\tBulk data:\t%s" % self.bulk)
-		return "\n".join(res) + "\n"
-
 class PWMan(CryptSQL, Cmd):
-	class Error(Exception): pass
 	class CommandError(Exception): pass
 	class Quit(Exception): pass
 
@@ -266,7 +164,7 @@ class PWMan(CryptSQL, Cmd):
 			self.undo = UndoStack()
 			self.__openFile(filename, passphrase)
 		except (CSQLError) as e:
-			raise PWMan.Error(str(e))
+			raise PWManError(str(e))
 
 	def __openFile(self, filename, passphrase):
 		self.open(filename, passphrase)
@@ -280,7 +178,7 @@ class PWMan(CryptSQL, Cmd):
 			dbVer = self.__getInfoField("db_version")
 			if dbType != self.DB_TYPE or\
 			   dbVer != self.DB_VER:
-				raise PWMan.Error("Unsupported database version '%s/%s'. "
+				raise PWManError("Unsupported database version '%s/%s'. "
 					"Expected '%s/%s'" %\
 					(str(dbType), str(dbVer), self.DB_TYPE, self.DB_VER))
 		self.sqlExec("CREATE TABLE IF NOT EXISTS "
@@ -498,7 +396,7 @@ class PWMan(CryptSQL, Cmd):
 		entry = PWManEntry(category, title, user, pw, bulk)
 		try:
 			self.addEntry(entry)
-		except (self.Error) as e:
+		except (PWManError) as e:
 			self.__err("new", str(e))
 		self.undo.do("new %s" % params,
 			     "remove %s %s" % (escapeCmd(category), escapeCmd(title)))
@@ -522,7 +420,7 @@ class PWMan(CryptSQL, Cmd):
 		newData = self.__skipParams(params, 2).strip()
 		try:
 			self.editEntry(data2entry(category, title, newData))
-		except (self.Error) as e:
+		except (PWManError) as e:
 			self.__err(commandName, str(e))
 		self.undo.do("%s %s" % (commandName, params),
 			     "%s %s %s %s" %\
@@ -641,7 +539,7 @@ class PWMan(CryptSQL, Cmd):
 			self.__err("remove", "Entry does not exist")
 		try:
 			self.delEntry(PWManEntry(category, title))
-		except (self.Error) as e:
+		except (PWManError) as e:
 			self.__err("remove", str(e))
 		self.undo.do("remove %s" % params,
 			     "new %s %s %s %s %s" %\
@@ -908,20 +806,20 @@ class PWMan(CryptSQL, Cmd):
 
 	def addEntry(self, entry):
 		if self.entryExists(entry):
-			raise self.Error("Entry does already exist")
+			raise PWManError("Entry does already exist")
 		self.__editEntry(None, entry)
 		self.setDirty()
 
 	def editEntry(self, entry):
 		oldEntry = self.getEntry(entry)
 		if not oldEntry:
-			raise self.Error("Entry does not exist")
+			raise PWManError("Entry does not exist")
 		self.__editEntry(oldEntry, entry)
 		self.setDirty()
 
 	def delEntry(self, entry):
 		if not self.entryExists(entry):
-			raise self.Error("Entry does not exist")
+			raise PWManError("Entry does not exist")
 		self.__delEntry(entry)
 		self.setDirty()
 
@@ -981,8 +879,8 @@ class PWMan(CryptSQL, Cmd):
 		try:
 			self.onecmd(command)
 		except (EscapeError, self.CommandError) as e:
-			raise self.Error(str(e))
+			raise PWManError(str(e))
 		except (KeyboardInterrupt, EOFError) as e:
-			raise self.Error("Interrupted")
+			raise PWManError("Interrupted")
 		except (CSQLError) as e:
-			raise self.Error("SQL error: %s" % str(e))
+			raise PWManError("SQL error: %s" % str(e))

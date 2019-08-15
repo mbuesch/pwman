@@ -6,25 +6,27 @@
 # Licensed under the GNU/GPL version 2 or later.
 """
 
-import libpwman as pwman
+import libpwman
 import getopt
 import sys
 
 
 def testEscape():
+	from libpwman.ui import escapeCmd, unescapeCmd
+
 	t0 = t1 = '1-2x-y-a\tb c\\\\_ \\\\ x_-y\r\n_\tz\v__\\\\__\\-'
 	nrIter = 3
 	print("ORIG :", t0)
 	for i in range(nrIter):
-		t1 = pwman.escapeCmd(t1)
+		t1 = escapeCmd(t1)
 		print("ESC%d : %s" % (i, t1))
 	for i in range(nrIter):
-		t1 = pwman.unescapeCmd(t1)
+		t1 = unescapeCmd(t1)
 	print("UNESC:", t1)
 	assert(t1 == t0)
 
 def usage():
-	print("pwman v%d - lightweight password manager" % pwman.VERSION)
+	print("pwman v%d - lightweight password manager" % libpwman.VERSION)
 	print("")
 	print("Usage: %s [OPTIONS] [COMMANDS]" % sys.argv[0])
 	print("")
@@ -34,7 +36,7 @@ def usage():
 	print("Options:")
 	print(" -d|--database PATH      Use PATH as database file.")
 	print("                         If not given, %s is used." %\
-						pwman.getDefaultDatabase())
+					libpwman.database.getDefaultDatabase())
 	print(" -U|--commit-clear-undo  The commit command clears undo queue.")
 	print(" -t|--timeout SECONDS    Sets the session timeout. Default is 10 minutes.")
 
@@ -65,29 +67,29 @@ def main():
 		return 1
 	commands = args
 	if not dbFile:
-		dbFile = pwman.getDefaultDatabase()
+		dbFile = libpwman.database.getDefaultDatabase()
 	if not dbFile:
 		print("No database file specified")
 		return 1
 	print("Opening database '%s'..." % dbFile)
-	passphrase = pwman.readPassphrase("Master passphrase",
-					  not pwman.fileExists(dbFile))
+	passphrase = libpwman.util.readPassphrase("Master passphrase",
+				not libpwman.util.fileExists(dbFile))
 	if passphrase is None:
 		return 1
 	try:
-		p = pwman.PWMan(dbFile, passphrase,
-				commitClearsUndo=commitClearsUndo,
-				timeout=timeout)
+		p = libpwman.PWMan(dbFile, passphrase,
+				   commitClearsUndo=commitClearsUndo,
+				   timeout=timeout)
 		if commands:
 			for command in commands:
 				p.runOneCommand(command)
 		else:
 			p.interactive()
-	except (pwman.PWMan.Error) as e:
+	except (libpwman.PWManError) as e:
 		print("Error: " + str(e))
 		return 1
-	except (pwman.PWManTimeout) as e:
-		pwman.clearScreen()
+	except (libpwman.PWManTimeout) as e:
+		libpwman.util.clearScreen()
 		print("pwman session timeout after %d seconds of inactivity." % e.seconds)
 		p.flunkDirty()
 		print("exiting...")

@@ -11,6 +11,6 @@ setup(
 	author		= "Michael Buesch",
 	author_email	= "m@bues.ch",
 	url		= "git://git.bues.ch/pwman.git",
-	py_modules	= [ "libpwman", "cryptsql", ],
+	packages	= [ "libpwman", ],
 	scripts		= [ "pwman", ]
 )
