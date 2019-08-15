@@ -19,5 +19,5 @@ hook_get_version()
 }
 
 project=pwman
-default_archives=py-sdist
+default_archives=py-sdist-xz
 makerelease "$@"
