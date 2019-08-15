@@ -10,6 +10,9 @@ import os
 import errno
 import zlib
 import hashlib
+import secrets
+import sqlite3 as sql
+import functools
 
 def missingMod(name, debpack=None):
 	print("Python '%s' module is not installed." % name)
@@ -18,15 +21,9 @@ def missingMod(name, debpack=None):
 	sys.exit(1)
 
 try:
-	import Crypto.Random
-	import Crypto.Random.random
 	import Crypto.Cipher.AES as AES
 except (ImportError) as e:
 	missingMod("Crypto", "python3-crypto")
-try:
-	import sqlite3 as sql
-except (ImportError) as e:
-	missingMod("sqlite3")
 
 
 __all__ = [
@@ -164,7 +161,6 @@ class CryptSQL(object):
 		self.__reset()
 
 	def __reset(self):
-		self.__rng = Crypto.Random.new()
 		self.db = None
 		self.filename = None
 
@@ -296,16 +292,20 @@ class CryptSQL(object):
 	def __random(self, nrBytes):
 		if nrBytes <= 0:
 			raise CSQLError("__random(): Invalid number of random bytes.")
-		data = self.__rng.read(nrBytes)
+		data = secrets.token_bytes(nrBytes)
 		if len(data) != nrBytes:
-			raise CSQLError("__random(): Sanity check failed.")
+			raise CSQLError("__random(): Sanity check failed (length).")
+		if functools.reduce(lambda a, b: a | b, data) == 0:
+			raise CSQLError("__random(): Sanity check failed (zero).")
+		if functools.reduce(lambda a, b: a & b, data) == 0xFF:
+			raise CSQLError("__random(): Sanity check failed (ones).")
 		return data
 
-	def __randomInt(self, minVal, maxVal):
-		if minVal >= maxVal:
+	def __randomInt(self, belowVal):
+		if belowVal <= 0:
 			raise CSQLError("__randomInt(): Invalid range.")
-		val = Crypto.Random.random.randint(minVal, maxVal)
-		if not (minVal <= val <= maxVal):
+		val = secrets.randbelow(belowVal)
+		if not (0 <= val < belowVal):
 			raise CSQLError("__randomInt(): Sanity check failed.")
 		return val
 
@@ -324,7 +324,7 @@ class CryptSQL(object):
 		# Encrypt payload
 		kdfHash = "SHA512"
 		kdfSalt = self.__random(34)
-		kdfIter = self.__randomInt(1000000, 1010000)
+		kdfIter = self.__randomInt(10000) + 1000000
 		keyLen = 256 // 8
 		key = hashlib.pbkdf2_hmac(hash_name=kdfHash,
 					  password=passphrase,
