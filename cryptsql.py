@@ -10,7 +10,7 @@ import os
 import errno
 import zlib
 
-def missingMod(name, debpack):
+def missingMod(name, debpack=None):
 	print("Python '%s' module is not installed." % name)
 	if debpack:
 		print("On Debian do:  aptitude install %s" % debpack)
@@ -24,11 +24,11 @@ try:
 	import Crypto.Random
 	import Crypto.Cipher.AES as AES
 except (ImportError) as e:
-	missingMod("Crypto", "python-crypto")
+	missingMod("Crypto", "python3-crypto")
 try:
 	import sqlite3 as sql
 except (ImportError) as e:
-	missingMod("sqlite3", "python-sqlite")
+	missingMod("sqlite3")
 
 
 CSQL_HEADER = b"CryptSQL v1"
