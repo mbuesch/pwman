@@ -1,10 +1,14 @@
+# -*- coding: utf-8 -*-
 """
 # Simple password manager
-# Copyright (c) 2011-2014 Michael Buesch <m@bues.ch>
+# Copyright (c) 2011-2019 Michael Buesch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
 import sys
+if sys.version_info.major <= 2:
+	raise Exception("Python 2 is not supported.")
+
 import os
 import errno
 import getpass
@@ -17,7 +21,6 @@ from cmd import Cmd
 from cryptsql import *
 
 VERSION = 1
-
 
 def getDefaultDatabase():
 	db = os.getenv("PWMAN_DATABASE")
@@ -52,7 +55,7 @@ def escapeCmd(s):
 	for c in s:
 		try:
 			c = subst[c]
-		except (KeyError), e:
+		except (KeyError) as e:
 			if c.isspace():
 				c = '\\x%02X' % ord(c)
 		ret.append(c)
@@ -117,18 +120,18 @@ def readPassphrase(prompt, verify=False):
 			p1 = getpass.getpass(prompt + " (verify): ")
 			if p0 == p1:
 				return p0
-			print "Passwords don't match. Try again..."
-	except (EOFError, KeyboardInterrupt), e:
-		print ""
+			print("Passwords don't match. Try again...")
+	except (EOFError, KeyboardInterrupt) as e:
+		print("")
 		return None
-	except (getpass.GetPassWarning), e:
-		print str(e)
+	except (getpass.GetPassWarning) as e:
+		print(str(e))
 		return None
 
 def fileExists(path):
 	try:
 		os.stat(path)
-	except (OSError), e:
+	except (OSError) as e:
 		if e.errno == errno.ENOENT:
 			return False
 		raise CSQLError("fileExists(): " + str(e))
@@ -200,7 +203,9 @@ class UndoStack(object):
 class PWManEntry(object):
 	Undefined = None
 
-	def __init__(self, category, title,
+	def __init__(self,
+		     category,
+		     title,
 		     user=Undefined,
 		     pw=Undefined,
 		     bulk=Undefined):
@@ -252,7 +257,7 @@ class PWMan(CryptSQL, Cmd):
 			self.commitClearsUndo = commitClearsUndo
 			self.undo = UndoStack()
 			self.__openFile(filename, passphrase)
-		except (CSQLError), e:
+		except (CSQLError) as e:
 			raise PWMan.Error(str(e))
 
 	def __openFile(self, filename, passphrase):
@@ -284,7 +289,7 @@ class PWMan(CryptSQL, Cmd):
 
 	def __info(self, source, message):
 		source = " " + source + ":" if source else ""
-		print "+++%s %s\n" % (source, message)
+		print("+++%s %s\n" % (source, message))
 
 	def precmd(self, line):
 		self.timeout.poke()
@@ -363,18 +368,18 @@ class PWMan(CryptSQL, Cmd):
 					msg += " Alias%s: %s" %\
 					("es" if len(aliases) > 1 else "",
 					", ".join(aliases))
-				print msg
-		print "Misc commands:"
+				print(msg)
+		print("Misc commands:")
 		printCmdHelp(self.cmdHelpMisc)
-		print "\nDatabase commands:"
+		print("\nDatabase commands:")
 		printCmdHelp(self.cmdHelpDatabase)
-		print "\nSearching/listing commands:"
+		print("\nSearching/listing commands:")
 		printCmdHelp(self.cmdHelpShow)
-		print "\nEditing commands:"
+		print("\nEditing commands:")
 		printCmdHelp(self.cmdHelpEdit)
-		print "\nHistory commands:"
+		print("\nHistory commands:")
 		printCmdHelp(self.cmdHelpHist)
-		print "\nType 'command?' or 'help command' for more help on a command."
+		print("\nType 'command?' or 'help command' for more help on a command.")
 	do_h = do_help
 
 	def do_quit(self, params):
@@ -416,14 +421,14 @@ class PWMan(CryptSQL, Cmd):
 		p = readPassphrase("Current master passphrase")
 		if p != self.passphrase:
 			stdout("Passphrase mismatch! ")
-			for i in range(0, 3):
+			for i in range(3):
 				stdout(".")
 				time.sleep(0.5)
-			print ""
+			print("")
 			return
 		p = readPassphrase("Master passphrase", verify=True)
 		if p is None:
-			print "Passphrase not changed."
+			print("Passphrase not changed.")
 			return
 		if p != self.passphrase:
 			self.passphrase = p
@@ -474,18 +479,18 @@ class PWMan(CryptSQL, Cmd):
 			bulk = self.__getParam(params, 4)
 		else:
 			stdout("Create new entry:\n")
-			category = raw_input("\tCategory: ")
-			title = raw_input("\tEntry title: ")
-			user = raw_input("\tUsername: ")
-			pw = raw_input("\tPassword: ")
-			bulk = raw_input("\tBulk data: ")
+			category = input("\tCategory: ")
+			title = input("\tEntry title: ")
+			user = input("\tUsername: ")
+			pw = input("\tPassword: ")
+			bulk = input("\tBulk data: ")
 		if not category or not title:
 			self.__err("new", "Invalid parameters. "
 				"Need to supply category and title.")
 		entry = PWManEntry(category, title, user, pw, bulk)
 		try:
 			self.addEntry(entry)
-		except (self.Error), e:
+		except (self.Error) as e:
 			self.__err("new", str(e))
 		self.undo.do("new %s" % params,
 			     "remove %s %s" % (escapeCmd(category), escapeCmd(title)))
@@ -509,7 +514,7 @@ class PWMan(CryptSQL, Cmd):
 		newData = self.__skipParams(params, 2).strip()
 		try:
 			self.editEntry(data2entry(category, title, newData))
-		except (self.Error), e:
+		except (self.Error) as e:
 			self.__err(commandName, str(e))
 		self.undo.do("%s %s" % (commandName, params),
 			     "%s %s %s %s" %\
@@ -628,7 +633,7 @@ class PWMan(CryptSQL, Cmd):
 			self.__err("remove", "Entry does not exist")
 		try:
 			self.delEntry(PWManEntry(category, title))
-		except (self.Error), e:
+		except (self.Error) as e:
 			self.__err("remove", str(e))
 		self.undo.do("remove %s" % params,
 			     "new %s %s %s %s %s" %\
@@ -651,13 +656,14 @@ class PWMan(CryptSQL, Cmd):
 		unencrypted to stdout.\n
 		Aliases: None"""
 		try:
+			dump = self.sqlPlainDump() + b"\n"
 			if params:
-				fd = file(params, "wb")
+				with open(params, "wb") as f:
+					f.write(dump)
 			else:
-				fd = sys.stdout
-			fd.write(self.sqlPlainDump() + "\n")
-			fd.flush()
-		except (IOError), e:
+				sys.stdout.buffer.write(dump)
+				sys.stdout.buffer.flush()
+		except (IOError) as e:
 			self.__err("dbdump", "Failed to write dump: %s" % e.strerror)
 
 	def do_find(self, params):
@@ -775,7 +781,7 @@ class PWMan(CryptSQL, Cmd):
 		startidx = endidx - 1
 		while startidx > 0 and not line[startidx].isspace():
 			startidx -= 1
-		return len(filter(None, line[:startidx].split())) - 1
+		return len([_f for _f in line[:startidx].split() if _f]) - 1
 
 	def __sanitizeCmdline(self, line):
 		# Sanitize a commandline for simple whitespace based splitting.
@@ -814,26 +820,24 @@ class PWMan(CryptSQL, Cmd):
 		categories = self.sqlExec("SELECT category FROM pw;").fetchAll()
 		if not categories:
 			return []
-		return uniq(map(lambda c: c[0], categories))
+		return uniq([c[0] for c in categories])
 
 	def __getCategoryCompletions(self, text):
-		catNames = filter(lambda n: n.lower().startswith(text.lower()),
-			      self.getCategoryNames())
-		return map(lambda n: escapeCmd(n) + " ", catNames)
+		catNames = [n for n in self.getCategoryNames() if n.lower().startswith(text.lower())]
+		return [escapeCmd(n) + " " for n in catNames]
 
 	def getEntryTitles(self, category):
 		sql = "SELECT title FROM pw WHERE category=?;"
 		titles = self.sqlExec(sql, (category,)).fetchAll()
 		if not titles:
 			return []
-		titles = map(lambda t: t[0], titles)
+		titles = [t[0] for t in titles]
 		titles.sort()
 		return titles
 
 	def __getEntryTitleCompletions(self, category, text):
-		titles = filter(lambda t: t.lower().startswith(text.lower()),
-			      self.getEntryTitles(category))
-		return map(lambda t: escapeCmd(t) + " ", titles)
+		titles = [t for t in self.getEntryTitles(category) if t.lower().startswith(text.lower())]
+		return [escapeCmd(t) + " " for t in titles]
 
 	def getEntry(self, entry):
 		sql = "SELECT category, title, user, pw, bulk FROM pw "\
@@ -863,8 +867,8 @@ class PWMan(CryptSQL, Cmd):
 			conditions.append( ("bulk %s ?" % operator, pattern) )
 		if not conditions:
 			return []
-		condStr = " OR ".join(map(lambda c: c[0], conditions))
-		params = map(lambda c: c[1], conditions)
+		condStr = " OR ".join([c[0] for c in conditions])
+		params = [c[1] for c in conditions]
 		sql = "SELECT category, title, user, pw, bulk FROM pw"
 		if inCategory:
 			sql += " WHERE category = ? AND ( " + condStr + " );"
@@ -874,8 +878,7 @@ class PWMan(CryptSQL, Cmd):
 		dataSet = self.sqlExec(sql, params).fetchAll()
 		if not dataSet:
 			return []
-		return map(lambda data: PWManEntry(data[0], data[1], data[2], data[3], data[4]),
-			   dataSet)
+		return [PWManEntry(data[0], data[1], data[2], data[3], data[4]) for data in dataSet]
 
 	def __delEntry(self, entry):
 		self.sqlExec("DELETE FROM pw WHERE category=? AND title=?;",
@@ -918,7 +921,7 @@ class PWMan(CryptSQL, Cmd):
 		try:
 			d = self.sqlExec("SELECT data FROM info WHERE name=?;", (name,)).fetchOne()
 			return d[0] if d else None
-		except (sql.OperationalError), e:
+		except (sql.OperationalError) as e:
 			return None
 
 	def __setInfoField(self, name, data):
@@ -934,7 +937,7 @@ class PWMan(CryptSQL, Cmd):
 
 	def flunkDirty(self):
 		if self.isDirty():
-			print "WARNING: Dropping uncommitted data"
+			print("WARNING: Dropping uncommitted data")
 			self.setDirty(False)
 
 	def commit(self):
@@ -943,10 +946,10 @@ class PWMan(CryptSQL, Cmd):
 
 	def __mayQuit(self):
 		if self.isDirty():
-			print "Warning: Uncommitted changes. " \
+			print("Warning: Uncommitted changes. " \
 				"Operation not performed. Use command 'commit' " \
 				"to write the changes to the database. Use " \
-				"command 'quit!' to quit without saving."
+				"command 'quit!' to quit without saving.")
 			return False
 		return True
 
@@ -955,23 +958,23 @@ class PWMan(CryptSQL, Cmd):
 			try:
 				self.cmdloop()
 				break
-			except (self.Quit), e:
+			except (self.Quit) as e:
 				if self.__mayQuit():
 					self.do_cls("")
 					break
-			except (EscapeError, self.CommandError), e:
+			except (EscapeError, self.CommandError) as e:
 				stdout(str(e) + "\n")
-			except (KeyboardInterrupt, EOFError), e:
+			except (KeyboardInterrupt, EOFError) as e:
 				stdout("\n")
-			except (CSQLError), e:
+			except (CSQLError) as e:
 				stdout("SQL error: %s\n" % str(e))
 
 	def runOneCommand(self, command):
 		try:
 			self.onecmd(command)
-		except (EscapeError, self.CommandError), e:
+		except (EscapeError, self.CommandError) as e:
 			raise self.Error(str(e))
-		except (KeyboardInterrupt, EOFError), e:
+		except (KeyboardInterrupt, EOFError) as e:
 			raise self.Error("Interrupted")
-		except (CSQLError), e:
+		except (CSQLError) as e:
 			raise self.Error("SQL error: %s" % str(e))
