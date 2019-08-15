@@ -1,4 +1,3 @@
-build
-*.pyc
-*.pyo
+/build/
+__pycache__/
 *.swp
