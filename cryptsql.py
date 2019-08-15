@@ -9,6 +9,7 @@ import sys
 import os
 import errno
 import zlib
+import hashlib
 
 def missingMod(name, debpack=None):
 	print("Python '%s' module is not installed." % name)
@@ -17,10 +18,6 @@ def missingMod(name, debpack=None):
 	sys.exit(1)
 
 try:
-	import Crypto.Hash.SHA256 as SHA256
-	import Crypto.Hash.SHA512 as SHA512
-	import Crypto.Hash.HMAC as HMAC
-	from Crypto.Protocol.KDF import PBKDF2
 	import Crypto.Random
 	import Crypto.Random.random
 	import Crypto.Cipher.AES as AES
@@ -212,26 +209,26 @@ class CryptSQL(object):
 			keyLen = 256 // 8
 		else:
 			raise CSQLError("Unknown key len: %s" % keyLen)
-		if kdfMethod == b"PBKDF2":
-			kdfMethod = PBKDF2
+		if kdfHash in (b"SHA256", b"SHA512"):
+			kdfHash = kdfHash.decode("UTF-8")
 		else:
-			raise CSQLError("Unknown kdf method: %s" % kdfMethod)
+			raise CSQLError("Unknown kdf-hash: %s" % kdfHash)
 		if len(kdfSalt) < 32:
 			raise CSQLError("Invalid salt len: %d" % len(kdfSalt))
 		try:
 			kdfIter = int(kdfIter.decode("UTF-8"), 10)
 		except (ValueError, UnicodeError) as e:
 			raise CSQLError("Unknown kdf-iter: %s" % kdfIter)
-		if kdfHash == b"SHA256":
-			kdfHash = SHA256
-		elif kdfHash == b"SHA512":
-			kdfHash = SHA512
+		if kdfMethod == b"PBKDF2":
+			if kdfMac != b"HMAC":
+				raise CSQLError("Unknown kdf-mac: %s" % kdfMac)
+			kdfMethod = lambda: hashlib.pbkdf2_hmac(hash_name=kdfHash,
+								password=passphrase,
+								salt=kdfSalt,
+								iterations=kdfIter,
+								dklen=keyLen)
 		else:
-			raise CSQLError("Unknown kdf-hash: %s" % kdfHash)
-		if kdfMac == b"HMAC":
-			kdfMac = HMAC
-		else:
-			raise CSQLError("Unknown kdf-mac: %s" % kdfMac)
+			raise CSQLError("Unknown kdf method: %s" % kdfMethod)
 		if compress == b"ZLIB":
 			compress = zlib
 		elif compress == b"NONE":
@@ -240,14 +237,10 @@ class CryptSQL(object):
 			raise CSQLError("Unknown compression: %s" % compress)
 		try:
 			# Decrypt payload
-			prf = lambda p, s: kdfMac.new(p, s, kdfHash).digest()
-			key = kdfMethod(password=passphrase,
-					salt=kdfSalt,
-					dkLen=keyLen,
-					count=kdfIter,
-					prf=prf)
-			cipher = cipher.new(key, mode = cipherMode,
-					    IV = cipherIV)
+			key = kdfMethod()
+			cipher = cipher.new(key,
+					    mode=cipherMode,
+					    IV=cipherIV)
 			payload = cipher.decrypt(payload)
 			payload = self.__unpadData(payload)
 			# Decompress payload
@@ -329,14 +322,15 @@ class CryptSQL(object):
 		# Dump the database
 		payload = self.sqlPlainDump()
 		# Encrypt payload
+		kdfHash = "SHA512"
 		kdfSalt = self.__random(34)
 		kdfIter = self.__randomInt(140000, 150000)
-		prf = lambda p, s: HMAC.new(p, s, SHA512).digest()
-		key = PBKDF2(password=passphrase,
-			     salt=kdfSalt,
-			     dkLen=(256 // 8),
-			     count=kdfIter,
-			     prf=prf)
+		keyLen = 256 // 8
+		key = hashlib.pbkdf2_hmac(hash_name=kdfHash,
+					  password=passphrase,
+					  salt=kdfSalt,
+					  iterations=kdfIter,
+					  dklen=keyLen)
 		cipherIV = self.__random(AES.block_size)
 		aes = AES.new(key,
 			      mode=AES.MODE_CBC,
@@ -348,11 +342,11 @@ class CryptSQL(object):
 			FileObj(b"CIPHER", b"AES"),
 			FileObj(b"CIPHER_MODE", b"CBC"),
 			FileObj(b"CIPHER_IV", cipherIV),
-			FileObj(b"KEY_LEN", b"256"),
+			FileObj(b"KEY_LEN", str(keyLen * 8).encode("UTF-8")),
 			FileObj(b"KDF_METHOD", b"PBKDF2"),
 			FileObj(b"KDF_SALT", kdfSalt),
 			FileObj(b"KDF_ITER", str(kdfIter).encode("UTF-8")),
-			FileObj(b"KDF_HASH", b"SHA512"),
+			FileObj(b"KDF_HASH", kdfHash.encode("UTF-8")),
 			FileObj(b"KDF_MAC", b"HMAC"),
 			FileObj(b"COMPRESS", b"NONE"),
 			FileObj(b"PAYLOAD", payload),
