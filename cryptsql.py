@@ -251,7 +251,8 @@ class CryptSQL(object):
 		self.db.text_factory = str
 		try:
 			try:
-				rawdata = open(filename, "rb").read()
+				with open(filename, "rb") as f:
+					rawdata = f.read()
 			except (IOError) as e:
 				if e.errno != errno.ENOENT:
 					raise CSQLError("Failed to read file: %s" %\
@@ -322,10 +323,9 @@ class CryptSQL(object):
 		# Write to the file
 		rawdata = fc.getRaw()
 		try:
-			fd = open(self.filename, "wb")
-			fd.write(rawdata)
-			fd.flush()
-			fd.close()
+			with open(self.filename, "wb") as f:
+				f.write(rawdata)
+				f.flush()
 		except (IOError) as e:
 			raise CSQLError("Failed to write file: %s" %\
 				e.strerror)
