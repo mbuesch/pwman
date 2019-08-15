@@ -42,6 +42,11 @@ CSQL_HEADER = b"CryptSQL v1"
 
 class CSQLError(Exception): pass
 
+class CompressDummy(object):
+	def compress(self, payload, *args):
+		return payload
+	decompress = compress
+
 class FileObj(object):
 	# Raw object layout:
 	#   [ 1 byte  ] => Name length
@@ -221,6 +226,8 @@ class CryptSQL(object):
 			raise CSQLError("Unknown kdf-mac: %s" % kdfMac)
 		if compress == b"ZLIB":
 			compress = zlib
+		elif compress == b"NONE":
+			compress = CompressDummy()
 		else:
 			raise CSQLError("Unknown compression: %s" % compress)
 		try:
@@ -291,8 +298,6 @@ class CryptSQL(object):
 		self.db.commit()
 		# Dump the database
 		payload = self.sqlPlainDump()
-		# Compress payload
-		payload = zlib.compress(payload, 1)
 		# Encrypt payload
 		kdfSalt = self.__random(34)
 		kdfIter = 40003
@@ -315,7 +320,7 @@ class CryptSQL(object):
 			FileObj(b"KDF_ITER", str(kdfIter).encode("UTF-8")),
 			FileObj(b"KDF_HASH", b"SHA512"),
 			FileObj(b"KDF_MAC", b"HMAC"),
-			FileObj(b"COMPRESS", b"ZLIB"),
+			FileObj(b"COMPRESS", b"NONE"),
 			FileObj(b"PAYLOAD", payload),
 		)
 		# Write to the file
