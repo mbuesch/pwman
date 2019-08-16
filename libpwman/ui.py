@@ -95,9 +95,15 @@ class PWManTimeout(Exception):
 		raise self
 
 class UndoCommand(object):
-	def __init__(self, doCommand, undoCommand):
-		self.doCommand = doCommand
-		self.undoCommand = undoCommand
+	def __init__(self, doCommands, undoCommands):
+		if isinstance(doCommands, (tuple, list)):
+			self.doCommands = tuple(doCommands)
+		else:
+			self.doCommands = (doCommands, )
+		if isinstance(undoCommands, (tuple, list)):
+			self.undoCommands = tuple(undoCommands)
+		else:
+			self.undoCommands = (undoCommands, )
 
 class UndoStack(object):
 	def __init__(self, limit=16):
@@ -110,10 +116,10 @@ class UndoStack(object):
 		while len(stack) > self.limit:
 			stack.pop(0)
 
-	def do(self, doCommand, undoCommand):
+	def do(self, doCommands, undoCommands):
 		if self.frozen:
 			return
-		c = UndoCommand(doCommand, undoCommand)
+		c = UndoCommand(doCommands, undoCommands)
 		self.__stackAppend(self.undoStack, c)
 		self.redoStack = []
 
@@ -603,11 +609,13 @@ class PWMan(Cmd):
 			self.__err("undo", "There is no command to be undone.")
 		self.undo.freeze()
 		try:
-			self.onecmd(cmd.undoCommand)
+			for undoCommand in cmd.undoCommands:
+				self.onecmd(undoCommand)
 		finally:
 			self.undo.thaw()
-		self.__info("undo", cmd.doCommand + "\nsuccessfully undone with\n" +\
-			    cmd.undoCommand)
+		self.__info("undo",
+			    "; ".join(cmd.doCommands) + "\nsuccessfully undone with\n" +\
+			    "; ".join(cmd.undoCommands))
 
 	def do_redo(self, params):
 		"""--- Redo the last undone command ---
@@ -620,11 +628,13 @@ class PWMan(Cmd):
 			self.__err("redo", "There is no undone command to be redone.")
 		self.undo.freeze()
 		try:
-			self.onecmd(cmd.doCommand)
+			for doCommand in cmd.doCommands:
+				self.onecmd(doCommand)
 		finally:
 			self.undo.thaw()
-		self.__info("redo", cmd.undoCommand + "\nsuccessfully redone with\n" +\
-			    cmd.doCommand)
+		self.__info("redo",
+			    "; ".join(cmd.undoCommands) + "\nsuccessfully redone with\n" +\
+			    "; ".join(cmd.doCommands))
 
 	def __skipParams(self, line, count,
 			 lineIncludesCommand=False, unescape=True):
