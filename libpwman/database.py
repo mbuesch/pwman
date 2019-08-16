@@ -35,12 +35,14 @@ class PWManEntry(object):
 		     title,
 		     user=Undefined,
 		     pw=Undefined,
-		     bulk=Undefined):
+		     bulk=Undefined,
+		     entryId=Undefined):
 		self.category = category
 		self.title = title
 		self.user = user
 		self.pw = pw
 		self.bulk = bulk
+		self.entryId = entryId
 
 	def copyUndefined(self, fromEntry):
 		assert(self.category is not self.Undefined)
@@ -68,12 +70,12 @@ class PWManDatabase(CryptSQL):
 	"""pwman database.
 	"""
 
-	DB_TYPE		= "PWMan database"
-	DB_VER		= "0"
+	DB_TYPE	= "PWMan database"
+	DB_VER	= ("0", "1")
 
 	def __init__(self, filename, passphrase):
 		try:
-			CryptSQL.__init__(self)
+			super().__init__()
 			self.__openFile(filename, passphrase)
 		except (CSQLError) as e:
 			raise PWManError(str(e))
@@ -81,25 +83,71 @@ class PWManDatabase(CryptSQL):
 	def __openFile(self, filename, passphrase):
 		self.open(filename, passphrase)
 		self.__passphrase = passphrase
-		self.dirty = False
-		initialize = False
+		self.__dirty = False
+		initDBVer = False
 		if self.sqlIsEmpty():
-			initialize = True
+			initDBVer = True
 		else:
 			dbType = self.__getInfoField("db_type")
 			dbVer = self.__getInfoField("db_version")
-			if dbType != self.DB_TYPE or\
-			   dbVer != self.DB_VER:
-				raise PWManError("Unsupported database version '%s/%s'. "
-					"Expected '%s/%s'" %\
-					(str(dbType), str(dbVer), self.DB_TYPE, self.DB_VER))
-		self.sqlExec("CREATE TABLE IF NOT EXISTS "
-			"info(name TEXT, data TEXT);")
-		self.sqlExec("CREATE TABLE IF NOT EXISTS "
-			"pw(category TEXT, title TEXT, user TEXT, pw TEXT, bulk TEXT);")
-		if initialize:
+			if (dbType != self.DB_TYPE or
+			    dbVer not in self.DB_VER):
+				raise PWManError("Unsupported database version '%s / %s'. "
+					"Expected '%s / %s'" % (
+					str(dbType),
+					str(dbVer),
+					self.DB_TYPE,
+					", ".join(self.DB_VER)))
+			if dbVer != self.DB_VER[-1]:
+				self.__migrateVersion(dbVer)
+				initDBVer = True
+		self.__initTables()
+		if initDBVer:
 			self.__setInfoField("db_type", self.DB_TYPE)
-			self.__setInfoField("db_version", self.DB_VER)
+			self.__setInfoField("db_version", self.DB_VER[-1])
+
+	def __migrateVersion(self, dbVer):
+		if dbVer == self.DB_VER[0]:
+			print("Migrating database from version %s to version %s..." % (
+			      dbVer, self.DB_VER[-1]))
+
+			self.__initTables()
+
+			c = self.sqlExec("SELECT category FROM pw;")
+			categories = c.fetchAll()
+			categories = uniq(c[0] for c in categories)
+			for category in categories:
+				c = self.sqlExec("SELECT title FROM pw WHERE category=?;",
+						 (category,))
+				titles = c.fetchAll()
+				titles = sorted(t[0] for t in titles)
+				for title in titles:
+					c = self.sqlExec("SELECT category, title, user, pw, bulk FROM pw "
+							 "WHERE category=? AND title=?;",
+							 (category, title))
+					data = c.fetchOne()
+					c = self.sqlExec("INSERT INTO entries(category, title, user, pw) "
+							 "VALUES(?,?,?,?);",
+							 (data[0], data[1], data[2], data[3]))
+					entryId = c.lastRowID()
+					if data[4]:
+						c = self.sqlExec("INSERT INTO bulk(entry, data) "
+								 "VALUES(?,?);",
+								 (entryId, data[4]))
+			c = self.sqlExec("DROP TABLE IF EXISTS pw;")
+			c = self.sqlExec("VACUUM;")
+		else:
+			assert(0)
+
+	def __initTables(self):
+		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
+				 "info(name TEXT, data TEXT);")
+		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
+				 "entries(id INTEGER PRIMARY KEY AUTOINCREMENT, "
+					 "category TEXT, title TEXT, user TEXT, pw TEXT);")
+		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
+				 "bulk(id INTEGER PRIMARY KEY AUTOINCREMENT, "
+				      "entry INTEGER, data TEXT);")
 
 	def getPassphrase(self):
 		return self.__passphrase
@@ -109,31 +157,45 @@ class PWManDatabase(CryptSQL):
 		self.setDirty()
 
 	def getCategoryNames(self):
-		categories = self.sqlExec("SELECT category FROM pw;").fetchAll()
+		c = self.sqlExec("SELECT category FROM entries;")
+		categories = c.fetchAll()
 		if not categories:
 			return []
-		return uniq([c[0] for c in categories])
+		return uniq(c[0] for c in categories)
 
 	def getEntryTitles(self, category):
-		sql = "SELECT title FROM pw WHERE category=?;"
-		titles = self.sqlExec(sql, (category,)).fetchAll()
+		c = self.sqlExec("SELECT title FROM entries WHERE category=?;",
+				 (category,))
+		titles = c.fetchAll()
 		if not titles:
 			return []
-		titles = [t[0] for t in titles]
-		titles.sort()
+		titles = sorted(t[0] for t in titles)
 		return titles
 
 	def getEntry(self, entry):
-		sql = "SELECT category, title, user, pw, bulk FROM pw "\
-			"WHERE category=? AND title=?;"
-		data = self.sqlExec(sql, (entry.category, entry.title)).fetchOne()
+		c = self.sqlExec("SELECT id, category, title, user, pw FROM entries "
+				 "WHERE category=? AND title=?;",
+				 (entry.category,
+				  entry.title))
+		data = c.fetchOne()
 		if not data:
 			return None
-		return PWManEntry(data[0], data[1], data[2], data[3], data[4])
+		entryId = data[0]
+		c = self.sqlExec("SELECT id, data FROM bulk WHERE entry=?",
+				 (entryId, ))
+		bulk = c.fetchOne()
+		bulk = PWManEntry.Undefined if bulk is None else bulk[1]
+		return PWManEntry(category=data[1],
+				  title=data[2],
+				  user=data[3],
+				  pw=data[4],
+				  bulk=bulk,
+				  entryId=entryId)
 
-	def findEntries(self, pattern, leftAnchor=False, rightAnchor=False,
-			inCategory=None, matchTitle=False,
-			matchUser=False, matchPw=False, matchBulk=False,
+	def findEntries(self, pattern,
+			leftAnchor=False, rightAnchor=False,
+			inCategory=None,
+			matchTitle=False, matchUser=False, matchPw=False, matchBulk=False,
 			doGlobMatch=False):
 		if not leftAnchor:
 			pattern = "*" + pattern
@@ -142,42 +204,68 @@ class PWManDatabase(CryptSQL):
 		conditions = []
 		operator = "GLOB" if doGlobMatch else "="
 		if matchTitle:
-			conditions.append( ("title %s ?" % operator, pattern) )
+			conditions.append( ("entries.title %s ?" % operator, pattern) )
 		if matchUser:
-			conditions.append( ("user %s ?" % operator, pattern) )
+			conditions.append( ("entries.user %s ?" % operator, pattern) )
 		if matchPw:
-			conditions.append( ("pw %s ?" % operator, pattern) )
+			conditions.append( ("entries.pw %s ?" % operator, pattern) )
 		if matchBulk:
-			conditions.append( ("bulk %s ?" % operator, pattern) )
+			conditions.append( ("bulk.data %s ?" % operator, pattern) )
 		if not conditions:
 			return []
 		condStr = " OR ".join([c[0] for c in conditions])
 		params = [c[1] for c in conditions]
-		sql = "SELECT category, title, user, pw, bulk FROM pw"
+		sql = "SELECT entries.id, entries.category, entries.title, entries.user, entries.pw, bulk.data "\
+		      "FROM entries, bulk "\
+		      "WHERE bulk.entry = entries.id AND "
 		if inCategory:
-			sql += " WHERE category = ? AND ( " + condStr + " );"
+			sql += "category = ? AND "
 			params.insert(0, inCategory)
-		else:
-			sql += " WHERE " + condStr + ";"
-		dataSet = self.sqlExec(sql, params).fetchAll()
+		sql += "( " + condStr + " );"
+		c = self.sqlExec(sql, params)
+		dataSet = c.fetchAll()
 		if not dataSet:
 			return []
-		return [PWManEntry(data[0], data[1], data[2], data[3], data[4]) for data in dataSet]
+		return [ PWManEntry(category=data[1],
+				    title=data[2],
+				    user=data[3],
+				    pw=data[4],
+				    bulk=data[5],
+				    entryId=data[0])
+			 for data in dataSet ]
 
 	def __delEntry(self, entry):
-		self.sqlExec("DELETE FROM pw WHERE category=? AND title=?;",
-			     (entry.category, entry.title))
+		c = self.sqlExec("SELECT id FROM entries WHERE category=? AND title=?;",
+				 (entry.category,
+				  entry.title))
+		entryId = c.fetchOne()
+		if entryId is None:
+			raise PWManError("Del-entry does not exist")
+		entryId = entryId[0]
+		c = self.sqlExec("DELETE FROM entries WHERE category=? AND title=?;",
+				 (entry.category, entry.title))
+		c = self.sqlExec("DELETE FROM bulk WHERE entry=?;",
+				 (entryId, ))
 
 	def __editEntry(self, oldEntry, newEntry):
+		#TODO use UPDATE
 		if oldEntry:
 			assert(oldEntry.category == newEntry.category)
 			assert(oldEntry.title == newEntry.title)
 			newEntry.copyUndefined(oldEntry)
 			self.__delEntry(oldEntry)
-		self.sqlExec("INSERT INTO pw(category, title, user, pw, bulk) "
-			     "VALUES(?,?,?,?,?);",
-			     (newEntry.category, newEntry.title, newEntry.user,
-			      newEntry.pw, newEntry.bulk))
+		c = self.sqlExec("INSERT INTO entries(category, title, user, pw) "
+				 "VALUES(?,?,?,?);",
+				 (newEntry.category,
+				  newEntry.title,
+				  newEntry.user,
+				  newEntry.pw))
+		newEntry.entryId = c.lastRowID()
+		if newEntry.bulk is not newEntry.Undefined:
+			c = self.sqlExec("INSERT INTO bulk(entry, data) "
+					 "VALUES(?,?);",
+					 (newEntry.entryId,
+					  newEntry.bulk))
 
 	def entryExists(self, entry):
 		return bool(self.getEntry(entry))
@@ -203,21 +291,24 @@ class PWManDatabase(CryptSQL):
 
 	def __getInfoField(self, name):
 		try:
-			d = self.sqlExec("SELECT data FROM info WHERE name=?;", (name,)).fetchOne()
-			return d[0] if d else None
-		except (sql.OperationalError) as e:
+			c = self.sqlExec("SELECT data FROM info WHERE name=?;",
+					 (name,))
+			data = c.fetchOne()
+			return data[0] if data else None
+		except (CSQLError) as e:
 			return None
 
 	def __setInfoField(self, name, data):
-		self.sqlExec("DELETE FROM info WHERE name=?;", (name,))
-		self.sqlExec("INSERT INTO info(name, data) VALUES(?,?);",
-			     (name, data))
+		c = self.sqlExec("DELETE FROM info WHERE name=?;",
+				 (name,))
+		c = self.sqlExec("INSERT INTO info(name, data) VALUES(?,?);",
+				 (name, data))
 
 	def setDirty(self, d=True):
-		self.dirty = d
+		self.__dirty = d
 
 	def isDirty(self):
-		return self.dirty
+		return self.__dirty
 
 	def flunkDirty(self):
 		if self.isDirty():
@@ -225,5 +316,5 @@ class PWManDatabase(CryptSQL):
 			self.setDirty(False)
 
 	def commit(self):
-		CryptSQL.commit(self, self.__passphrase)
+		super().commit(self.__passphrase)
 		self.setDirty(False)
