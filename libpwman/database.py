@@ -244,59 +244,74 @@ class PWManDatabase(CryptSQL):
 				    entryId=data[0])
 			 for data in dataSet ]
 
-	def __delEntry(self, entry):
-		c = self.sqlExec("SELECT id FROM entries WHERE category=? AND title=?;",
-				 (entry.category,
-				  entry.title))
-		entryId = c.fetchOne()
-		if entryId is None:
-			raise PWManError("Del-entry does not exist")
-		entryId = entryId[0]
-		c = self.sqlExec("DELETE FROM entries WHERE category=? AND title=?;",
-				 (entry.category, entry.title))
-		c = self.sqlExec("DELETE FROM bulk WHERE entry=?;",
-				 (entryId, ))
-
-	def __editEntry(self, oldEntry, newEntry):
-		#TODO use UPDATE
-		if oldEntry:
-			assert(oldEntry.category == newEntry.category)
-			assert(oldEntry.title == newEntry.title)
-			newEntry.copyUndefined(oldEntry)
-			self.__delEntry(oldEntry)
-		c = self.sqlExec("INSERT INTO entries(category, title, user, pw) "
-				 "VALUES(?,?,?,?);",
-				 (newEntry.category,
-				  newEntry.title,
-				  newEntry.user,
-				  newEntry.pw))
-		newEntry.entryId = c.lastRowID()
-		if newEntry.bulk is not newEntry.Undefined:
-			c = self.sqlExec("INSERT INTO bulk(entry, data) "
-					 "VALUES(?,?);",
-					 (newEntry.entryId,
-					  newEntry.bulk))
-
 	def entryExists(self, entry):
 		return bool(self.getEntry(entry))
 
 	def addEntry(self, entry):
 		if self.entryExists(entry):
 			raise PWManError("Entry does already exist")
-		self.__editEntry(None, entry)
+		c = self.sqlExec("INSERT INTO entries(category, title, user, pw) "
+				 "VALUES(?,?,?,?);",
+				 (entry.category,
+				  entry.title,
+				  entry.user,
+				  entry.pw))
+		entry.entryId = c.lastRowID()
+		if entry.bulk is not entry.Undefined:
+			c = self.sqlExec("INSERT INTO bulk(entry, data) "
+					 "VALUES(?,?);",
+					 (entry.entryId,
+					  entry.bulk))
 		self.setDirty()
 
 	def editEntry(self, entry):
 		oldEntry = self.getEntry(entry)
 		if not oldEntry:
 			raise PWManError("Entry does not exist")
-		self.__editEntry(oldEntry, entry)
+
+		entry.copyUndefined(oldEntry)
+		entry.entryId = oldEntry.entryId
+
+		c = self.sqlExec("UPDATE entries SET "
+				 "category=?, title=?, user=?, pw=? "
+				 "WHERE id=?;",
+				 (entry.category,
+				  entry.title,
+				  entry.user,
+				  entry.pw,
+				  entry.entryId))
+		if entry.bulk:
+			c = self.sqlExec("SELECT id, data FROM bulk WHERE entry=?",
+					 (entry.entryId, ))
+			bulk = c.fetchOne()
+			if bulk is None:
+				c = self.sqlExec("INSERT INTO bulk(entry, data) "
+						 "VALUES(?,?);",
+						 (entry.entryId,
+						  entry.bulk))
+			else:
+				c = self.sqlExec("UPDATE bulk "
+						 "SET data=? "
+						 "WHERE entry=?;",
+						 (entry.bulk,
+						  entry.entryId))
+		else:
+			c = self.sqlExec("DELETE FROM bulk WHERE entry=?;",
+					 (entry.entryId,))
 		self.setDirty()
 
 	def delEntry(self, entry):
-		if not self.entryExists(entry):
+		c = self.sqlExec("SELECT id FROM entries WHERE category=? AND title=?;",
+				 (entry.category,
+				  entry.title))
+		entryId = c.fetchOne()
+		if entryId is None:
 			raise PWManError("Entry does not exist")
-		self.__delEntry(entry)
+		entryId = entryId[0]
+		c = self.sqlExec("DELETE FROM entries WHERE id=?;",
+				 (entryId,))
+		c = self.sqlExec("DELETE FROM bulk WHERE entry=?;",
+				 (entryId,))
 		self.setDirty()
 
 	def __getGlobalAttr(self, name):
