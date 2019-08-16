@@ -10,6 +10,7 @@ from libpwman.exception import *
 from libpwman.util import *
 
 import os
+from copy import copy, deepcopy
 
 __all__ = [
 	"CSQLError",
@@ -29,6 +30,15 @@ def getDefaultDatabase():
 
 class PWManEntry(object):
 	Undefined = None
+
+	__slots__ = (
+		"category",
+		"title",
+		"user",
+		"pw",
+		"bulk",
+		"entryId",
+	)
 
 	def __init__(self,
 		     category,
@@ -65,6 +75,26 @@ class PWManEntry(object):
 		if self.bulk:
 			res.append("\tBulk data:\t%s" % self.bulk)
 		return "\n".join(res) + "\n"
+
+	def __copy__(self):
+		return self.__class__(
+			category=copy(self.category),
+			title=copy(self.title),
+			user=copy(self.user),
+			pw=copy(self.pw),
+			bulk=copy(self.bulk),
+			entryId=copy(self.entryId),
+		)
+
+	def __deepcopy__(self, memo):
+		return self.__class__(
+			category=deepcopy(self.category, memo),
+			title=deepcopy(self.title, memo),
+			user=deepcopy(self.user, memo),
+			pw=deepcopy(self.pw, memo),
+			bulk=deepcopy(self.bulk, memo),
+			entryId=deepcopy(self.entryId, memo),
+		)
 
 class PWManDatabase(CryptSQL):
 	"""pwman database.
