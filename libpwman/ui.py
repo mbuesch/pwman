@@ -149,7 +149,7 @@ class PWMan(Cmd):
 
 	def __init__(self, filename, passphrase,
 		     commitClearsUndo=False, timeout=-1):
-		Cmd.__init__(self)
+		super().__init__()
 
 		self.__db = PWManDatabase(filename, passphrase)
 		self.prompt = "pwman$ "
@@ -232,7 +232,7 @@ class PWMan(Cmd):
 		Command: help\n
 		Aliases: h"""
 		if params:
-			Cmd.do_help(self, params)
+			super().do_help(params)
 			return
 		def printCmdHelp(cmdHelp):
 			for (cmd, aliases, desc) in cmdHelp:
