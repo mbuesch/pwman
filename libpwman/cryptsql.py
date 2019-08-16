@@ -139,22 +139,45 @@ class FileObjCollection(object):
 		return FileObjCollection(*objects)
 
 class CryptSQLCursor(object):
-	def __init__(self, c):
-		self.c = c
+	def __init__(self, db):
+		self.__db = db
+		self.__c = db.cursor()
 
-	def sqlExec(self, code, params=[]):
-		self.c.execute(code, params)
-		return self
+	def sqlExec(self, code, params=[], dbCommit=True):
+		try:
+			self.__c.execute(code, params)
+			if dbCommit:
+				self.__db.commit()
+			return self
+		except (sql.Error, sql.DatabaseError) as e:
+			raise CSQLError("Database error: " + str(e))
 
-	def sqlExecScript(self, code):
-		self.c.executescript(code)
-		return self
+	def sqlExecScript(self, code, dbCommit=True):
+		try:
+			self.__c.executescript(code)
+			if dbCommit:
+				self.__db.commit()
+			return self
+		except (sql.Error, sql.DatabaseError) as e:
+			raise CSQLError("Database error: " + str(e))
 
 	def fetchOne(self):
-		return self.c.fetchone()
+		try:
+			return self.__c.fetchone()
+		except (sql.Error, sql.DatabaseError) as e:
+			raise CSQLError("Database error: " + str(e))
 
 	def fetchAll(self):
-		return self.c.fetchall()
+		try:
+			return self.__c.fetchall()
+		except (sql.Error, sql.DatabaseError) as e:
+			raise CSQLError("Database error: " + str(e))
+
+	def lastRowID(self):
+		try:
+			return self.__c.lastrowid
+		except (sql.Error, sql.DatabaseError) as e:
+			raise CSQLError("Database error: " + str(e))
 
 class CryptSQL(object):
 	def __init__(self):
@@ -243,7 +266,7 @@ class CryptSQL(object):
 			payload = compress.decompress(payload)
 			# Import the SQL database
 			self.db.cursor().executescript(payload.decode("UTF-8"))
-		except (CSQLError, zlib.error, sql.Error, UnicodeError) as e:
+		except (CSQLError, zlib.error, sql.Error, sql.DatabaseError, UnicodeError) as e:
 			raise CSQLError("Failed to decrypt database. "
 					"Wrong passphrase?")
 
@@ -318,7 +341,10 @@ class CryptSQL(object):
 			raise CSQLError("Cannot UTF-8-encode passphrase.")
 		if not self.db or not self.filename:
 			raise CSQLError("Database is not open")
+
 		self.db.commit()
+		self.sqlExec("VACUUM;", dbCommit=True)
+
 		# Dump the database
 		payload = self.sqlPlainDump()
 		# Encrypt payload
@@ -361,11 +387,11 @@ class CryptSQL(object):
 			raise CSQLError("Failed to write file: %s" %\
 				e.strerror)
 
-	def sqlExec(self, code, params=[]):
-		return CryptSQLCursor(self.db.cursor()).sqlExec(code, params)
+	def sqlExec(self, code, params=[], dbCommit=True):
+		return CryptSQLCursor(self.db).sqlExec(code, params, dbCommit)
 
-	def sqlExecScript(self, code):
-		return CryptSQLCursor(self.db.cursor()).sqlExecScript(code)
+	def sqlExecScript(self, code, dbCommit=True):
+		return CryptSQLCursor(self.db).sqlExecScript(code, dbCommit)
 
 	def sqlCreateFunction(self, name, nrParams, func):
 		self.db.create_function(name, nrParams, func)
