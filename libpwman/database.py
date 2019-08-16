@@ -88,8 +88,11 @@ class PWManDatabase(CryptSQL):
 		if self.sqlIsEmpty():
 			initDBVer = True
 		else:
-			dbType = self.__getInfoField("db_type")
-			dbVer = self.__getInfoField("db_version")
+			dbType = self.__getGlobalAttr("db_type")
+			dbVer = self.__getGlobalAttr("db_version")
+			if dbType is None and dbVer is None: # Compat v0
+				dbType = self.DB_TYPE
+				dbVer = self.DB_VER[0]
 			if (dbType != self.DB_TYPE or
 			    dbVer not in self.DB_VER):
 				raise PWManError("Unsupported database version '%s / %s'. "
@@ -103,8 +106,8 @@ class PWManDatabase(CryptSQL):
 				initDBVer = True
 		self.__initTables()
 		if initDBVer:
-			self.__setInfoField("db_type", self.DB_TYPE)
-			self.__setInfoField("db_version", self.DB_VER[-1])
+			self.__setGlobalAttr("db_type", self.DB_TYPE)
+			self.__setGlobalAttr("db_version", self.DB_VER[-1])
 
 	def __migrateVersion(self, dbVer):
 		if dbVer == self.DB_VER[0]:
@@ -134,14 +137,21 @@ class PWManDatabase(CryptSQL):
 						c = self.sqlExec("INSERT INTO bulk(entry, data) "
 								 "VALUES(?,?);",
 								 (entryId, data[4]))
+			c = self.sqlExec("SELECT name, data FROM info;")
+			infos = c.fetchAll()
+			for info in infos:
+				c = self.sqlExec("INSERT INTO globalattr(name, data) VALUES(?,?);",
+						 (info[0], info[1]))
 			c = self.sqlExec("DROP TABLE IF EXISTS pw;")
+			c = self.sqlExec("DROP TABLE IF EXISTS info;")
 			c = self.sqlExec("VACUUM;")
 		else:
 			assert(0)
 
 	def __initTables(self):
 		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
-				 "info(name TEXT, data TEXT);")
+				 "globalattr(id INTEGER PRIMARY KEY AUTOINCREMENT, "
+					    "name TEXT, data TEXT);")
 		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
 				 "entries(id INTEGER PRIMARY KEY AUTOINCREMENT, "
 					 "category TEXT, title TEXT, user TEXT, pw TEXT);")
@@ -289,19 +299,22 @@ class PWManDatabase(CryptSQL):
 		self.__delEntry(entry)
 		self.setDirty()
 
-	def __getInfoField(self, name):
+	def __getGlobalAttr(self, name):
 		try:
-			c = self.sqlExec("SELECT data FROM info WHERE name=?;",
+			c = self.sqlExec("SELECT id, data FROM globalattr WHERE name=?;",
 					 (name,))
 			data = c.fetchOne()
-			return data[0] if data else None
+			return data[1] if data else None
 		except (CSQLError) as e:
 			return None
 
-	def __setInfoField(self, name, data):
-		c = self.sqlExec("DELETE FROM info WHERE name=?;",
+	def __setGlobalAttr(self, name, data):
+		attr = self.__getGlobalAttr(name)
+		if attr and attr == data:
+			return
+		c = self.sqlExec("DELETE FROM globalattr WHERE name=?;",
 				 (name,))
-		c = self.sqlExec("INSERT INTO info(name, data) VALUES(?,?);",
+		c = self.sqlExec("INSERT INTO globalattr(name, data) VALUES(?,?);",
 				 (name, data))
 
 	def setDirty(self, d=True):
