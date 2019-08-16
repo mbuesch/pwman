@@ -14,6 +14,7 @@ import time
 import re
 import readline
 import signal
+from copy import copy, deepcopy
 from cmd import Cmd
 
 __all__ = [
@@ -225,6 +226,7 @@ class PWMan(Cmd):
 		("edit_user", ("eu",), "Edit the 'user' field of an entry"),
 		("edit_pw", ("ep",), "Edit the 'password' field of an entry"),
 		("edit_bulk", ("eb",), "Edit the 'bulk' field of an entry"),
+		("move", ("mv", "rename"), "Move/rename and existing entry"),
 		("remove", ("rm", "del"), "Remove and existing entry"),
 	)
 
@@ -526,6 +528,48 @@ class PWMan(Cmd):
 	complete_remove = __complete_category_title
 	complete_rm = complete_remove
 	complete_del = complete_remove
+
+	def do_move(self, params):
+		"""--- Move/rename an existing entry ---
+		Command: move category title newCategory [newTitle]\n
+		Move/rename an existing database entry.\n
+		Aliases: mv rename"""
+		fromCategory = self.__getParam(params, 0)
+		fromTitle = self.__getParam(params, 1)
+		toCategory = self.__getParam(params, 2)
+		toTitle = self.__getParam(params, 3)
+		if not fromCategory or not fromTitle or not toCategory:
+			self.__err("remove", "Invalid parameters. "
+				"Need to supply category, title and newCategory.")
+		if not toTitle:
+			toTitle = fromTitle
+		if fromCategory == toCategory and fromTitle == toTitle:
+			self.__info("move", "Nothing changed. Not moving anything.")
+			return
+		oldEntry = self.__db.getEntry(PWManEntry(fromCategory, fromTitle))
+		if not oldEntry:
+			self.__err("move", "Source entry does not exist.")
+		newEntry = deepcopy(oldEntry)
+		newEntry.category = toCategory
+		newEntry.title = toTitle
+		try:
+			self.__db.addEntry(newEntry)
+		except (PWManError) as e:
+			self.__err("move", str(e))
+		try:
+			self.__db.delEntry(oldEntry)
+		except (PWManError) as e:
+			self.__info("move", str(e))
+		self.undo.do("move %s" % params,
+			     "move %s %s %s %s" % (
+			     escapeCmd(newEntry.category), escapeCmd(newEntry.title),
+			     escapeCmd(oldEntry.category), escapeCmd(oldEntry.title)))
+	do_mv = do_move
+	do_rename = do_move
+
+	complete_move = __complete_category_title
+	complete_mv = complete_move
+	complete_rename = complete_move
 
 	def do_dbdump(self, params):
 		"""--- Dump the SQL database as SQL script ---
