@@ -8,6 +8,7 @@
 from libpwman.database import *
 from libpwman.exception import *
 from libpwman.util import *
+from libpwman.otp import *
 
 import sys
 import time
@@ -218,6 +219,8 @@ class PWMan(Cmd):
 	cmdHelpShow = (
 		("list", ("ls", "cat"), "List/print entry contents"),
 		("find", ("f",), "Search the database for patterns"),
+		("totp", ("t",), "Generate TOTP token"),
+		("totp_key", ("tk",), "Show TOTP key and parameters"),
 		("dbdump", (), "Dump the database"),
 	)
 
@@ -226,6 +229,7 @@ class PWMan(Cmd):
 		("edit_user", ("eu",), "Edit the 'user' field of an entry"),
 		("edit_pw", ("ep",), "Edit the 'password' field of an entry"),
 		("edit_bulk", ("eb",), "Edit the 'bulk' field of an entry"),
+		("edit_totp", ("et",), "Edit the TOTP key and parameters"),
 		("move", ("mv", "rename"), "Move/rename and existing entry"),
 		("remove", ("rm", "del"), "Remove and existing entry"),
 	)
@@ -642,6 +646,112 @@ class PWMan(Cmd):
 			return self.__getCategoryCompletions(text)
 		return []
 	complete_f = complete_find
+
+	def do_totp(self, params):
+		"""--- Generate a TOTP token ---
+		Command: totp category title\n
+		Generates a token using the Time-Based One-Time Password Algorithm.\n
+		Aliases: t"""
+		category = self.__getParam(params, 0)
+		title = self.__getParam(params, 1)
+		if not category:
+			self.__err("totp", "Category parameter is required.")
+		if not title:
+			self.__err("totp", "Title parameter is required.")
+		entry = self.__db.getEntry(PWManEntry(category, title))
+		if not entry:
+			self.__err("totp", "'%s/%s' not found" % (category, title))
+		entryTotp = self.__db.getEntryTotp(entry)
+		if not entryTotp:
+			self.__err("totp", "'%s/%s' does not have "
+				   "TOTP key information" % (category, title))
+		try:
+			token = totp(key=entryTotp.key,
+				     nrDigits=entryTotp.digits,
+				     hmacHash=entryTotp.hmacHash)
+		except OtpError as e:
+			self.__err("totp", "Failed to generate TOTP: %s" % str(e))
+		stdout("%s\n" % token)
+	do_t = do_totp
+
+	complete_totp = __complete_category_title
+	complete_t = complete_totp
+
+	def do_totp_key(self, params):
+		"""--- Show TOTP key and parameters ---
+		Command: totp_key category title\n
+		Show Time-Based One-Time Password Algorithm key and parameters.\n
+		Aliases: tk"""
+		category = self.__getParam(params, 0)
+		title = self.__getParam(params, 1)
+		if not category:
+			self.__err("totp_key", "Category parameter is required.")
+		if not title:
+			self.__err("totp_key", "Title parameter is required.")
+		entry = self.__db.getEntry(PWManEntry(category, title))
+		if not entry:
+			self.__err("totp_key", "'%s/%s' not found" % (category, title))
+		entryTotp = self.__db.getEntryTotp(entry)
+		enc = "  (base32 encoding)"
+		if not entryTotp:
+			entryTotp = PWManEntryTOTP(key="--- none ---",
+						   digits=6,
+						   hmacHash="SHA1")
+			enc = ""
+		stdout("TOTP key:     %s%s\n" % (entryTotp.key, enc))
+		stdout("TOTP digits:  %d\n" % entryTotp.digits)
+		stdout("TOTP hash:    %s\n" % entryTotp.hmacHash)
+	do_tk = do_totp_key
+
+	complete_totp_key = __complete_category_title
+	complete_tk = complete_totp_key
+
+	def do_edit_totp(self, params):
+		"""--- Edit TOTP key and parameters ---
+		Command: edit_totp category title [KEY] [DIGITS] [HASH]\n
+		Set Time-Based One-Time Password Algorithm key and parameters.\n
+		Aliases: et"""
+		category = self.__getParam(params, 0)
+		title = self.__getParam(params, 1)
+		key = self.__getParam(params, 2)
+		digits = self.__getParam(params, 3)
+		_hash = self.__getParam(params, 4)
+		if not category:
+			self.__err("edit_totp", "Category parameter is required.")
+		if not title:
+			self.__err("edit_totp", "Title parameter is required.")
+		entry = self.__db.getEntry(PWManEntry(category, title))
+		if not entry:
+			self.__err("edit_totp", "'%s/%s' not found" % (category, title))
+		entryTotp = self.__db.getEntryTotp(entry)
+		if not entryTotp:
+			entryTotp = PWManEntryTOTP(None, entry=entry)
+		entryTotp.key = key
+		if digits:
+			try:
+				entryTotp.digits = int(digits)
+			except ValueError:
+				self.__err("edit_totp", "Invalid digits parameter.")
+		if _hash:
+			entryTotp.hmacHash = _hash
+		self.__db.setEntryTotp(entryTotp)
+		#TODO undo
+	do_et = do_edit_totp
+
+	def complete_edit_totp(self, text, line, begidx, endidx):
+		self.timeout.poke()
+		paramIdx = self.__calcParamIndex(line, endidx)
+		if paramIdx in (0, 1):
+			return self.__complete_category_title(text, line, begidx, endidx)
+		text = self.__getParam(line, paramIdx, True)
+		if paramIdx == 2: # key
+			pass#TODO
+		elif paramIdx == 3: # digits
+			pass#TODO
+		elif paramIdx == 4: # hash
+			pass#TODO
+		return []
+	complete_et = complete_edit_totp
 
 	def do_undo(self, params):
 		"""--- Undo the last command ---
