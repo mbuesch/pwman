@@ -10,11 +10,13 @@ from libpwman.exception import *
 from libpwman.util import *
 
 import os
+from dataclasses import dataclass
 from copy import copy, deepcopy
 
 __all__ = [
 	"CSQLError",
 	"getDefaultDatabase",
+	"PWManEntryTOTP",
 	"PWManEntry",
 	"PWManDatabase",
 ]
@@ -83,6 +85,14 @@ class PWManEntry(object):
 			bulk=deepcopy(self.bulk, memo),
 			entryId=deepcopy(self.entryId, memo),
 		)
+
+@dataclass
+class PWManEntryTOTP(object):
+	key		: str
+	digits		: int = 6
+	hmacHash	: str = "SHA1"
+	entry		: PWManEntry = None
+	totpId		: int = None
 
 class PWManDatabase(CryptSQL):
 	"""pwman database.
@@ -176,6 +186,9 @@ class PWManDatabase(CryptSQL):
 		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
 				 "bulk(id INTEGER PRIMARY KEY AUTOINCREMENT, "
 				      "entry INTEGER, data TEXT);")
+		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
+				 "totp(id INTEGER PRIMARY KEY AUTOINCREMENT, "
+				      "entry INTEGER, key TEXT, digits INTEGER, hash TEXT);")
 
 	def getPassphrase(self):
 		return self.__passphrase
@@ -336,6 +349,51 @@ class PWManDatabase(CryptSQL):
 		c = self.sqlExec("DELETE FROM bulk WHERE entry=?;",
 				 (entryId,))
 		self.setDirty()
+
+	def getEntryTotp(self, entry):
+		c = self.sqlExec("SELECT totp.id, totp.key, totp.digits, totp.hash "
+				 "FROM totp, entries "
+				 "WHERE entries.category=? AND entries.title=? AND "
+				 "totp.entry = entries.id;",
+				 (entry.category,
+				  entry.title))
+		data = c.fetchOne()
+		if not data:
+			return None
+		return PWManEntryTOTP(key=data[1],
+				      digits=data[2],
+				      hmacHash=data[3],
+				      entry=entry,
+				      totpId=data[0])
+
+	def setEntryTotp(self, entryTotp):
+		entry = entryTotp.entry
+		if not entry or entry.entryId is None:
+			raise PWManError("Entry does not exist")
+		if entryTotp.key:
+			c = self.sqlExec("SELECT id FROM totp WHERE entry=?",
+					 (entry.entryId, ))
+			totpId = c.fetchOne()
+			if totpId is None:
+				c = self.sqlExec("INSERT INTO totp(entry, key, digits, hash) "
+						 "VALUES(?,?,?,?);",
+						 (entry.entryId,
+						  entryTotp.key,
+						  entryTotp.digits,
+						  entryTotp.hmacHash))
+			else:
+				totpId = totpId[0]
+				c = self.sqlExec("UPDATE totp "
+						 "SET entry=?, key=?, digits=?, hash=? "
+						 "WHERE id=?;",
+						 (entry.entryId,
+						  entryTotp.key,
+						  entryTotp.digits,
+						  entryTotp.hmacHash,
+						  totpId))
+		else:
+			c = self.sqlExec("DELETE FROM totp WHERE id=?;",
+					 (entryTotp.totpId,))
 
 	def __getGlobalAttr(self, name):
 		try:
