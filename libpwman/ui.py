@@ -760,6 +760,9 @@ class PWMan(Cmd):
 			return False
 		return True
 
+	def flunkDirty(self):
+		self.__db.flunkDirty()
+
 	def interactive(self):
 		while True:
 			try:
