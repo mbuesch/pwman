@@ -108,9 +108,9 @@ class PWMan(Cmd):
 		self.__db = PWManDatabase(filename, passphrase)
 		self.prompt = "pwman$ "
 
-		self.timeout = PWManTimeout(timeout)
-		self.commitClearsUndo = commitClearsUndo
-		self.undo = UndoStack()
+		self.__timeout = PWManTimeout(timeout)
+		self.__commitClearsUndo = commitClearsUndo
+		self.__undo = UndoStack()
 
 	def __err(self, source, message):
 		source = " " + source + ":" if source else ""
@@ -121,20 +121,20 @@ class PWMan(Cmd):
 		print("+++%s %s\n" % (source, message))
 
 	def precmd(self, line):
-		self.timeout.poke()
+		self.__timeout.poke()
 		first = self.__getParam(line, 0, unescape=False)
 		if first.endswith('?'):
 			return "help %s" % first[:-1]
 		return line
 
 	def postcmd(self, stop, line):
-		self.timeout.poke()
+		self.__timeout.poke()
 
 	def default(self, line):
 		self.__err(None, "Unknown command: %s\nType 'help' for more help." % line)
 
 	def emptyline(self):
-		self.timeout.poke()
+		self.__timeout.poke()
 		# Don't repeat the last command
 
 	def __dumpEntry(self, entry):
@@ -154,7 +154,7 @@ class PWMan(Cmd):
 
 	def __complete_category_title(self, text, line, begidx, endidx):
 		# Generic [category] [title] completion
-		self.timeout.poke()
+		self.__timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
 		text = self.__getParam(line, paramIdx, ignoreFirst=True)
 		if paramIdx == 0:
@@ -250,15 +250,15 @@ class PWMan(Cmd):
 		'screen' session buffer or other advanced console buffers.\n
 		Aliases: None"""
 		clearScreen()
-		self.undo.clear()
+		self.__undo.clear()
 
 	def do_commit(self, params):
 		"""--- Write changes to the database file ---\n
 		Command: commit\n
 		Aliases: c w"""
 		self.__db.commit()
-		if self.commitClearsUndo:
-			self.undo.clear()
+		if self.__commitClearsUndo:
+			self.__undo.clear()
 	do_c = do_commit
 	do_w = do_commit
 
@@ -280,7 +280,7 @@ class PWMan(Cmd):
 			return
 		if p != self.__db.getPassphrase():
 			self.__db.setPassphrase(p)
-			self.undo.clear()
+			self.__undo.clear()
 
 	def do_list(self, params):
 		"""--- Print a listing ---
@@ -339,8 +339,8 @@ class PWMan(Cmd):
 			self.__db.addEntry(entry)
 		except (PWManError) as e:
 			self.__err("new", str(e))
-		self.undo.do("new %s" % params,
-			     "remove %s %s" % (escapeCmd(category), escapeCmd(title)))
+		self.__undo.do("new %s" % params,
+			       "remove %s %s" % (escapeCmd(category), escapeCmd(title)))
 	do_n = do_new
 	do_add = do_new
 
@@ -363,11 +363,11 @@ class PWMan(Cmd):
 			self.__db.editEntry(data2entry(category, title, newData))
 		except (PWManError) as e:
 			self.__err(commandName, str(e))
-		self.undo.do("%s %s" % (commandName, params),
-			     "%s %s %s %s" %\
-			     (commandName, escapeCmd(oldEntry.category),
-			      escapeCmd(oldEntry.title),
-			      escapeCmd(entry2data(oldEntry))))
+		self.__undo.do("%s %s" % (commandName, params),
+			       "%s %s %s %s" %\
+			       (commandName, escapeCmd(oldEntry.category),
+				escapeCmd(oldEntry.title),
+				escapeCmd(entry2data(oldEntry))))
 
 	def do_edit_user(self, params):
 		"""--- Edit the 'user' field of an existing entry ---
@@ -383,7 +383,7 @@ class PWMan(Cmd):
 	do_eu = do_edit_user
 
 	def complete_edit_user(self, text, line, begidx, endidx):
-		self.timeout.poke()
+		self.__timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
 		text = self.__getParam(line, paramIdx, ignoreFirst=True)
 		if paramIdx == 0:
@@ -415,7 +415,7 @@ class PWMan(Cmd):
 	do_ep = do_edit_pw
 
 	def complete_edit_pw(self, text, line, begidx, endidx):
-		self.timeout.poke()
+		self.__timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
 		text = self.__getParam(line, paramIdx, ignoreFirst=True)
 		if paramIdx == 0:
@@ -447,7 +447,7 @@ class PWMan(Cmd):
 	do_eb = do_edit_bulk
 
 	def complete_edit_bulk(self, text, line, begidx, endidx):
-		self.timeout.poke()
+		self.__timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
 		text = self.__getParam(line, paramIdx, ignoreFirst=True)
 		if paramIdx == 0:
@@ -482,11 +482,11 @@ class PWMan(Cmd):
 			self.__db.delEntry(PWManEntry(category, title))
 		except (PWManError) as e:
 			self.__err("remove", str(e))
-		self.undo.do("remove %s" % params,
-			     "new %s %s %s %s %s" %\
-			     (escapeCmd(oldEntry.category), escapeCmd(oldEntry.title),
-			      escapeCmd(oldEntry.user), escapeCmd(oldEntry.pw),
-			      escapeCmd(oldEntry.bulk)))
+		self.__undo.do("remove %s" % params,
+			       "new %s %s %s %s %s" %\
+			       (escapeCmd(oldEntry.category), escapeCmd(oldEntry.title),
+				escapeCmd(oldEntry.user), escapeCmd(oldEntry.pw),
+				escapeCmd(oldEntry.bulk)))
 	do_rm = do_remove
 	do_del = do_remove
 
@@ -525,10 +525,10 @@ class PWMan(Cmd):
 			self.__db.delEntry(oldEntry)
 		except (PWManError) as e:
 			self.__info("move", str(e))
-		self.undo.do("move %s" % params,
-			     "move %s %s %s %s" % (
-			     escapeCmd(newEntry.category), escapeCmd(newEntry.title),
-			     escapeCmd(oldEntry.category), escapeCmd(oldEntry.title)))
+		self.__undo.do("move %s" % params,
+			       "move %s %s %s %s" % (
+			       escapeCmd(newEntry.category), escapeCmd(newEntry.title),
+			       escapeCmd(oldEntry.category), escapeCmd(oldEntry.title)))
 	do_mv = do_move
 	do_rename = do_move
 
@@ -599,7 +599,7 @@ class PWMan(Cmd):
 	do_f = do_find
 
 	def complete_find(self, text, line, begidx, endidx):
-		self.timeout.poke()
+		self.__timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
 		text = self.__getParam(line, paramIdx, ignoreFirst=True)
 		if paramIdx == 0:
@@ -697,17 +697,17 @@ class PWMan(Cmd):
 		if _hash:
 			entryTotp.hmacHash = _hash
 		self.__db.setEntryTotp(entryTotp)
-		self.undo.do("edit_totp %s" % params,
-			     "edit_totp %s %s %s %s %s" % (
-			     escapeCmd(category),
-			     escapeCmd(title),
-			     escapeCmd(origEntryTotp.key or ""),
-			     escapeCmd(("%d" % origEntryTotp.digits) if origEntryTotp.digits else ""),
-			     escapeCmd(origEntryTotp.hmacHash or "")))
+		self.__undo.do("edit_totp %s" % params,
+			       "edit_totp %s %s %s %s %s" % (
+			       escapeCmd(category),
+			       escapeCmd(title),
+			       escapeCmd(origEntryTotp.key or ""),
+			       escapeCmd(("%d" % origEntryTotp.digits) if origEntryTotp.digits else ""),
+			       escapeCmd(origEntryTotp.hmacHash or "")))
 	do_et = do_edit_totp
 
 	def complete_edit_totp(self, text, line, begidx, endidx):
-		self.timeout.poke()
+		self.__timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
@@ -732,15 +732,15 @@ class PWMan(Cmd):
 		Command: undo\n
 		Rewinds the last command that changed the database.\n
 		Aliases: None"""
-		cmd = self.undo.undo()
+		cmd = self.__undo.undo()
 		if not cmd:
 			self.__err("undo", "There is no command to be undone.")
-		self.undo.freeze()
+		self.__undo.freeze()
 		try:
 			for undoCommand in cmd.undoCommands:
 				self.onecmd(undoCommand)
 		finally:
-			self.undo.thaw()
+			self.__undo.thaw()
 		self.__info("undo",
 			    "; ".join(cmd.doCommands) + "\nsuccessfully undone with\n" +\
 			    "; ".join(cmd.undoCommands))
@@ -751,15 +751,15 @@ class PWMan(Cmd):
 		Redoes the last undone command.
 		Also see 'undo' help.\n
 		Aliases: None"""
-		cmd = self.undo.redo()
+		cmd = self.__undo.redo()
 		if not cmd:
 			self.__err("redo", "There is no undone command to be redone.")
-		self.undo.freeze()
+		self.__undo.freeze()
 		try:
 			for doCommand in cmd.doCommands:
 				self.onecmd(doCommand)
 		finally:
-			self.undo.thaw()
+			self.__undo.thaw()
 		self.__info("redo",
 			    "; ".join(cmd.undoCommands) + "\nsuccessfully redone with\n" +\
 			    "; ".join(cmd.doCommands))
