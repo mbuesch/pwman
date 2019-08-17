@@ -11,7 +11,6 @@ from libpwman.util import *
 
 import os
 from dataclasses import dataclass
-from copy import copy, deepcopy
 
 __all__ = [
 	"CSQLError",
@@ -30,29 +29,14 @@ def getDefaultDatabase():
 		return home + "/.pwman.db"
 	return None
 
+@dataclass
 class PWManEntry(object):
-	__slots__ = (
-		"category",
-		"title",
-		"user",
-		"pw",
-		"bulk",
-		"entryId",
-	)
-
-	def __init__(self,
-		     category,
-		     title,
-		     user=None,
-		     pw=None,
-		     bulk=None,
-		     entryId=None):
-		self.category = category
-		self.title = title
-		self.user = user
-		self.pw = pw
-		self.bulk = bulk
-		self.entryId = entryId
+	category	: str
+	title		: str
+	user		: str = None
+	pw		: str = None
+	bulk		: str = None
+	entryId		: int = None
 
 	def dump(self):
 		res = []
@@ -65,26 +49,6 @@ class PWManEntry(object):
 		if self.bulk:
 			res.append("\tBulk data:\t%s" % self.bulk)
 		return "\n".join(res) + "\n"
-
-	def __copy__(self):
-		return self.__class__(
-			category=copy(self.category),
-			title=copy(self.title),
-			user=copy(self.user),
-			pw=copy(self.pw),
-			bulk=copy(self.bulk),
-			entryId=copy(self.entryId),
-		)
-
-	def __deepcopy__(self, memo):
-		return self.__class__(
-			category=deepcopy(self.category, memo),
-			title=deepcopy(self.title, memo),
-			user=deepcopy(self.user, memo),
-			pw=deepcopy(self.pw, memo),
-			bulk=deepcopy(self.bulk, memo),
-			entryId=deepcopy(self.entryId, memo),
-		)
 
 @dataclass
 class PWManEntryTOTP(object):
