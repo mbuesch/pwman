@@ -29,8 +29,6 @@ def getDefaultDatabase():
 	return None
 
 class PWManEntry(object):
-	Undefined = None
-
 	__slots__ = (
 		"category",
 		"title",
@@ -43,26 +41,16 @@ class PWManEntry(object):
 	def __init__(self,
 		     category,
 		     title,
-		     user=Undefined,
-		     pw=Undefined,
-		     bulk=Undefined,
-		     entryId=Undefined):
+		     user=None,
+		     pw=None,
+		     bulk=None,
+		     entryId=None):
 		self.category = category
 		self.title = title
 		self.user = user
 		self.pw = pw
 		self.bulk = bulk
 		self.entryId = entryId
-
-	def copyUndefined(self, fromEntry):
-		assert(self.category is not self.Undefined)
-		assert(self.title is not self.Undefined)
-		if self.user is self.Undefined:
-			self.user = fromEntry.user
-		if self.pw is self.Undefined:
-			self.pw = fromEntry.pw
-		if self.bulk is self.Undefined:
-			self.bulk = fromEntry.bulk
 
 	def dump(self):
 		res = []
@@ -224,7 +212,7 @@ class PWManDatabase(CryptSQL):
 		c = self.sqlExec("SELECT id, data FROM bulk WHERE entry=?",
 				 (entryId, ))
 		bulk = c.fetchOne()
-		bulk = PWManEntry.Undefined if bulk is None else bulk[1]
+		bulk = bulk if bulk is None else bulk[1]
 		return PWManEntry(category=data[1],
 				  title=data[2],
 				  user=data[3],
@@ -287,7 +275,7 @@ class PWManDatabase(CryptSQL):
 				  entry.user,
 				  entry.pw))
 		entry.entryId = c.lastRowID()
-		if entry.bulk is not entry.Undefined:
+		if entry.bulk is not None:
 			c = self.sqlExec("INSERT INTO bulk(entry, data) "
 					 "VALUES(?,?);",
 					 (entry.entryId,
@@ -299,7 +287,12 @@ class PWManDatabase(CryptSQL):
 		if not oldEntry:
 			raise PWManError("Entry does not exist")
 
-		entry.copyUndefined(oldEntry)
+		if entry.user is None:
+			entry.user = oldEntry.user
+		if entry.pw is None:
+			entry.pw = oldEntry.pw
+		if entry.bulk is None:
+			entry.bulk = oldEntry.bulk
 		entry.entryId = oldEntry.entryId
 
 		c = self.sqlExec("UPDATE entries SET "
