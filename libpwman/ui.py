@@ -670,9 +670,9 @@ class PWMan(Cmd):
 		if not entry:
 			self.__err("edit_totp", "'%s/%s' not found" % (category, title))
 		entryTotp = self.__db.getEntryTotp(entry)
-		origEntryTotp = deepcopy(entryTotp)
 		if not entryTotp:
 			entryTotp = PWManEntryTOTP(None, entry=entry)
+		origEntryTotp = deepcopy(entryTotp)
 		entryTotp.key = key
 		if digits:
 			try:
