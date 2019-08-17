@@ -38,18 +38,6 @@ class PWManEntry(object):
 	bulk		: str = None
 	entryId		: int = None
 
-	def dump(self):
-		res = []
-		res.append("===  %s  ===" % self.category)
-		res.append("\t---  %s  ---" % self.title)
-		if self.user:
-			res.append("\tUser:\t\t%s" % self.user)
-		if self.pw:
-			res.append("\tPassword:\t%s" % self.pw)
-		if self.bulk:
-			res.append("\tBulk data:\t%s" % self.bulk)
-		return "\n".join(res) + "\n"
-
 @dataclass
 class PWManEntryTOTP(object):
 	key		: str

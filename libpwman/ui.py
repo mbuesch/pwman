@@ -137,6 +137,21 @@ class PWMan(Cmd):
 		self.timeout.poke()
 		# Don't repeat the last command
 
+	def __dumpEntry(self, entry):
+		res = []
+		res.append("===  %s  ===" % entry.category)
+		res.append("\t---  %s  ---" % entry.title)
+		if entry.user:
+			res.append("\tUser:\t\t%s" % entry.user)
+		if entry.pw:
+			res.append("\tPassword:\t%s" % entry.pw)
+		if entry.bulk:
+			res.append("\tBulk data:\t%s" % entry.bulk)
+		entryTotp = self.__db.getEntryTotp(entry)
+		if entryTotp:
+			res.append("\tTOTP:\t\tavailable")
+		return "\n".join(res) + "\n"
+
 	def __complete_category_title(self, text, line, begidx, endidx):
 		# Generic [category] [title] completion
 		self.timeout.poke()
@@ -285,7 +300,7 @@ class PWMan(Cmd):
 		elif category and title:
 			entry = self.__db.getEntry(PWManEntry(category, title))
 			if entry:
-				stdout(entry.dump())
+				stdout(self.__dumpEntry(entry))
 			else:
 				self.__err("list", "'%s/%s' not found" % (category, title))
 		else:
@@ -580,7 +595,7 @@ class PWMan(Cmd):
 		if not entries:
 			self.__err("find", "'%s' not found" % pattern)
 		for entry in entries:
-			stdout(entry.dump() + "\n\n")
+			stdout(self.__dumpEntry(entry) + "\n\n")
 	do_f = do_find
 
 	def complete_find(self, text, line, begidx, endidx):
@@ -671,7 +686,7 @@ class PWMan(Cmd):
 			self.__err("edit_totp", "'%s/%s' not found" % (category, title))
 		entryTotp = self.__db.getEntryTotp(entry)
 		if not entryTotp:
-			entryTotp = PWManEntryTOTP(None, entry=entry)
+			entryTotp = PWManEntryTOTP(key=None, entry=entry)
 		origEntryTotp = deepcopy(entryTotp)
 		entryTotp.key = key
 		if digits:
