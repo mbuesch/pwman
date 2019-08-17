@@ -24,7 +24,6 @@ __all__ = [
 	"PWManTimeout",
 ]
 
-
 class EscapeError(Exception):
 	pass
 
@@ -208,7 +207,7 @@ class PWMan(Cmd):
 			super().do_help(params)
 			return
 		def printCmdHelp(cmdHelp):
-			for (cmd, aliases, desc) in cmdHelp:
+			for cmd, aliases, desc in cmdHelp:
 				spc = " " * (10 - len(cmd))
 				msg = "  %s%s%s" % (cmd, spc, desc)
 				if aliases:
@@ -792,7 +791,7 @@ class PWMan(Cmd):
 		startidx = endidx - 1
 		while startidx > 0 and not line[startidx].isspace():
 			startidx -= 1
-		return len([_f for _f in line[:startidx].split() if _f]) - 1
+		return len([l for l in line[:startidx].split() if l]) - 1
 
 	def __sanitizeCmdline(self, line):
 		# Sanitize a commandline for simple whitespace based splitting.
@@ -808,7 +807,7 @@ class PWMan(Cmd):
 			paramIndex += 1
 		inParam = False
 		idx = 0
-		for (startIndex, c) in enumerate(sline):
+		for startIndex, c in enumerate(sline):
 			if c.isspace():
 				if inParam:
 					idx += 1
