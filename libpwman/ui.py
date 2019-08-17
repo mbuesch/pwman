@@ -670,6 +670,7 @@ class PWMan(Cmd):
 		if not entry:
 			self.__err("edit_totp", "'%s/%s' not found" % (category, title))
 		entryTotp = self.__db.getEntryTotp(entry)
+		origEntryTotp = deepcopy(entryTotp)
 		if not entryTotp:
 			entryTotp = PWManEntryTOTP(None, entry=entry)
 		entryTotp.key = key
@@ -681,7 +682,13 @@ class PWMan(Cmd):
 		if _hash:
 			entryTotp.hmacHash = _hash
 		self.__db.setEntryTotp(entryTotp)
-		#TODO undo
+		self.undo.do("edit_totp %s" % params,
+			     "edit_totp %s %s %s %s %s" % (
+			     escapeCmd(category),
+			     escapeCmd(title),
+			     escapeCmd(origEntryTotp.key or ""),
+			     escapeCmd(("%d" % origEntryTotp.digits) if origEntryTotp.digits else ""),
+			     escapeCmd(origEntryTotp.hmacHash or "")))
 	do_et = do_edit_totp
 
 	def complete_edit_totp(self, text, line, begidx, endidx):
