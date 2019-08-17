@@ -122,7 +122,7 @@ class PWMan(Cmd):
 
 	def precmd(self, line):
 		self.timeout.poke()
-		first = self.__getParam(line, 0, False, False)
+		first = self.__getParam(line, 0, unescape=False)
 		if first.endswith('?'):
 			return "help %s" % first[:-1]
 		return line
@@ -156,13 +156,13 @@ class PWMan(Cmd):
 		# Generic [category] [title] completion
 		self.timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
-		text = self.__getParam(line, paramIdx, True)
+		text = self.__getParam(line, paramIdx, ignoreFirst=True)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self.__getParam(line, 0, True),
+			return self.__getEntryTitleCompletions(self.__getParam(line, 0, ignoreFirst=True),
 							       text)
 		return []
 
@@ -385,18 +385,18 @@ class PWMan(Cmd):
 	def complete_edit_user(self, text, line, begidx, endidx):
 		self.timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
-		text = self.__getParam(line, paramIdx, True)
+		text = self.__getParam(line, paramIdx, ignoreFirst=True)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self.__getParam(line, 0, True),
+			return self.__getEntryTitleCompletions(self.__getParam(line, 0, ignoreFirst=True),
 							       text)
 		elif paramIdx == 2:
 			# User data
-			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, True),
-							      self.__getParam(line, 1, True)))
+			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, ignoreFirst=True),
+							      self.__getParam(line, 1, ignoreFirst=True)))
 			return [ escapeCmd(entry.user) ]
 		return []
 	complete_eu = complete_edit_user
@@ -417,18 +417,18 @@ class PWMan(Cmd):
 	def complete_edit_pw(self, text, line, begidx, endidx):
 		self.timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
-		text = self.__getParam(line, paramIdx, True)
+		text = self.__getParam(line, paramIdx, ignoreFirst=True)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self.__getParam(line, 0, True),
+			return self.__getEntryTitleCompletions(self.__getParam(line, 0, ignoreFirst=True),
 							       text)
 		elif paramIdx == 2:
 			# Password data
-			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, True),
-							      self.__getParam(line, 1, True)))
+			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, ignoreFirst=True),
+							      self.__getParam(line, 1, ignoreFirst=True)))
 			return [ escapeCmd(entry.pw) ]
 		return []
 	complete_ep = complete_edit_pw
@@ -449,18 +449,18 @@ class PWMan(Cmd):
 	def complete_edit_bulk(self, text, line, begidx, endidx):
 		self.timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
-		text = self.__getParam(line, paramIdx, True)
+		text = self.__getParam(line, paramIdx, ignoreFirst=True)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self.__getParam(line, 0, True),
+			return self.__getEntryTitleCompletions(self.__getParam(line, 0, ignoreFirst=True),
 							       text)
 		elif paramIdx == 2:
 			# Bulk data
-			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, True),
-							      self.__getParam(line, 1, True)))
+			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, ignoreFirst=True),
+							      self.__getParam(line, 1, ignoreFirst=True)))
 			return [ escapeCmd(entry.bulk) ]
 		return []
 	complete_eb = complete_edit_bulk
@@ -601,7 +601,7 @@ class PWMan(Cmd):
 	def complete_find(self, text, line, begidx, endidx):
 		self.timeout.poke()
 		paramIdx = self.__calcParamIndex(line, endidx)
-		text = self.__getParam(line, paramIdx, True)
+		text = self.__getParam(line, paramIdx, ignoreFirst=True)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
@@ -711,13 +711,19 @@ class PWMan(Cmd):
 		paramIdx = self.__calcParamIndex(line, endidx)
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
-		text = self.__getParam(line, paramIdx, True)
-		if paramIdx == 2: # key
-			pass#TODO
-		elif paramIdx == 3: # digits
-			pass#TODO
-		elif paramIdx == 4: # hash
-			pass#TODO
+		category = self.__getParam(line, 0, ignoreFirst=True)
+		title = self.__getParam(line, 1, ignoreFirst=True)
+		if category and title:
+			entry = self.__db.getEntry(PWManEntry(category, title))
+			if entry:
+				entryTotp = self.__db.getEntryTotp(entry)
+				if entryTotp:
+					if paramIdx == 2: # key
+						return [ entryTotp.key + " " ]
+					elif paramIdx == 3: # digits
+						return [ str(entryTotp.digits) + " " ]
+					elif paramIdx == 4: # hash
+						return [ entryTotp.hmacHash + " " ]
 		return []
 	complete_et = complete_edit_totp
 
