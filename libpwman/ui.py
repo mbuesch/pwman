@@ -679,14 +679,25 @@ class PWMan(Cmd):
 
 	def do_totp(self, params):
 		"""--- Generate a TOTP token ---
-		Command: totp category title\n
+		Command: totp [CATEGORY TITLE] OR [TITLE]\n
 		Generates a token using the Time-Based One-Time Password Algorithm.\n
 		Aliases: t"""
-		category, title = self.__getParams(params, 0, 2)
-		if not category:
-			self.__err("totp", "Category parameter is required.")
-		if not title:
-			self.__err("totp", "Title parameter is required.")
+		first, second = self.__getParams(params, 0, 2)
+		if not first:
+			self.__err("totp", "First parameter is required.")
+		if second:
+			category, title = first, second
+		else:
+			entries = self.__db.findEntries(first, matchTitle=True)
+			if not entries:
+				self.__err("totp", "Entry title not found.")
+				return
+			elif len(entries) == 1:
+				category = entries[0].category
+				title = entries[0].title
+			else:
+				self.__err("totp", "Entry title ambiguous.")
+				return
 		entry = self.__db.getEntry(category, title)
 		if not entry:
 			self.__err("totp", "'%s/%s' not found" % (category, title))
