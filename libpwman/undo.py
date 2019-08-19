@@ -21,7 +21,7 @@ class UndoCommand(object):
 			self.undoCommands = (undoCommands, )
 
 class UndoStack(object):
-	def __init__(self, limit=16):
+	def __init__(self, limit=2**15):
 		self.limit = limit
 		self.frozen = 0
 		self.clear()
