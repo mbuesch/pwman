@@ -682,7 +682,10 @@ class PWMan(Cmd):
 	def do_edit_totp(self, params):
 		"""--- Edit TOTP key and parameters ---
 		Command: edit_totp category title [KEY] [DIGITS] [HASH]\n
-		Set Time-Based One-Time Password Algorithm key and parameters.\n
+		Set Time-Based One-Time Password Algorithm key and parameters.
+		If KEY is not provided, the TOTP parameters for this entry are deleted.
+		DIGITS default to 6, if not provided.
+		HASH defaults to SHA1, if not provided.\n
 		Aliases: et"""
 		category = self.__getParam(params, 0)
 		title = self.__getParam(params, 1)
