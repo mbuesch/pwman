@@ -321,11 +321,3 @@ class CryptSQL(object):
 			table = table[0]
 			if table != "sqlite_sequence":
 				self.sqlExec("DROP TABLE %s" % table)
-
-if __name__ == "__main__":
-	databaseFile = sys.argv[1]
-	passphrase = sys.argv[2]
-	csql = CryptSQL()
-	csql.open(databaseFile, passphrase)
-	csql.commit(passphrase)
-	csql.close()
