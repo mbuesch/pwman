@@ -58,8 +58,8 @@ class FileObj(object):
 		r += self.__data
 		return r
 
-	@staticmethod
-	def parseRaw(raw):
+	@classmethod
+	def parseRaw(cls, raw):
 		assert isinstance(raw, (bytes, bytearray)),\
 		       "FileObj: Invalid 'raw' type."
 		try:
@@ -77,7 +77,8 @@ class FileObj(object):
 			off += dataLen
 		except (IndexError, KeyError) as e:
 			raise FileObjError("Failed to parse file object")
-		return (FileObj(name, data), off)
+		return (cls(name, data),
+			off)
 
 class FileObjCollection(object):
 	def __init__(self, *objects):
