@@ -513,15 +513,37 @@ class PWMan(Cmd):
 		oldEntry = self.__db.getEntry(category, title)
 		if not oldEntry:
 			self.__err("remove", "Entry does not exist")
+		oldEntryBulk = self.__db.getEntryBulk(oldEntry)
+		oldEntryAttrs = self.__db.getEntryAttrs(oldEntry)
+		oldEntryTotp = self.__db.getEntryTotp(oldEntry)
 		try:
 			self.__db.delEntry(PWManEntry(category, title))
 		except (PWManError) as e:
 			self.__err("remove", str(e))
-		#FIXME associated bulk, entryattr, totp
-		self.__undo.do("remove %s" % params,
-			       "new %s %s %s %s" %\
-			       (escapeCmd(oldEntry.category), escapeCmd(oldEntry.title),
-				escapeCmd(oldEntry.user), escapeCmd(oldEntry.pw)))
+		undoCmds = [ "new %s %s %s %s" % (
+			     escapeCmd(oldEntry.category),
+			     escapeCmd(oldEntry.title),
+			     escapeCmd(oldEntry.user),
+			     escapeCmd(oldEntry.pw)) ]
+		if oldEntryBulk:
+			undoCmds.append("edit_bulk %s %s %s" % (
+					escapeCmd(oldEntry.category),
+					escapeCmd(oldEntry.title),
+					escapeCmd(oldEntryBulk.data or "")))
+		for oldEntryAttr in (oldEntryAttrs or []):
+			undoCmds.append("edit_attr %s %s %s %s" % (
+					escapeCmd(oldEntry.category),
+					escapeCmd(oldEntry.title),
+					escapeCmd(oldEntryAttr.name),
+					escapeCmd(oldEntryAttr.data or "")))
+		if oldEntryTotp:
+			undoCmds.append("edit_totp %s %s %s %s %s" % (
+					escapeCmd(oldEntry.category),
+					escapeCmd(oldEntry.title),
+					escapeCmd(oldEntryTotp.key or ""),
+					escapeCmd(("%d" % oldEntryTotp.digits) if oldEntryTotp.digits else ""),
+					escapeCmd(oldEntryTotp.hmacHash or "")))
+		self.__undo.do("remove %s" % params, undoCmds)
 	do_rm = do_remove
 	do_del = do_remove
 
@@ -812,8 +834,9 @@ class PWMan(Cmd):
 		finally:
 			self.__undo.thaw()
 		self.__info("undo",
-			    "; ".join(cmd.doCommands) + "\nsuccessfully undone with\n" +\
-			    "; ".join(cmd.undoCommands))
+			    "\n    " + "\n    ".join(cmd.doCommands) +
+			    "\nsuccessfully undone with:\n" +
+			    "    " + "\n    ".join(cmd.undoCommands))
 
 	def do_redo(self, params):
 		"""--- Redo the last undone command ---
@@ -831,8 +854,9 @@ class PWMan(Cmd):
 		finally:
 			self.__undo.thaw()
 		self.__info("redo",
-			    "; ".join(cmd.undoCommands) + "\nsuccessfully redone with\n" +\
-			    "; ".join(cmd.doCommands))
+			    "\n    " + "\n    ".join(cmd.undoCommands) +
+			    "\nsuccessfully redone with:\n" +
+			    "    " + "\n    ".join(cmd.doCommands))
 
 	def __skipParams(self, line, count,
 			 lineIncludesCommand=False, unescape=True):
