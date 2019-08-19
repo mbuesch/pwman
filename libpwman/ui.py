@@ -503,13 +503,20 @@ class PWMan(Cmd):
 
 	def do_remove(self, params):
 		"""--- Remove an existing entry ---
-		Command: remove category title\n
+		Command: remove category [title]\n
 		Remove an existing database entry.\n
 		Aliases: rm del"""
 		category, title = self.__getParams(params, 0, 2)
-		if not category or not title:
-			self.__err("remove", "Invalid parameters. "
-				"Need to supply category and title.")
+		if not category:
+			self.__err("remove", "Category parameter is required.")
+		if not title:
+			# Remove whole category
+			for title in self.__db.getEntryTitles(category):
+				p = "%s %s" % (escapeCmd(category),
+					       escapeCmd(title))
+				print("remove %s" % p)
+				self.do_remove(p)
+			return
 		oldEntry = self.__db.getEntry(category, title)
 		if not oldEntry:
 			self.__err("remove", "Entry does not exist")
