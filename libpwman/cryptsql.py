@@ -14,6 +14,8 @@ import secrets
 import sqlite3 as sql
 import functools
 
+from libpwman.fileobj import *
+
 def missingMod(name, debpack=None):
 	print("Python '%s' module is not installed." % name)
 	if debpack:
@@ -41,102 +43,6 @@ class CompressDummy(object):
 	def compress(self, payload, *args):
 		return payload
 	decompress = compress
-
-class FileObj(object):
-	# Raw object layout:
-	#   [ 1 byte  ] => Name length
-	#   [ x bytes ] => Name
-	#   [ 4 bytes ] => Payload data length
-	#   [ x bytes ] => Payload data
-
-	def __init__(self, name, data):
-		"""Construct FileObj().
-		name: The object name. Must be bytes-like.
-		data: The object payload. Must be bytes-like.
-		"""
-		assert isinstance(name, (bytes, bytearray)),\
-		       "FileObj: Invalid 'name' type."
-		assert isinstance(data, (bytes, bytearray)),\
-		       "FileObj: Invalid 'data' type."
-		if len(name) > 0xFF:
-			raise CSQLError("FileObj: Name too long")
-		self.__name = name
-		if len(data) > 0xFFFFFFFF:
-			raise CSQLError("FileObj: Data too long")
-		self.__data = data
-
-	def getName(self):
-		return self.__name
-
-	def getData(self):
-		return self.__data
-
-	def getRaw(self):
-		r = bytearray()
-		nameLen = len(self.__name)
-		r += b"%c" % (nameLen & 0xFF)
-		r += self.__name
-		dataLen = len(self.__data)
-		r += b"%c" % (dataLen & 0xFF)
-		r += b"%c" % ((dataLen >> 8) & 0xFF)
-		r += b"%c" % ((dataLen >> 16) & 0xFF)
-		r += b"%c" % ((dataLen >> 24) & 0xFF)
-		r += self.__data
-		return r
-
-	@staticmethod
-	def parseRaw(raw):
-		assert isinstance(raw, (bytes, bytearray)),\
-		       "FileObj: Invalid 'raw' type."
-		try:
-			off = 0
-			nameLen = raw[off]
-			off += 1
-			name = raw[off : off + nameLen]
-			off += nameLen
-			dataLen = (raw[off] |
-				   (raw[off + 1] << 8) |
-				   (raw[off + 2] << 16) |
-				   (raw[off + 3] << 24))
-			off += 4
-			data = raw[off : off + dataLen]
-			off += dataLen
-		except (IndexError, KeyError) as e:
-			raise CSQLError("Failed to parse file object")
-		return (FileObj(name, data), off)
-
-class FileObjCollection(object):
-	def __init__(self, *objects):
-		self.objects = objects
-
-	def getRaw(self):
-		raw = bytearray()
-		for obj in self.objects:
-			raw += obj.getRaw()
-		return raw
-
-	def get(self, name):
-		return [o for o in self.objects if o.getName() == name]
-
-	def getOne(self, name, errorMsg=None):
-		objs = self.get(name)
-		if len(objs) != 1:
-			if errorMsg:
-				raise CSQLError(errorMsg)
-			return None
-		return objs[0]
-
-	@staticmethod
-	def parseRaw(raw):
-		assert isinstance(raw, (bytes, bytearray)),\
-		       "FileObjCollection: Invalid 'raw' type."
-		offset = 0
-		objects = []
-		while offset < len(raw):
-			(obj, objLen) = FileObj.parseRaw(raw[offset:])
-			objects.append(obj)
-			offset += objLen
-		return FileObjCollection(*objects)
 
 class CryptSQLCursor(object):
 	def __init__(self, db):
@@ -195,80 +101,83 @@ class CryptSQL(object):
 		except UnicodeError as e:
 			raise CSQLError("Cannot UTF-8-encode passphrase.")
 
-		fc = FileObjCollection.parseRaw(rawdata)
-		head = fc.getOne(b"HEAD", "Invalid file header object")
-		if head.getData() != CSQL_HEADER:
-			raise CSQLError("Invalid file header")
-		cipher = fc.getOne(b"CIPHER", "Invalid CYPHER object").getData()
-		cipherMode = fc.getOne(b"CIPHER_MODE", "Invalid CYPHER_MODE object").getData()
-		cipherIV = fc.getOne(b"CIPHER_IV")
-		if cipherIV:
-			cipherIV = cipherIV.getData()
-		keyLen = fc.getOne(b"KEY_LEN", "Invalid KEY_LEN object").getData()
-		kdfMethod = fc.getOne(b"KDF_METHOD", "Invalid KDF_METHOD object").getData()
-		kdfSalt = fc.getOne(b"KDF_SALT", "Invalid KDF_SALT object").getData()
-		kdfIter = fc.getOne(b"KDF_ITER", "Invalid KDF_ITER object").getData()
-		kdfHash = fc.getOne(b"KDF_HASH", "Invalid KDF_HASH object").getData()
-		kdfMac = fc.getOne(b"KDF_MAC", "Invalid KDF_MAC object").getData()
-		compress = fc.getOne(b"COMPRESS", "Invalid COMPRESS object").getData()
-		payload = fc.getOne(b"PAYLOAD", "Invalid PAYLOAD object").getData()
-		if cipher == b"AES":
-			cipher = AES
-		else:
-			raise CSQLError("Unknown cipher: %s" % cipher.decode("UTF-8", "ignore"))
-		if cipherMode == b"CBC":
-			cipherMode = AES.MODE_CBC
-		else:
-			raise CSQLError("Unknown cipher mode: %s" % cipherMode.decode("UTF-8", "ignore"))
-		if not cipherIV:
-			cipherIV = b'\x00' * cipher.block_size
-		if len(cipherIV) != cipher.block_size:
-			raise CSQLError("Invalid IV len: %d" % len(cipherIV))
-		if keyLen == b"256":
-			keyLen = 256 // 8
-		else:
-			raise CSQLError("Unknown key len: %s" % keyLen.decode("UTF-8", "ignore"))
-		if kdfHash in (b"SHA256", b"SHA512"):
-			kdfHash = kdfHash.decode("UTF-8")
-		else:
-			raise CSQLError("Unknown kdf-hash: %s" % kdfHash.decode("UTF-8", "ignore"))
-		if len(kdfSalt) < 32:
-			raise CSQLError("Invalid salt len: %d" % len(kdfSalt))
 		try:
-			kdfIter = int(kdfIter.decode("UTF-8"), 10)
-		except (ValueError, UnicodeError) as e:
-			raise CSQLError("Unknown kdf-iter: %s" % kdfIter.decode("UTF-8", "ignore"))
-		if kdfMethod == b"PBKDF2":
-			if kdfMac != b"HMAC":
-				raise CSQLError("Unknown kdf-mac: %s" % kdfMac)
-			kdfMethod = lambda: hashlib.pbkdf2_hmac(hash_name=kdfHash,
-								password=passphrase,
-								salt=kdfSalt,
-								iterations=kdfIter,
-								dklen=keyLen)
-		else:
-			raise CSQLError("Unknown kdf method: %s" % kdfMethod)
-		if compress == b"ZLIB":
-			compress = zlib
-		elif compress == b"NONE":
-			compress = CompressDummy()
-		else:
-			raise CSQLError("Unknown compression: %s" % compress)
-		try:
-			# Decrypt payload
-			key = kdfMethod()
-			cipher = cipher.new(key,
-					    mode=cipherMode,
-					    IV=cipherIV)
-			payload = cipher.decrypt(payload)
-			payload = self.__unpadData(payload)
-			# Decompress payload
-			payload = compress.decompress(payload)
-			# Import the SQL database
-			self.db.cursor().executescript(payload.decode("UTF-8"))
-		except (CSQLError, zlib.error, sql.Error, sql.DatabaseError, UnicodeError) as e:
-			raise CSQLError("Failed to decrypt database. "
-					"Wrong passphrase?")
+			fc = FileObjCollection.parseRaw(rawdata)
+			head = fc.getOne(b"HEAD", "Invalid file header object")
+			if head.getData() != CSQL_HEADER:
+				raise CSQLError("Invalid file header")
+			cipher = fc.getOne(b"CIPHER", "Invalid CYPHER object").getData()
+			cipherMode = fc.getOne(b"CIPHER_MODE", "Invalid CYPHER_MODE object").getData()
+			cipherIV = fc.getOne(b"CIPHER_IV")
+			if cipherIV:
+				cipherIV = cipherIV.getData()
+			keyLen = fc.getOne(b"KEY_LEN", "Invalid KEY_LEN object").getData()
+			kdfMethod = fc.getOne(b"KDF_METHOD", "Invalid KDF_METHOD object").getData()
+			kdfSalt = fc.getOne(b"KDF_SALT", "Invalid KDF_SALT object").getData()
+			kdfIter = fc.getOne(b"KDF_ITER", "Invalid KDF_ITER object").getData()
+			kdfHash = fc.getOne(b"KDF_HASH", "Invalid KDF_HASH object").getData()
+			kdfMac = fc.getOne(b"KDF_MAC", "Invalid KDF_MAC object").getData()
+			compress = fc.getOne(b"COMPRESS", "Invalid COMPRESS object").getData()
+			payload = fc.getOne(b"PAYLOAD", "Invalid PAYLOAD object").getData()
+			if cipher == b"AES":
+				cipher = AES
+			else:
+				raise CSQLError("Unknown cipher: %s" % cipher.decode("UTF-8", "ignore"))
+			if cipherMode == b"CBC":
+				cipherMode = AES.MODE_CBC
+			else:
+				raise CSQLError("Unknown cipher mode: %s" % cipherMode.decode("UTF-8", "ignore"))
+			if not cipherIV:
+				cipherIV = b'\x00' * cipher.block_size
+			if len(cipherIV) != cipher.block_size:
+				raise CSQLError("Invalid IV len: %d" % len(cipherIV))
+			if keyLen == b"256":
+				keyLen = 256 // 8
+			else:
+				raise CSQLError("Unknown key len: %s" % keyLen.decode("UTF-8", "ignore"))
+			if kdfHash in (b"SHA256", b"SHA512"):
+				kdfHash = kdfHash.decode("UTF-8")
+			else:
+				raise CSQLError("Unknown kdf-hash: %s" % kdfHash.decode("UTF-8", "ignore"))
+			if len(kdfSalt) < 32:
+				raise CSQLError("Invalid salt len: %d" % len(kdfSalt))
+			try:
+				kdfIter = int(kdfIter.decode("UTF-8"), 10)
+			except (ValueError, UnicodeError) as e:
+				raise CSQLError("Unknown kdf-iter: %s" % kdfIter.decode("UTF-8", "ignore"))
+			if kdfMethod == b"PBKDF2":
+				if kdfMac != b"HMAC":
+					raise CSQLError("Unknown kdf-mac: %s" % kdfMac)
+				kdfMethod = lambda: hashlib.pbkdf2_hmac(hash_name=kdfHash,
+									password=passphrase,
+									salt=kdfSalt,
+									iterations=kdfIter,
+									dklen=keyLen)
+			else:
+				raise CSQLError("Unknown kdf method: %s" % kdfMethod)
+			if compress == b"ZLIB":
+				compress = zlib
+			elif compress == b"NONE":
+				compress = CompressDummy()
+			else:
+				raise CSQLError("Unknown compression: %s" % compress)
+			try:
+				# Decrypt payload
+				key = kdfMethod()
+				cipher = cipher.new(key,
+						    mode=cipherMode,
+						    IV=cipherIV)
+				payload = cipher.decrypt(payload)
+				payload = self.__unpadData(payload)
+				# Decompress payload
+				payload = compress.decompress(payload)
+				# Import the SQL database
+				self.db.cursor().executescript(payload.decode("UTF-8"))
+			except (CSQLError, zlib.error, sql.Error, sql.DatabaseError, UnicodeError) as e:
+				raise CSQLError("Failed to decrypt database. "
+						"Wrong passphrase?")
+		except FileObjError as e:
+			raise CSQLError("File format error: %s" % str(e))
 
 	def isOpen(self):
 		return bool(self.db)
@@ -347,6 +256,7 @@ class CryptSQL(object):
 
 		# Dump the database
 		payload = self.sqlPlainDump()
+
 		# Encrypt payload
 		kdfHash = "SHA512"
 		kdfSalt = self.__random(34)
@@ -362,30 +272,35 @@ class CryptSQL(object):
 			      mode=AES.MODE_CBC,
 			      IV=cipherIV)
 		payload = aes.encrypt(self.__padData(payload, aes.block_size))
-		# Assemble file objects
-		fc = FileObjCollection(
-			FileObj(b"HEAD", CSQL_HEADER),
-			FileObj(b"CIPHER", b"AES"),
-			FileObj(b"CIPHER_MODE", b"CBC"),
-			FileObj(b"CIPHER_IV", cipherIV),
-			FileObj(b"KEY_LEN", str(keyLen * 8).encode("UTF-8")),
-			FileObj(b"KDF_METHOD", b"PBKDF2"),
-			FileObj(b"KDF_SALT", kdfSalt),
-			FileObj(b"KDF_ITER", str(kdfIter).encode("UTF-8")),
-			FileObj(b"KDF_HASH", kdfHash.encode("UTF-8")),
-			FileObj(b"KDF_MAC", b"HMAC"),
-			FileObj(b"COMPRESS", b"NONE"),
-			FileObj(b"PAYLOAD", payload),
-		)
-		# Write to the file
-		rawdata = fc.getRaw()
+
 		try:
-			with open(self.filename, "wb") as f:
-				f.write(rawdata)
-				f.flush()
-		except (IOError) as e:
-			raise CSQLError("Failed to write file: %s" %\
-				e.strerror)
+			# Assemble file objects
+			fc = FileObjCollection(
+				FileObj(b"HEAD", CSQL_HEADER),
+				FileObj(b"CIPHER", b"AES"),
+				FileObj(b"CIPHER_MODE", b"CBC"),
+				FileObj(b"CIPHER_IV", cipherIV),
+				FileObj(b"KEY_LEN", str(keyLen * 8).encode("UTF-8")),
+				FileObj(b"KDF_METHOD", b"PBKDF2"),
+				FileObj(b"KDF_SALT", kdfSalt),
+				FileObj(b"KDF_ITER", str(kdfIter).encode("UTF-8")),
+				FileObj(b"KDF_HASH", kdfHash.encode("UTF-8")),
+				FileObj(b"KDF_MAC", b"HMAC"),
+				FileObj(b"COMPRESS", b"NONE"),
+				FileObj(b"PAYLOAD", payload),
+			)
+
+			# Write to the file
+			rawdata = fc.getRaw()
+			try:
+				with open(self.filename, "wb") as f:
+					f.write(rawdata)
+					f.flush()
+			except (IOError) as e:
+				raise CSQLError("Failed to write file: %s" %\
+					e.strerror)
+		except FileObjError as e:
+			raise CSQLError("File format error: %s" % str(e))
 
 	def sqlExec(self, code, params=[], dbCommit=True):
 		return CryptSQLCursor(self.db).sqlExec(code, params, dbCommit)
