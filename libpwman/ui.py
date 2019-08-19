@@ -149,6 +149,12 @@ class PWMan(Cmd):
 		entryTotp = self.__db.getEntryTotp(entry)
 		if entryTotp:
 			res.append("\tTOTP:\t\tavailable")
+		entryAttrs = self.__db.getEntryAttrs(entry)
+		if entryAttrs:
+			res.append("\tAttributes:")
+			for entryAttr in entryAttrs:
+				res.append("\t\t%s:\t%s" % (entryAttr.name,
+							    entryAttr.data))
 		return "\n".join(res) + "\n"
 
 	def __complete_category_title(self, text, line, begidx, endidx):
@@ -190,6 +196,7 @@ class PWMan(Cmd):
 		("edit_pw", ("ep",), "Edit the 'password' field of an entry"),
 		("edit_bulk", ("eb",), "Edit the 'bulk' field of an entry"),
 		("edit_totp", ("et",), "Edit the TOTP key and parameters"),
+		("edit_attr", ("ea",), "Edit an entry attribute"),
 		("move", ("mv", "rename"), "Move/rename and existing entry"),
 		("remove", ("rm", "del"), "Remove and existing entry"),
 	)
@@ -725,6 +732,59 @@ class PWMan(Cmd):
 						return [ escapeCmd(entryTotp.hmacHash) + " " ]
 		return []
 	complete_et = complete_edit_totp
+
+	def do_edit_attr(self, params):
+		"""--- Edit an entry attribute ---
+		Command: edit_attr category title NAME [DATA]\n
+		Edit or delete an entry attribute.\n
+		Aliases: ea"""
+		category = self.__getParam(params, 0)
+		title = self.__getParam(params, 1)
+		name = self.__getParam(params, 2)
+		data = self.__getParam(params, 3)
+		if not category:
+			self.__err("edit_attr", "Category parameter is required.")
+		if not title:
+			self.__err("edit_attr", "Title parameter is required.")
+		entry = self.__db.getEntry(PWManEntry(category, title))
+		if not entry:
+			self.__err("edit_attr", "'%s/%s' not found" % (category, title))
+		entryAttr = self.__db.getEntryAttr(entry, name)
+		if not entryAttr:
+			entryAttr = PWManEntryAttr(name=name, entry=entry)
+		origEntryAttr = deepcopy(entryAttr)
+		entryAttr.data = data
+		self.__db.setEntryAttr(entryAttr)
+		self.__undo.do("edit_attr %s" % params,
+			       "edit_attr %s %s %s %s" % (
+			       escapeCmd(category),
+			       escapeCmd(title),
+			       escapeCmd(origEntryAttr.name or ""),
+			       escapeCmd(origEntryAttr.data or "")))
+	do_ea = do_edit_attr
+
+	def complete_edit_attr(self, text, line, begidx, endidx):
+		self.__timeout.poke()
+		paramIdx = self.__calcParamIndex(line, endidx)
+		if paramIdx in (0, 1):
+			return self.__complete_category_title(text, line, begidx, endidx)
+		category = self.__getParam(line, 0, ignoreFirst=True)
+		title = self.__getParam(line, 1, ignoreFirst=True)
+		name = self.__getParam(line, 2, ignoreFirst=True)
+		if category and title:
+			entry = self.__db.getEntry(PWManEntry(category, title))
+			if entry:
+				if paramIdx == 2: # name
+					entryAttrs = self.__db.getEntryAttrs(entry)
+					if entryAttrs:
+						return [ escapeCmd(entryAttr.name) + " "
+							 for entryAttr in entryAttrs ]
+				elif paramIdx == 3: # data
+					entryAttr = self.__db.getEntryAttr(entry, name)
+					if entryAttr:
+						return [ escapeCmd(entryAttr.data) + " " ]
+		return []
+	complete_ea = complete_edit_attr
 
 	def do_undo(self, params):
 		"""--- Undo the last command ---
