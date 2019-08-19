@@ -616,8 +616,7 @@ class PWMan(Cmd):
 			(mTitle, mUser, mPw, mBulk) = (True,) * 4
 		entries = self.__db.findEntries(pattern, inCategory=category,
 						matchTitle=mTitle, matchUser=mUser,
-						matchPw=mPw, matchBulk=mBulk,
-						doGlobMatch=True)
+						matchPw=mPw, matchBulk=mBulk)
 		if not entries:
 			self.__err("find", "'%s' not found" % pattern)
 		for entry in entries:
