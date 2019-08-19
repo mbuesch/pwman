@@ -517,7 +517,7 @@ class PWMan(Cmd):
 			self.__db.delEntry(PWManEntry(category, title))
 		except (PWManError) as e:
 			self.__err("remove", str(e))
-		#FIXME associated elems
+		#FIXME associated bulk, entryattr, totp
 		self.__undo.do("remove %s" % params,
 			       "new %s %s %s %s" %\
 			       (escapeCmd(oldEntry.category), escapeCmd(oldEntry.title),

@@ -159,6 +159,14 @@ class PWManDatabase(CryptSQL):
 				 "totp(id INTEGER PRIMARY KEY AUTOINCREMENT, "
 				      "entry INTEGER, key TEXT, digits INTEGER, hash TEXT);")
 
+	def __garbageCollect(self):
+		c = self.sqlExec("DELETE FROM bulk "
+				 "WHERE entry NOT IN (SELECT id FROM entries);")
+		c = self.sqlExec("DELETE FROM entryattr "
+				 "WHERE entry NOT IN (SELECT id FROM entries);")
+		c = self.sqlExec("DELETE FROM totp "
+				 "WHERE entry NOT IN (SELECT id FROM entries);")
+
 	def getPassphrase(self):
 		return self.__passphrase
 
@@ -328,7 +336,7 @@ class PWManDatabase(CryptSQL):
 		entryId = entryId[0]
 		c = self.sqlExec("DELETE FROM entries WHERE id=?;",
 				 (entryId,))
-		#TODO remove all associated elements
+		self.__garbageCollect()
 		self.setDirty()
 
 	def getEntryBulk(self, entry):
@@ -522,5 +530,6 @@ class PWManDatabase(CryptSQL):
 			self.setDirty(False)
 
 	def commit(self):
+		self.__garbageCollect()
 		super().commit(self.__passphrase)
 		self.setDirty(False)
