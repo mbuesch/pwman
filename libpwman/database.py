@@ -94,8 +94,8 @@ class PWManDatabase(CryptSQL):
 				initDBVer = True
 		self.__initTables()
 		if initDBVer:
-			self.setGlobalAttr("db_type", self.DB_TYPE)
-			self.setGlobalAttr("db_version", self.DB_VER[-1])
+			self.setGlobalAttr("db_type", self.DB_TYPE, setDirty=False)
+			self.setGlobalAttr("db_version", self.DB_VER[-1], setDirty=False)
 
 	def __migrateVersion(self, dbVer):
 		if dbVer == self.DB_VER[0]:
@@ -357,6 +357,7 @@ class PWManDatabase(CryptSQL):
 		else:
 			c = self.sqlExec("DELETE FROM totp WHERE id=?;",
 					 (entryTotp.totpId,))
+		self.setDirty()
 
 	def getEntryAttr(self, entry, attrName):
 		c = self.sqlExec("SELECT entryattr.id, entryattr.name, entryattr.data "
@@ -418,6 +419,7 @@ class PWManDatabase(CryptSQL):
 		else:
 			c = self.sqlExec("DELETE FROM entryattr WHERE id=?;",
 					 (entryAttr.attrId,))
+		self.setDirty()
 
 	def getGlobalAttr(self, name):
 		try:
@@ -428,7 +430,7 @@ class PWManDatabase(CryptSQL):
 		except (CSQLError) as e:
 			return None
 
-	def setGlobalAttr(self, name, data):
+	def setGlobalAttr(self, name, data, setDirty=True):
 		if data:
 			c = self.sqlExec("SELECT id FROM globalattr "
 					 "WHERE name=?;",
@@ -447,6 +449,8 @@ class PWManDatabase(CryptSQL):
 		else:
 			c = self.sqlExec("DELETE FROM globalattr WHERE name=?;",
 					 (name,))
+		if setDirty:
+			self.setDirty()
 
 	def setDirty(self, d=True):
 		self.__dirty = d
