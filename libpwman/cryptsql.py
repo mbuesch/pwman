@@ -7,7 +7,6 @@
 
 import sys
 import os
-import errno
 import zlib
 import hashlib
 import secrets
@@ -93,16 +92,19 @@ class CryptSQL(object):
 		self.db = None
 		self.filename = None
 
-	def __parseFileData(self, rawdata, passphrase):
+	def __parseFile(self, filename, passphrase):
 		assert isinstance(passphrase, str),\
 		       "CryptSQL: Passphrase is not 'str'."
 		try:
-			passphrase = passphrase.encode("UTF-8")
-		except UnicodeError as e:
-			raise CSQLError("Cannot UTF-8-encode passphrase.")
+			fc = FileObjCollection.parseFile(filename)
+			if fc is None:
+				return
 
-		try:
-			fc = FileObjCollection.parseRaw(rawdata)
+			try:
+				passphrase = passphrase.encode("UTF-8")
+			except UnicodeError as e:
+				raise CSQLError("Cannot UTF-8-encode passphrase.")
+
 			head = fc.getOne(b"HEAD", "Invalid file header object")
 			if head.getData() != CSQL_HEADER:
 				raise CSQLError("Invalid file header")
@@ -169,15 +171,17 @@ class CryptSQL(object):
 						    IV=cipherIV)
 				payload = cipher.decrypt(payload)
 				payload = self.__unpadData(payload)
+
 				# Decompress payload
 				payload = compress.decompress(payload)
+
 				# Import the SQL database
 				self.db.cursor().executescript(payload.decode("UTF-8"))
 			except (CSQLError, zlib.error, sql.Error, sql.DatabaseError, UnicodeError) as e:
 				raise CSQLError("Failed to decrypt database. "
 						"Wrong passphrase?")
 		except FileObjError as e:
-			raise CSQLError("File format error: %s" % str(e))
+			raise CSQLError("File error: %s" % str(e))
 
 	def isOpen(self):
 		return bool(self.db)
@@ -189,15 +193,7 @@ class CryptSQL(object):
 		self.db = sql.connect(":memory:")
 		self.db.text_factory = str
 		try:
-			try:
-				with open(filename, "rb") as f:
-					rawdata = f.read()
-			except (IOError) as e:
-				if e.errno != errno.ENOENT:
-					raise CSQLError("Failed to read file: %s" %\
-						e.strerror)
-			else:
-				self.__parseFileData(rawdata, passphrase)
+			self.__parseFile(filename, passphrase)
 		except (CSQLError) as e:
 			self.__reset()
 			raise
@@ -291,16 +287,10 @@ class CryptSQL(object):
 			)
 
 			# Write to the file
-			rawdata = fc.getRaw()
-			try:
-				with open(self.filename, "wb") as f:
-					f.write(rawdata)
-					f.flush()
-			except (IOError) as e:
-				raise CSQLError("Failed to write file: %s" %\
-					e.strerror)
+			fc.writeFile(self.filename)
+
 		except FileObjError as e:
-			raise CSQLError("File format error: %s" % str(e))
+			raise CSQLError("File error: %s" % str(e))
 
 	def sqlExec(self, code, params=[], dbCommit=True):
 		return CryptSQLCursor(self.db).sqlExec(code, params, dbCommit)

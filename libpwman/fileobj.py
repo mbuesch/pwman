@@ -5,6 +5,8 @@
 # Licensed under the GNU/GPL version 2 or later.
 """
 
+import errno
+
 __all__ = [
 	"FileObjError",
 	"FileObj",
@@ -81,6 +83,15 @@ class FileObjCollection(object):
 	def __init__(self, *objects):
 		self.objects = objects
 
+	def writeFile(self, filepath):
+		try:
+			with open(filepath, "wb") as f:
+				f.write(self.getRaw())
+				f.flush()
+		except IOError as e:
+			raise FileObjError("Failed to write file: %s" %
+					   e.strerror)
+
 	def getRaw(self):
 		raw = bytearray()
 		for obj in self.objects:
@@ -98,8 +109,8 @@ class FileObjCollection(object):
 			return None
 		return objs[0]
 
-	@staticmethod
-	def parseRaw(raw):
+	@classmethod
+	def parseRaw(cls, raw):
 		assert isinstance(raw, (bytes, bytearray)),\
 		       "FileObjCollection: Invalid 'raw' type."
 		offset = 0
@@ -108,4 +119,16 @@ class FileObjCollection(object):
 			(obj, objLen) = FileObj.parseRaw(raw[offset:])
 			objects.append(obj)
 			offset += objLen
-		return FileObjCollection(*objects)
+		return cls(*objects)
+
+	@classmethod
+	def parseFile(cls, filepath):
+		try:
+			with open(filepath, "rb") as f:
+				rawData = f.read()
+		except (IOError) as e:
+			if e.errno != errno.ENOENT:
+				raise FileObjError("Failed to read file: %s" %\
+						   e.strerror)
+			return None
+		return cls.parseRaw(rawData)
