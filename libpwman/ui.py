@@ -775,7 +775,8 @@ class PWMan(Cmd):
 					entryAttrs = self.__db.getEntryAttrs(entry)
 					if entryAttrs:
 						return [ escapeCmd(entryAttr.name) + " "
-							 for entryAttr in entryAttrs ]
+							 for entryAttr in entryAttrs
+							 if entryAttr.name.lower().startswith(name.lower()) ]
 				elif paramIdx == 3: # data
 					entryAttr = self.__db.getEntryAttr(entry, name)
 					if entryAttr:
