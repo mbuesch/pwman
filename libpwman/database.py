@@ -14,11 +14,12 @@ from dataclasses import dataclass
 
 __all__ = [
 	"CSQLError",
-	"getDefaultDatabase",
-	"PWManEntry",
-	"PWManEntryTOTP",
-	"PWManEntryAttr",
 	"PWManDatabase",
+	"PWManEntry",
+	"PWManEntryAttr",
+	"PWManEntryBulk",
+	"PWManEntryTOTP",
+	"getDefaultDatabase",
 ]
 
 def getDefaultDatabase():
@@ -36,8 +37,20 @@ class PWManEntry(object):
 	title		: str
 	user		: str = None
 	pw		: str = None
-	bulk		: str = None
 	entryId		: int = None
+
+@dataclass
+class PWManEntryAttr(object):
+	name		: str
+	data		: str = None
+	entry		: PWManEntry = None
+	attrId		: int = None
+
+@dataclass
+class PWManEntryBulk(object):
+	data		: str = None
+	entry		: PWManEntry = None
+	bulkId		: int = None
 
 @dataclass
 class PWManEntryTOTP(object):
@@ -46,13 +59,6 @@ class PWManEntryTOTP(object):
 	hmacHash	: str = "SHA1"
 	entry		: PWManEntry = None
 	totpId		: int = None
-
-@dataclass
-class PWManEntryAttr(object):
-	name		: str
-	data		: str = None
-	entry		: PWManEntry = None
-	attrId		: int = None
 
 class PWManDatabase(CryptSQL):
 	"""pwman database.
@@ -184,17 +190,11 @@ class PWManDatabase(CryptSQL):
 		data = c.fetchOne()
 		if not data:
 			return None
-		entryId = data[0]
-		c = self.sqlExec("SELECT id, data FROM bulk WHERE entry=?;",
-				 (entryId, ))
-		bulk = c.fetchOne()
-		bulk = bulk if bulk is None else bulk[1]
 		return PWManEntry(category=data[1],
 				  title=data[2],
 				  user=data[3],
 				  pw=data[4],
-				  bulk=bulk,
-				  entryId=entryId)
+				  entryId=data[0])
 
 	def findEntries(self, pattern,
 			leftAnchor=False, rightAnchor=False,
@@ -251,11 +251,6 @@ class PWManDatabase(CryptSQL):
 				  entry.user,
 				  entry.pw))
 		entry.entryId = c.lastRowID()
-		if entry.bulk is not None:
-			c = self.sqlExec("INSERT INTO bulk(entry, data) "
-					 "VALUES(?,?);",
-					 (entry.entryId,
-					  entry.bulk))
 		self.setDirty()
 
 	def editEntry(self, entry):
@@ -267,8 +262,6 @@ class PWManDatabase(CryptSQL):
 			entry.user = oldEntry.user
 		if entry.pw is None:
 			entry.pw = oldEntry.pw
-		if entry.bulk is None:
-			entry.bulk = oldEntry.bulk
 		entry.entryId = oldEntry.entryId
 
 		c = self.sqlExec("UPDATE entries SET "
@@ -279,24 +272,6 @@ class PWManDatabase(CryptSQL):
 				  entry.user,
 				  entry.pw,
 				  entry.entryId))
-		if entry.bulk:
-			c = self.sqlExec("SELECT id, data FROM bulk WHERE entry=?;",
-					 (entry.entryId, ))
-			bulk = c.fetchOne()
-			if bulk is None:
-				c = self.sqlExec("INSERT INTO bulk(entry, data) "
-						 "VALUES(?,?);",
-						 (entry.entryId,
-						  entry.bulk))
-			else:
-				c = self.sqlExec("UPDATE bulk "
-						 "SET data=? "
-						 "WHERE entry=?;",
-						 (entry.bulk,
-						  entry.entryId))
-		else:
-			c = self.sqlExec("DELETE FROM bulk WHERE entry=?;",
-					 (entry.entryId,))
 		self.setDirty()
 
 	def delEntry(self, entry):
@@ -309,8 +284,47 @@ class PWManDatabase(CryptSQL):
 		entryId = entryId[0]
 		c = self.sqlExec("DELETE FROM entries WHERE id=?;",
 				 (entryId,))
-		c = self.sqlExec("DELETE FROM bulk WHERE entry=?;",
-				 (entryId,))
+		#TODO remove all associated elements
+		self.setDirty()
+
+	def getEntryBulk(self, entry):
+		c = self.sqlExec("SELECT bulk.id, bulk.data "
+				 "FROM bulk, entries "
+				 "WHERE entries.category=? AND entries.title=? AND "
+				 "bulk.entry = entries.id;",
+				 (entry.category,
+				  entry.title))
+		data = c.fetchOne()
+		if not data:
+			return None
+		return PWManEntryBulk(data=data[1],
+				      entry=entry,
+				      bulkId=data[0])
+
+	def setEntryBulk(self, entryBulk):
+		entry = entryBulk.entry
+		if not entry or entry.entryId is None:
+			raise PWManError("Bulk: Entry does not exist.")
+		if entryBulk.data:
+			c = self.sqlExec("SELECT id FROM bulk WHERE entry=?;",
+					 (entry.entryId, ))
+			bulkId = c.fetchOne()
+			if bulkId is None:
+				c = self.sqlExec("INSERT INTO bulk(entry, data) "
+						 "VALUES(?,?);",
+						 (entry.entryId,
+						  entryBulk.data))
+			else:
+				bulkId = bulkId[0]
+				c = self.sqlExec("UPDATE bulk "
+						 "SET entry=?, data=? "
+						 "WHERE id=?;",
+						 (entry.entryId,
+						  entryBulk.data,
+						  bulkId))
+		else:
+			c = self.sqlExec("DELETE FROM bulk WHERE id=?;",
+					 (entryBulk.bulkId,))
 		self.setDirty()
 
 	def getEntryTotp(self, entry):

@@ -150,8 +150,9 @@ class PWMan(Cmd):
 			res.append("\tUser:\t\t%s" % entry.user)
 		if entry.pw:
 			res.append("\tPassword:\t%s" % entry.pw)
-		if entry.bulk:
-			res.append("\tBulk data:\t%s" % entry.bulk)
+		entryBulk = self.__db.getEntryBulk(entry)
+		if entryBulk:
+			res.append("\tBulk data:\t%s" % entryBulk.data)
 		entryTotp = self.__db.getEntryTotp(entry)
 		if entryTotp:
 			res.append("\tTOTP:\t\tavailable")
@@ -335,23 +336,22 @@ class PWMan(Cmd):
 
 	def do_new(self, params):
 		"""--- Create a new entry ---
-		Command: new [category] [title] [user] [password] [bulk-data]\n
+		Command: new [category] [title] [user] [password]\n
 		Create a new database entry. If no parameters are given,
 		they are asked for interactively.\n
 		Aliases: n add"""
 		if params:
-			category, title, user, pw, bulk = self.__getParams(params, 0, 5)
+			category, title, user, pw = self.__getParams(params, 0, 4)
 		else:
 			stdout("Create new entry:\n")
 			category = input("\tCategory: ")
 			title = input("\tEntry title: ")
 			user = input("\tUsername: ")
 			pw = input("\tPassword: ")
-			bulk = input("\tBulk data: ")
 		if not category or not title:
 			self.__err("new", "Invalid parameters. "
 				"Need to supply category and title.")
-		entry = PWManEntry(category, title, user, pw, bulk)
+		entry = PWManEntry(category=category, title=title, user=user, pw=pw)
 		try:
 			self.__db.addEntry(entry)
 		except (PWManError) as e:
@@ -365,8 +365,8 @@ class PWMan(Cmd):
 	complete_n = complete_new
 	complete_add = complete_new
 
-	def __do_edit_generic(self, params, commandName,
-			      entry2data, data2entry):
+	def __do_edit_entry(self, params, commandName,
+			    entry2data, data2entry):
 		category, title = self.__getParams(params, 0, 2)
 		if not category or not title:
 			self.__err(commandName, "Invalid parameters. "
@@ -393,7 +393,7 @@ class PWMan(Cmd):
 		The NEWDATA must _not_ be escaped (however, category and
 		title must be escaped).\n
 		Aliases: eu"""
-		self.__do_edit_generic(params, "edit_user",
+		self.__do_edit_entry(params, "edit_user",
 			lambda entry: entry.user,
 			lambda cat, tit, data: PWManEntry(cat, tit, user=data))
 	do_eu = do_edit_user
@@ -425,7 +425,7 @@ class PWMan(Cmd):
 		The NEWDATA must _not_ be escaped (however, category and
 		title must be escaped).\n
 		Aliases: ep"""
-		self.__do_edit_generic(params, "edit_pw",
+		self.__do_edit_entry(params, "edit_pw",
 			lambda entry: entry.pw,
 			lambda cat, tit, data: PWManEntry(cat, tit, pw=data))
 	do_ep = do_edit_pw
@@ -457,9 +457,26 @@ class PWMan(Cmd):
 		The NEWDATA must _not_ be escaped (however, category and
 		title must be escaped).\n
 		Aliases: eb"""
-		self.__do_edit_generic(params, "edit_bulk",
-			lambda entry: entry.bulk,
-			lambda cat, tit, data: PWManEntry(cat, tit, bulk=data))
+		category, title = self.__getParams(params, 0, 2)
+		data = self.__skipParams(params, 2).strip()
+		if not category:
+			self.__err("edit_bulk", "Category parameter is required.")
+		if not title:
+			self.__err("edit_bulk", "Title parameter is required.")
+		entry = self.__db.getEntry(PWManEntry(category, title))
+		if not entry:
+			self.__err("edit_bulk", "'%s/%s' not found" % (category, title))
+		entryBulk = self.__db.getEntryBulk(entry)
+		if not entryBulk:
+			entryBulk = PWManEntryBulk(entry=entry)
+		origEntryBulk = deepcopy(entryBulk)
+		entryBulk.data = data
+		self.__db.setEntryBulk(entryBulk)
+		self.__undo.do("edit_bulk %s" % params,
+			       "edit_bulk %s %s %s" % (
+			       escapeCmd(category),
+			       escapeCmd(title),
+			       escapeCmd(origEntryBulk.data or "")))
 	do_eb = do_edit_bulk
 
 	def complete_edit_bulk(self, text, line, begidx, endidx):
@@ -477,7 +494,10 @@ class PWMan(Cmd):
 			# Bulk data
 			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, ignoreFirst=True),
 							      self.__getParam(line, 1, ignoreFirst=True)))
-			return [ escapeCmd(entry.bulk) ]
+			if entry:
+				entryBulk = self.__db.getEntryBulk(entry)
+				if entryBulk:
+					return [ escapeCmd(entryBulk.data) ]
 		return []
 	complete_eb = complete_edit_bulk
 
@@ -497,11 +517,11 @@ class PWMan(Cmd):
 			self.__db.delEntry(PWManEntry(category, title))
 		except (PWManError) as e:
 			self.__err("remove", str(e))
+		#FIXME associated elems
 		self.__undo.do("remove %s" % params,
-			       "new %s %s %s %s %s" %\
+			       "new %s %s %s %s" %\
 			       (escapeCmd(oldEntry.category), escapeCmd(oldEntry.title),
-				escapeCmd(oldEntry.user), escapeCmd(oldEntry.pw),
-				escapeCmd(oldEntry.bulk)))
+				escapeCmd(oldEntry.user), escapeCmd(oldEntry.pw)))
 	do_rm = do_remove
 	do_del = do_remove
 
@@ -529,6 +549,7 @@ class PWMan(Cmd):
 		newEntry = deepcopy(oldEntry)
 		newEntry.category = toCategory
 		newEntry.title = toTitle
+		#FIXME this does not move associated data
 		try:
 			self.__db.addEntry(newEntry)
 		except (PWManError) as e:
