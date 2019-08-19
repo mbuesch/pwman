@@ -177,6 +177,16 @@ class PWMan(Cmd):
 							       text)
 		return []
 
+	def __getCategoryCompletions(self, text):
+		return [ escapeCmd(n) + " "
+			 for n in self.__db.getCategoryNames()
+			 if n.lower().startswith(text.lower()) ]
+
+	def __getEntryTitleCompletions(self, category, text):
+		return [ escapeCmd(t) + " "
+			 for t in self.__db.getEntryTitles(category)
+			 if t.lower().startswith(text.lower()) ]
+
 	cmdHelpMisc = (
 		("help", ("h",), "Show help about commands"),
 		("quit", ("q", "exit", "^D"), "Quit pwman"),
@@ -882,16 +892,6 @@ class PWMan(Cmd):
 		"""
 		return ( self.__getParam(line, i, ignoreFirst, unescape)
 			 for i in range(paramIndex, paramIndex + count) )
-
-	def __getCategoryCompletions(self, text):
-		catNames = [ n for n in self.__db.getCategoryNames()
-			     if n.lower().startswith(text.lower()) ]
-		return [ escapeCmd(n) + " " for n in catNames ]
-
-	def __getEntryTitleCompletions(self, category, text):
-		titles = [ t for t in self.__db.getEntryTitles(category)
-			   if t.lower().startswith(text.lower()) ]
-		return [ escapeCmd(t) + " " for t in titles ]
 
 	def __mayQuit(self):
 		if self.__db.isDirty():
