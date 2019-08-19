@@ -404,6 +404,19 @@ class CryptSQL(object):
 	def sqlPlainDump(self):
 		return ("\n".join(self.db.iterdump())).encode("UTF-8")
 
+	def importSqlScript(self, script, clear=True):
+		if clear:
+			self.dropAllTables()
+		self.sqlExecScript(script)
+
+	def dropAllTables(self):
+		c = self.sqlExec("SELECT name FROM sqlite_master "
+				 "WHERE type='table';")
+		for table in c.fetchAll():
+			table = table[0]
+			if table != "sqlite_sequence":
+				self.sqlExec("DROP TABLE %s" % table)
+
 if __name__ == "__main__":
 	databaseFile = sys.argv[1]
 	passphrase = sys.argv[2]

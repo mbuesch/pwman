@@ -197,6 +197,8 @@ class PWMan(Cmd):
 	cmdHelpDatabase = (
 		("commit", ("c", "w"), "Commit / write database file"),
 		("masterp", (), "Change the master passphrase"),
+		("dbdump", (), "Dump the database"),
+		("dbimport", (), "Import a database dump file"),
 	)
 
 	cmdHelpShow = (
@@ -204,7 +206,6 @@ class PWMan(Cmd):
 		("find", ("f",), "Search the database for patterns"),
 		("totp", ("t",), "Generate TOTP token"),
 		("totp_key", ("tk",), "Show TOTP key and parameters"),
-		("dbdump", (), "Dump the database"),
 	)
 
 	cmdHelpEdit = (
@@ -608,6 +609,20 @@ class PWMan(Cmd):
 				stdout(dump)
 		except (IOError) as e:
 			self.__err("dbdump", "Failed to write dump: %s" % e.strerror)
+
+	def do_dbimport(self, params):
+		"""--- Import an SQL database dump ---
+		Command: dbimport FILEPATH\n
+		Import the FILEPATH into the current database.
+		The database is cleared before importing the file!\n
+		Aliases: None"""
+		try:
+			with open(params, "rb") as f:
+				data = f.read().decode("UTF-8")
+			self.__db.importSqlScript(data)
+			self.__info("dbimport", "success.")
+		except (CSQLError, IOError, UnicodeError) as e:
+			self.__err("dbimport", "Failed to import dump: %s" % str(e))
 
 	def do_find(self, params):
 		"""--- Search the database ---

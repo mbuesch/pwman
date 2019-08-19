@@ -533,3 +533,7 @@ class PWManDatabase(CryptSQL):
 		self.__garbageCollect()
 		super().commit(self.__passphrase)
 		self.setDirty(False)
+
+	def importSqlScript(self, *args, **kwargs):
+		self.setDirty()
+		super().importSqlScript(*args, **kwargs)
