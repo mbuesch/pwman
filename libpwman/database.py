@@ -174,7 +174,7 @@ class PWManDatabase(CryptSQL):
 		if not data:
 			return None
 		entryId = data[0]
-		c = self.sqlExec("SELECT id, data FROM bulk WHERE entry=?",
+		c = self.sqlExec("SELECT id, data FROM bulk WHERE entry=?;",
 				 (entryId, ))
 		bulk = c.fetchOne()
 		bulk = bulk if bulk is None else bulk[1]
@@ -269,7 +269,7 @@ class PWManDatabase(CryptSQL):
 				  entry.pw,
 				  entry.entryId))
 		if entry.bulk:
-			c = self.sqlExec("SELECT id, data FROM bulk WHERE entry=?",
+			c = self.sqlExec("SELECT id, data FROM bulk WHERE entry=?;",
 					 (entry.entryId, ))
 			bulk = c.fetchOne()
 			if bulk is None:
@@ -321,9 +321,9 @@ class PWManDatabase(CryptSQL):
 	def setEntryTotp(self, entryTotp):
 		entry = entryTotp.entry
 		if not entry or entry.entryId is None:
-			raise PWManError("Entry does not exist")
+			raise PWManError("TOTP: Entry does not exist.")
 		if entryTotp.key:
-			c = self.sqlExec("SELECT id FROM totp WHERE entry=?",
+			c = self.sqlExec("SELECT id FROM totp WHERE entry=?;",
 					 (entry.entryId, ))
 			totpId = c.fetchOne()
 			if totpId is None:
