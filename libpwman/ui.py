@@ -718,11 +718,11 @@ class PWMan(Cmd):
 				entryTotp = self.__db.getEntryTotp(entry)
 				if entryTotp:
 					if paramIdx == 2: # key
-						return [ entryTotp.key + " " ]
+						return [ escapeCmd(entryTotp.key) + " " ]
 					elif paramIdx == 3: # digits
-						return [ str(entryTotp.digits) + " " ]
+						return [ escapeCmd(str(entryTotp.digits)) + " " ]
 					elif paramIdx == 4: # hash
-						return [ entryTotp.hmacHash + " " ]
+						return [ escapeCmd(entryTotp.hmacHash) + " " ]
 		return []
 	complete_et = complete_edit_totp
 
