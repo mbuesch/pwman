@@ -182,11 +182,11 @@ class PWManDatabase(CryptSQL):
 		titles = sorted(t[0] for t in titles)
 		return titles
 
-	def getEntry(self, entry):
+	def getEntry(self, category, title):
 		c = self.sqlExec("SELECT id, category, title, user, pw FROM entries "
 				 "WHERE category=? AND title=?;",
-				 (entry.category,
-				  entry.title))
+				 (category,
+				  title))
 		data = c.fetchOne()
 		if not data:
 			return None
@@ -266,11 +266,11 @@ class PWManDatabase(CryptSQL):
 				    entryId=data[0])
 			 for data in dataSet ]
 
-	def entryExists(self, entry):
-		return bool(self.getEntry(entry))
+	def entryExists(self, category, title):
+		return bool(self.getEntry(category, title))
 
 	def addEntry(self, entry):
-		if self.entryExists(entry):
+		if self.entryExists(entry.category, entry.title):
 			raise PWManError("Entry does already exist")
 		c = self.sqlExec("INSERT INTO entries(category, title, user, pw) "
 				 "VALUES(?,?,?,?);",
@@ -282,7 +282,7 @@ class PWManDatabase(CryptSQL):
 		self.setDirty()
 
 	def editEntry(self, entry):
-		oldEntry = self.getEntry(entry)
+		oldEntry = self.getEntry(entry.category, entry.title)
 		if not oldEntry:
 			raise PWManError("Entry does not exist")
 
@@ -303,9 +303,9 @@ class PWManDatabase(CryptSQL):
 		self.setDirty()
 
 	def moveEntry(self, entry, newCategory, newTitle):
-		if self.entryExists(PWManEntry(newCategory, newTitle)):
+		if self.entryExists(newCategory, newTitle):
 			raise PWManError("Entry does already exist.")
-		oldEntry = self.getEntry(entry)
+		oldEntry = self.getEntry(entry.category, entry.title)
 		if not oldEntry:
 			raise PWManError("Entry does not exist.")
 		entry.category = newCategory

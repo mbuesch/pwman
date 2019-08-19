@@ -320,7 +320,7 @@ class PWMan(Cmd):
 			stdout("Entries in category '%s':\n\t" % category)
 			stdout("\n\t".join(self.__db.getEntryTitles(category)) + "\n")
 		elif category and title:
-			entry = self.__db.getEntry(PWManEntry(category, title))
+			entry = self.__db.getEntry(category, title)
 			if entry:
 				stdout(self.__dumpEntry(entry))
 			else:
@@ -371,7 +371,7 @@ class PWMan(Cmd):
 		if not category or not title:
 			self.__err(commandName, "Invalid parameters. "
 				"Need to supply category and title.")
-		oldEntry = self.__db.getEntry(PWManEntry(category, title))
+		oldEntry = self.__db.getEntry(category, title)
 		if not oldEntry:
 			self.__err(commandName, "Entry does not exist")
 		newData = self.__skipParams(params, 2).strip()
@@ -411,8 +411,8 @@ class PWMan(Cmd):
 							       text)
 		elif paramIdx == 2:
 			# User data
-			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, ignoreFirst=True),
-							      self.__getParam(line, 1, ignoreFirst=True)))
+			entry = self.__db.getEntry(self.__getParam(line, 0, ignoreFirst=True),
+						   self.__getParam(line, 1, ignoreFirst=True))
 			return [ escapeCmd(entry.user) ]
 		return []
 	complete_eu = complete_edit_user
@@ -443,8 +443,8 @@ class PWMan(Cmd):
 							       text)
 		elif paramIdx == 2:
 			# Password data
-			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, ignoreFirst=True),
-							      self.__getParam(line, 1, ignoreFirst=True)))
+			entry = self.__db.getEntry(self.__getParam(line, 0, ignoreFirst=True),
+						   self.__getParam(line, 1, ignoreFirst=True))
 			return [ escapeCmd(entry.pw) ]
 		return []
 	complete_ep = complete_edit_pw
@@ -463,7 +463,7 @@ class PWMan(Cmd):
 			self.__err("edit_bulk", "Category parameter is required.")
 		if not title:
 			self.__err("edit_bulk", "Title parameter is required.")
-		entry = self.__db.getEntry(PWManEntry(category, title))
+		entry = self.__db.getEntry(category, title)
 		if not entry:
 			self.__err("edit_bulk", "'%s/%s' not found" % (category, title))
 		entryBulk = self.__db.getEntryBulk(entry)
@@ -492,8 +492,8 @@ class PWMan(Cmd):
 							       text)
 		elif paramIdx == 2:
 			# Bulk data
-			entry = self.__db.getEntry(PWManEntry(self.__getParam(line, 0, ignoreFirst=True),
-							      self.__getParam(line, 1, ignoreFirst=True)))
+			entry = self.__db.getEntry(self.__getParam(line, 0, ignoreFirst=True),
+						   self.__getParam(line, 1, ignoreFirst=True))
 			if entry:
 				entryBulk = self.__db.getEntryBulk(entry)
 				if entryBulk:
@@ -510,7 +510,7 @@ class PWMan(Cmd):
 		if not category or not title:
 			self.__err("remove", "Invalid parameters. "
 				"Need to supply category and title.")
-		oldEntry = self.__db.getEntry(PWManEntry(category, title))
+		oldEntry = self.__db.getEntry(category, title)
 		if not oldEntry:
 			self.__err("remove", "Entry does not exist")
 		try:
@@ -543,7 +543,7 @@ class PWMan(Cmd):
 		if fromCategory == toCategory and fromTitle == toTitle:
 			self.__info("move", "Nothing changed. Not moving anything.")
 			return
-		entry = self.__db.getEntry(PWManEntry(fromCategory, fromTitle))
+		entry = self.__db.getEntry(fromCategory, fromTitle)
 		if not entry:
 			self.__err("move", "Source entry does not exist.")
 		oldEntry = deepcopy(entry)
@@ -643,7 +643,7 @@ class PWMan(Cmd):
 			self.__err("totp", "Category parameter is required.")
 		if not title:
 			self.__err("totp", "Title parameter is required.")
-		entry = self.__db.getEntry(PWManEntry(category, title))
+		entry = self.__db.getEntry(category, title)
 		if not entry:
 			self.__err("totp", "'%s/%s' not found" % (category, title))
 		entryTotp = self.__db.getEntryTotp(entry)
@@ -672,7 +672,7 @@ class PWMan(Cmd):
 			self.__err("totp_key", "Category parameter is required.")
 		if not title:
 			self.__err("totp_key", "Title parameter is required.")
-		entry = self.__db.getEntry(PWManEntry(category, title))
+		entry = self.__db.getEntry(category, title)
 		if not entry:
 			self.__err("totp_key", "'%s/%s' not found" % (category, title))
 		entryTotp = self.__db.getEntryTotp(entry)
@@ -703,7 +703,7 @@ class PWMan(Cmd):
 			self.__err("edit_totp", "Category parameter is required.")
 		if not title:
 			self.__err("edit_totp", "Title parameter is required.")
-		entry = self.__db.getEntry(PWManEntry(category, title))
+		entry = self.__db.getEntry(category, title)
 		if not entry:
 			self.__err("edit_totp", "'%s/%s' not found" % (category, title))
 		entryTotp = self.__db.getEntryTotp(entry)
@@ -735,7 +735,7 @@ class PWMan(Cmd):
 			return self.__complete_category_title(text, line, begidx, endidx)
 		category, title = self.__getParams(line, 0, 2, ignoreFirst=True)
 		if category and title:
-			entry = self.__db.getEntry(PWManEntry(category, title))
+			entry = self.__db.getEntry(category, title)
 			if entry:
 				entryTotp = self.__db.getEntryTotp(entry)
 				if entryTotp:
@@ -758,7 +758,7 @@ class PWMan(Cmd):
 			self.__err("edit_attr", "Category parameter is required.")
 		if not title:
 			self.__err("edit_attr", "Title parameter is required.")
-		entry = self.__db.getEntry(PWManEntry(category, title))
+		entry = self.__db.getEntry(category, title)
 		if not entry:
 			self.__err("edit_attr", "'%s/%s' not found" % (category, title))
 		entryAttr = self.__db.getEntryAttr(entry, name)
@@ -782,7 +782,7 @@ class PWMan(Cmd):
 			return self.__complete_category_title(text, line, begidx, endidx)
 		category, title, name = self.__getParams(line, 0, 3, ignoreFirst=True)
 		if category and title:
-			entry = self.__db.getEntry(PWManEntry(category, title))
+			entry = self.__db.getEntry(category, title)
 			if entry:
 				if paramIdx == 2: # name
 					entryAttrs = self.__db.getEntryAttrs(entry)
