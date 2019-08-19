@@ -15,8 +15,9 @@ from dataclasses import dataclass
 __all__ = [
 	"CSQLError",
 	"getDefaultDatabase",
-	"PWManEntryTOTP",
 	"PWManEntry",
+	"PWManEntryTOTP",
+	"PWManEntryAttr",
 	"PWManDatabase",
 ]
 
@@ -45,6 +46,13 @@ class PWManEntryTOTP(object):
 	hmacHash	: str = "SHA1"
 	entry		: PWManEntry = None
 	totpId		: int = None
+
+@dataclass
+class PWManEntryAttr(object):
+	name		: str
+	data		: str = None
+	entry		: PWManEntry = None
+	attrId		: int = None
 
 class PWManDatabase(CryptSQL):
 	"""pwman database.
@@ -138,6 +146,9 @@ class PWManDatabase(CryptSQL):
 		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
 				 "bulk(id INTEGER PRIMARY KEY AUTOINCREMENT, "
 				      "entry INTEGER, data TEXT);")
+		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
+				 "entryattr(id INTEGER PRIMARY KEY AUTOINCREMENT, "
+					   "entry INTEGER, name TEXT, data TEXT);")
 		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
 				 "totp(id INTEGER PRIMARY KEY AUTOINCREMENT, "
 				      "entry INTEGER, key TEXT, digits INTEGER, hash TEXT);")
@@ -346,6 +357,67 @@ class PWManDatabase(CryptSQL):
 		else:
 			c = self.sqlExec("DELETE FROM totp WHERE id=?;",
 					 (entryTotp.totpId,))
+
+	def getEntryAttr(self, entry, attrName):
+		c = self.sqlExec("SELECT entryattr.id, entryattr.name, entryattr.data "
+				 "FROM entryattr, entries "
+				 "WHERE entries.category=? AND entries.title=? AND "
+				 "entryattr.entry = entries.id AND entryattr.name=?;",
+				 (entry.category,
+				  entry.title,
+				  attrName))
+		data = c.fetchOne()
+		if not data:
+			return None
+		return PWManEntryAttr(name=data[1],
+				      data=data[2],
+				      entry=entry,
+				      attrId=data[0])
+
+	def getEntryAttrs(self, entry):
+		c = self.sqlExec("SELECT entryattr.id, entryattr.name, entryattr.data "
+				 "FROM entryattr, entries "
+				 "WHERE entries.category=? AND entries.title=? AND "
+				 "entryattr.entry = entries.id;",
+				 (entry.category,
+				  entry.title))
+		dataSet = c.fetchAll()
+		if not dataSet:
+			return []
+		return [ PWManEntryAttr(name=data[1],
+				        data=data[2],
+				        entry=entry,
+				        attrId=data[0])
+			 for data in dataSet ]
+
+	def setEntryAttr(self, entryAttr):
+		entry = entryAttr.entry
+		if not entry or entry.entryId is None:
+			raise PWManError("Attr: Entry does not exist.")
+		if entryAttr.data:
+			c = self.sqlExec("SELECT id FROM entryattr "
+					 "WHERE entry=? AND name=?;",
+					 (entry.entryId,
+					  entryAttr.name))
+			attrId = c.fetchOne()
+			if attrId is None:
+				c = self.sqlExec("INSERT INTO entryattr(entry, name, data) "
+						 "VALUES(?,?,?);",
+						 (entry.entryId,
+						  entryAttr.name,
+						  entryAttr.data))
+			else:
+				attrId = attrId[0]
+				c = self.sqlExec("UPDATE entryattr "
+						 "SET entry=?, name=?, data=? "
+						 "WHERE id=?;",
+						 (entry.entryId,
+						  entryAttr.name,
+						  entryAttr.data,
+						  attrId))
+		else:
+			c = self.sqlExec("DELETE FROM entryattr WHERE id=?;",
+					 (entryAttr.attrId,))
 
 	def __getGlobalAttr(self, name):
 		try:
