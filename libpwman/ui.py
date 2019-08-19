@@ -301,8 +301,7 @@ class PWMan(Cmd):
 		contents of the category. If category and entry
 		are given, list the contents of the entry.\n
 		Aliases: ls cat"""
-		category = self.__getParam(params, 0)
-		title = self.__getParam(params, 1)
+		category, title = self.__getParams(params, 0, 2)
 		if not category and not title:
 			stdout("Categories:\n\t")
 			stdout("\n\t".join(self.__db.getCategoryNames()) + "\n")
@@ -331,11 +330,7 @@ class PWMan(Cmd):
 		they are asked for interactively.\n
 		Aliases: n add"""
 		if params:
-			category = self.__getParam(params, 0)
-			title = self.__getParam(params, 1)
-			user = self.__getParam(params, 2)
-			pw = self.__getParam(params, 3)
-			bulk = self.__getParam(params, 4)
+			category, title, user, pw, bulk = self.__getParams(params, 0, 5)
 		else:
 			stdout("Create new entry:\n")
 			category = input("\tCategory: ")
@@ -362,8 +357,7 @@ class PWMan(Cmd):
 
 	def __do_edit_generic(self, params, commandName,
 			      entry2data, data2entry):
-		category = self.__getParam(params, 0)
-		title = self.__getParam(params, 1)
+		category, title = self.__getParams(params, 0, 2)
 		if not category or not title:
 			self.__err(commandName, "Invalid parameters. "
 				"Need to supply category and title.")
@@ -482,8 +476,7 @@ class PWMan(Cmd):
 		Command: remove category title\n
 		Remove an existing database entry.\n
 		Aliases: rm del"""
-		category = self.__getParam(params, 0)
-		title = self.__getParam(params, 1)
+		category, title = self.__getParams(params, 0, 2)
 		if not category or not title:
 			self.__err("remove", "Invalid parameters. "
 				"Need to supply category and title.")
@@ -511,10 +504,7 @@ class PWMan(Cmd):
 		Command: move category title newCategory [newTitle]\n
 		Move/rename an existing database entry.\n
 		Aliases: mv rename"""
-		fromCategory = self.__getParam(params, 0)
-		fromTitle = self.__getParam(params, 1)
-		toCategory = self.__getParam(params, 2)
-		toTitle = self.__getParam(params, 3)
+		fromCategory, fromTitle, toCategory, toTitle = self.__getParams(params, 0, 4)
 		if not fromCategory or not fromTitle or not toCategory:
 			self.__err("remove", "Invalid parameters. "
 				"Need to supply category, title and newCategory.")
@@ -625,8 +615,7 @@ class PWMan(Cmd):
 		Command: totp category title\n
 		Generates a token using the Time-Based One-Time Password Algorithm.\n
 		Aliases: t"""
-		category = self.__getParam(params, 0)
-		title = self.__getParam(params, 1)
+		category, title = self.__getParams(params, 0, 2)
 		if not category:
 			self.__err("totp", "Category parameter is required.")
 		if not title:
@@ -655,8 +644,7 @@ class PWMan(Cmd):
 		Command: totp_key category title\n
 		Show Time-Based One-Time Password Algorithm key and parameters.\n
 		Aliases: tk"""
-		category = self.__getParam(params, 0)
-		title = self.__getParam(params, 1)
+		category, title = self.__getParams(params, 0, 2)
 		if not category:
 			self.__err("totp_key", "Category parameter is required.")
 		if not title:
@@ -687,11 +675,7 @@ class PWMan(Cmd):
 		DIGITS default to 6, if not provided.
 		HASH defaults to SHA1, if not provided.\n
 		Aliases: et"""
-		category = self.__getParam(params, 0)
-		title = self.__getParam(params, 1)
-		key = self.__getParam(params, 2)
-		digits = self.__getParam(params, 3)
-		_hash = self.__getParam(params, 4)
+		category, title, key, digits, _hash = self.__getParams(params, 0, 5)
 		if not category:
 			self.__err("edit_totp", "Category parameter is required.")
 		if not title:
@@ -726,8 +710,7 @@ class PWMan(Cmd):
 		paramIdx = self.__calcParamIndex(line, endidx)
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
-		category = self.__getParam(line, 0, ignoreFirst=True)
-		title = self.__getParam(line, 1, ignoreFirst=True)
+		category, title = self.__getParams(line, 0, 2, ignoreFirst=True)
 		if category and title:
 			entry = self.__db.getEntry(PWManEntry(category, title))
 			if entry:
@@ -747,10 +730,7 @@ class PWMan(Cmd):
 		Command: edit_attr category title NAME [DATA]\n
 		Edit or delete an entry attribute.\n
 		Aliases: ea"""
-		category = self.__getParam(params, 0)
-		title = self.__getParam(params, 1)
-		name = self.__getParam(params, 2)
-		data = self.__getParam(params, 3)
+		category, title, name, data = self.__getParams(params, 0, 4)
 		if not category:
 			self.__err("edit_attr", "Category parameter is required.")
 		if not title:
@@ -777,9 +757,7 @@ class PWMan(Cmd):
 		paramIdx = self.__calcParamIndex(line, endidx)
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
-		category = self.__getParam(line, 0, ignoreFirst=True)
-		title = self.__getParam(line, 1, ignoreFirst=True)
-		name = self.__getParam(line, 2, ignoreFirst=True)
+		category, title, name = self.__getParams(line, 0, 3, ignoreFirst=True)
 		if category and title:
 			entry = self.__db.getEntry(PWManEntry(category, title))
 			if entry:
@@ -870,7 +848,8 @@ class PWMan(Cmd):
 
 	def __getParam(self, line, paramIndex,
 		       ignoreFirst=False, unescape=True):
-		# Returns the full parameter from the commandline
+		"""Returns the full parameter from the commandline.
+		"""
 		sline = self.__sanitizeCmdline(line)
 		if ignoreFirst:
 			paramIndex += 1
@@ -895,13 +874,24 @@ class PWMan(Cmd):
 			p = unescapeCmd(p)
 		return p
 
+	def __getParams(self, line, paramIndex, count,
+			ignoreFirst=False, unescape=True):
+		"""Returns a generator of the specified parameters from the commandline.
+		paramIndex: start index.
+		count: Number of paramerts to fetch.
+		"""
+		return ( self.__getParam(line, i, ignoreFirst, unescape)
+			 for i in range(paramIndex, paramIndex + count) )
+
 	def __getCategoryCompletions(self, text):
-		catNames = [n for n in self.__db.getCategoryNames() if n.lower().startswith(text.lower())]
-		return [escapeCmd(n) + " " for n in catNames]
+		catNames = [ n for n in self.__db.getCategoryNames()
+			     if n.lower().startswith(text.lower()) ]
+		return [ escapeCmd(n) + " " for n in catNames ]
 
 	def __getEntryTitleCompletions(self, category, text):
-		titles = [t for t in self.__db.getEntryTitles(category) if t.lower().startswith(text.lower())]
-		return [escapeCmd(t) + " " for t in titles]
+		titles = [ t for t in self.__db.getEntryTitles(category)
+			   if t.lower().startswith(text.lower()) ]
+		return [ escapeCmd(t) + " " for t in titles ]
 
 	def __mayQuit(self):
 		if self.__db.isDirty():
