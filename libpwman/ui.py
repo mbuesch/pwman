@@ -543,24 +543,17 @@ class PWMan(Cmd):
 		if fromCategory == toCategory and fromTitle == toTitle:
 			self.__info("move", "Nothing changed. Not moving anything.")
 			return
-		oldEntry = self.__db.getEntry(PWManEntry(fromCategory, fromTitle))
-		if not oldEntry:
+		entry = self.__db.getEntry(PWManEntry(fromCategory, fromTitle))
+		if not entry:
 			self.__err("move", "Source entry does not exist.")
-		newEntry = deepcopy(oldEntry)
-		newEntry.category = toCategory
-		newEntry.title = toTitle
-		#FIXME this does not move associated data
+		oldEntry = deepcopy(entry)
 		try:
-			self.__db.addEntry(newEntry)
+			self.__db.moveEntry(entry, toCategory, toTitle)
 		except (PWManError) as e:
 			self.__err("move", str(e))
-		try:
-			self.__db.delEntry(oldEntry)
-		except (PWManError) as e:
-			self.__info("move", str(e))
 		self.__undo.do("move %s" % params,
 			       "move %s %s %s %s" % (
-			       escapeCmd(newEntry.category), escapeCmd(newEntry.title),
+			       escapeCmd(entry.category), escapeCmd(entry.title),
 			       escapeCmd(oldEntry.category), escapeCmd(oldEntry.title)))
 	do_mv = do_move
 	do_rename = do_move

@@ -274,6 +274,22 @@ class PWManDatabase(CryptSQL):
 				  entry.entryId))
 		self.setDirty()
 
+	def moveEntry(self, entry, newCategory, newTitle):
+		if self.entryExists(PWManEntry(newCategory, newTitle)):
+			raise PWManError("Entry does already exist.")
+		oldEntry = self.getEntry(entry)
+		if not oldEntry:
+			raise PWManError("Entry does not exist.")
+		entry.category = newCategory
+		entry.title = newTitle
+		c = self.sqlExec("UPDATE entries SET "
+				 "category=?, title=? "
+				 "WHERE id=?;",
+				 (entry.category,
+				  entry.title,
+				  oldEntry.entryId))
+		self.setDirty()
+
 	def delEntry(self, entry):
 		c = self.sqlExec("SELECT id FROM entries WHERE category=? AND title=?;",
 				 (entry.category,
