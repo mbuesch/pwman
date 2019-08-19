@@ -104,6 +104,12 @@ class PWMan(Cmd):
 		     commitClearsUndo=False, timeout=-1):
 		super().__init__()
 
+		if sys.flags.optimize >= 2:
+			# We need docstrings.
+			raise PWManError("pwman does not support "
+					 "Python optimization level 2 (-OO). "
+					 "Please call with python3 -O or less.")
+
 		self.__db = PWManDatabase(filename, passphrase)
 		self.prompt = "pwman$ "
 
