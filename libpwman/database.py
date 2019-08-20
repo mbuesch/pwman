@@ -207,7 +207,8 @@ class PWManDatabase(CryptSQL):
 	def findEntries(self, pattern,
 			leftAnchor=False, rightAnchor=False,
 			inCategory=None,
-			matchTitle=False, matchUser=False, matchPw=False, matchBulk=False):
+			matchTitle=False, matchUser=False, matchPw=False,
+			matchBulk=False, matchAttrName=False, matchAttrData=False):
 		if not leftAnchor:
 			pattern = "%" + pattern
 		if not rightAnchor:
@@ -227,13 +228,13 @@ class PWManDatabase(CryptSQL):
 				conditions.append( ("entries.user LIKE ?", pattern) )
 			if matchPw:
 				conditions.append( ("entries.pw LIKE ?", pattern) )
-			params = [ c[1] for c in conditions ]
 			sql = "SELECT id FROM entries WHERE "
+			params = []
 			if inCategory:
 				sql += "category=? AND "
-				params.insert(0, inCategory)
-			condStr = " OR ".join(c[0] for c in conditions)
-			sql += "( " + condStr + " );"
+				params.append(inCategory)
+			sql += "( " + (" OR ".join(c[0] for c in conditions)) + " );"
+			params.extend(c[1] for c in conditions)
 			dump(sql, params)
 			c = self.sqlExec(sql, params)
 			IDs.update(entryId[0] for entryId in (c.fetchAll() or []))
@@ -243,11 +244,31 @@ class PWManDatabase(CryptSQL):
 			sql = "SELECT entries.id "\
 			      "FROM entries, bulk "\
 			      "WHERE bulk.entry = entries.id AND "
-			params = [ pattern ]
+			params = []
 			if inCategory:
 				sql += "entries.category = ? AND "
-				params.insert(0, inCategory)
+				params.append(inCategory)
 			sql += "bulk.data LIKE ?;"
+			params.append(pattern)
+			dump(sql, params)
+			c = self.sqlExec(sql, params)
+			IDs.update(entryId[0] for entryId in (c.fetchAll() or []))
+
+		if matchAttrName or matchAttrData:
+			conditions = []
+			if matchAttrName:
+				conditions.append( ("entryattr.name LIKE ?", pattern) )
+			if matchAttrData:
+				conditions.append( ("entryattr.data LIKE ?", pattern) )
+			sql = "SELECT entries.id "\
+			      "FROM entries, entryattr "\
+			      "WHERE entryattr.entry = entries.id AND "
+			params = []
+			if inCategory:
+				sql += "entries.category = ? AND "
+				params.append(inCategory)
+			sql += "( " + (" OR ".join(c[0] for c in conditions)) + " );"
+			params.extend(c[1] for c in conditions)
 			dump(sql, params)
 			c = self.sqlExec(sql, params)
 			IDs.update(entryId[0] for entryId in (c.fetchAll() or []))
@@ -256,11 +277,12 @@ class PWManDatabase(CryptSQL):
 			return []
 		IDs = sorted(IDs) # stable sorting
 
-		sql = "SELECT entries.id, entries.category, entries.title, entries.user, entries.pw "\
+		sql = "SELECT entries.id, entries.category, "\
+		      "entries.title, entries.user, entries.pw "\
 		      "FROM entries "\
-		      "WHERE "
-		sql += " OR ".join("entries.id=?" for ID in IDs)
-		sql += ";"
+		      "WHERE entries.id IN ( "
+		sql += ", ".join("?" for ID in IDs)
+		sql += " );"
 		params = [ str(ID) for ID in IDs ]
 		dump(sql, params)
 		c = self.sqlExec(sql, params)

@@ -633,22 +633,30 @@ class PWMan(Cmd):
 		  -t   Only match 'title'
 		  -u   Only match 'user'
 		  -p   Only match 'password'
-		  -b   Only match 'bulk'\n
+		  -b   Only match 'bulk'
+		  -a   Only match 'attribute data'
+		  -A   Also match 'attribute name'\n
+		If no OPTS are given, the search uses these OPTS:
+		  -t -u -p -b -a\n
 		Aliases: f"""
-		(p, i) = ([], 0)
-		(mTitle, mUser, mPw, mBulk) = (False,) * 4
+		p, i = [], 0
+		mTitle, mUser, mPw, mBulk, mAttrData, mAttrName = (False,) * 6
 		while True:
 			param = self.__getParam(params, i)
 			if not param:
 				break
-			if param == "-t":
+			if param == "-t" and not p:
 				mTitle = True
-			elif param == "-u":
+			elif param == "-u" and not p:
 				mUser = True
-			elif param == "-p":
+			elif param == "-p" and not p:
 				mPw = True
-			elif param == "-b":
+			elif param == "-b" and not p:
 				mBulk = True
+			elif param == "-a" and not p:
+				mAttrData = True
+			elif param == "-A" and not p:
+				mAttrName = True
 			else:
 				p.append(param)
 			i += 1
@@ -656,11 +664,16 @@ class PWMan(Cmd):
 			self.__err("find", "Invalid parameters.")
 		category = p[0] if len(p) > 1 else None
 		pattern = p[1] if len(p) > 1 else p[0]
-		if not any( (mTitle, mUser, mPw, mBulk) ):
-			(mTitle, mUser, mPw, mBulk) = (True,) * 4
-		entries = self.__db.findEntries(pattern, inCategory=category,
-						matchTitle=mTitle, matchUser=mUser,
-						matchPw=mPw, matchBulk=mBulk)
+		if not any( (mTitle, mUser, mPw, mBulk, mAttrData) ):
+			mTitle, mUser, mPw, mBulk, mAttrData = (True,) * 5
+		entries = self.__db.findEntries(pattern=pattern,
+						inCategory=category,
+						matchTitle=mTitle,
+						matchUser=mUser,
+						matchPw=mPw,
+						matchBulk=mBulk,
+						matchAttrName=mAttrName,
+						matchAttrData=mAttrData)
 		if not entries:
 			self.__err("find", "'%s' not found" % pattern)
 		for entry in entries:
