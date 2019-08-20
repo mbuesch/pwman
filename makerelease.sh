@@ -18,6 +18,14 @@ hook_get_version()
 	version="$(cat libpwman.py | grep -e VERSION | head -n1 | cut -d'=' -f2 | tr -d ' ')"
 }
 
+hook_regression_tests()
+{
+	default_hook_regression_tests "$@"
+
+	# Run selftests
+	sh "$1/tests/run.sh"
+}
+
 project=pwman
 default_archives=py-sdist-xz
 makerelease "$@"

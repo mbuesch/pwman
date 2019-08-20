@@ -11,20 +11,6 @@ import getopt
 import sys
 
 
-def testEscape():
-	from libpwman.ui import escapeCmd, unescapeCmd
-
-	t0 = t1 = '1-2x-y-a\tb c\\\\_ \\\\ x_-y\r\n_\tz\v__\\\\__\\-'
-	nrIter = 3
-	print("ORIG :", t0)
-	for i in range(nrIter):
-		t1 = escapeCmd(t1)
-		print("ESC%d : %s" % (i, t1))
-	for i in range(nrIter):
-		t1 = unescapeCmd(t1)
-	print("UNESC:", t1)
-	assert(t1 == t0)
-
 def usage():
 	print("pwman v%d - lightweight password manager" % libpwman.VERSION)
 	print("")
@@ -47,7 +33,7 @@ def main():
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
 			"hd:Ut:",
-			[ "help", "database=", "test", "commit-clear-undo",
+			[ "help", "database=", "commit-clear-undo",
 			  "timeout=", ])
 		for (o, v) in opts:
 			if o in ("-h", "--help"):
@@ -55,9 +41,6 @@ def main():
 				return 0
 			if o in ("-d", "--database"):
 				dbFile = v
-			if o == "--test":
-				testEscape()
-				return 0
 			if o in ("-U", "--commit-clear-undo"):
 				commitClearsUndo = True
 			if o in ("-t", "--timeout"):
