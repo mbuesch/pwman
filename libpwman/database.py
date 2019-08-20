@@ -190,6 +190,18 @@ class PWManDatabase(CryptSQL):
 		titles = sorted(t[0] for t in titles)
 		return titles
 
+	def renameCategory(self, category, toCategory):
+		categories = self.getCategoryNames()
+		if category not in categories:
+			raise PWManError("Source category does not exist.")
+		if toCategory in categories:
+			raise PWManError("Target category does already exist.")
+		c = self.sqlExec("UPDATE entries SET category=? "
+				 "WHERE category=?;",
+				 (toCategory,
+				  category))
+		self.setDirty()
+
 	def getEntry(self, category, title):
 		c = self.sqlExec("SELECT id, category, title, user, pw FROM entries "
 				 "WHERE category=? AND title=?;",

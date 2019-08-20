@@ -560,31 +560,45 @@ class PWMan(Cmd):
 	complete_del = complete_remove
 
 	def do_move(self, params):
-		"""--- Move/rename an existing entry ---
+		"""--- Move/rename an existing entry or a category ---\n
+		Move/rename an existing entry:
 		Command: move category title newCategory [newTitle]\n
-		Move/rename an existing database entry.\n
+		Rename an existing category:
+		Command: move category newCategory\n
 		Aliases: mv rename"""
-		fromCategory, fromTitle, toCategory, toTitle = self.__getParams(params, 0, 4)
-		if not fromCategory or not fromTitle or not toCategory:
-			self.__err("remove", "Invalid parameters. "
-				"Need to supply category, title and newCategory.")
-		if not toTitle:
-			toTitle = fromTitle
-		if fromCategory == toCategory and fromTitle == toTitle:
-			self.__info("move", "Nothing changed. Not moving anything.")
-			return
-		entry = self.__db.getEntry(fromCategory, fromTitle)
-		if not entry:
-			self.__err("move", "Source entry does not exist.")
-		oldEntry = deepcopy(entry)
-		try:
-			self.__db.moveEntry(entry, toCategory, toTitle)
-		except (PWManError) as e:
-			self.__err("move", str(e))
-		self.__undo.do("move %s" % params,
-			       "move %s %s %s %s" % (
-			       escapeCmd(entry.category), escapeCmd(entry.title),
-			       escapeCmd(oldEntry.category), escapeCmd(oldEntry.title)))
+		p0, p1, p2, p3 = self.__getParams(params, 0, 4)
+		if p0 and p1 and p2:
+			# Entry move
+			fromCategory, fromTitle, toCategory, toTitle = p0, p1, p2, p3
+			if not toTitle:
+				toTitle = fromTitle
+			if fromCategory == toCategory and fromTitle == toTitle:
+				self.__info("move", "Nothing changed. Not moving anything.")
+				return
+			entry = self.__db.getEntry(fromCategory, fromTitle)
+			if not entry:
+				self.__err("move", "Source entry does not exist.")
+			oldEntry = deepcopy(entry)
+			try:
+				self.__db.moveEntry(entry, toCategory, toTitle)
+			except (PWManError) as e:
+				self.__err("move", str(e))
+			self.__undo.do("move %s" % params,
+				       "move %s %s %s %s" % (
+				       escapeCmd(entry.category), escapeCmd(entry.title),
+				       escapeCmd(oldEntry.category), escapeCmd(oldEntry.title)))
+		elif p0 and p1:
+			# Category rename
+			fromCategory, toCategory = p0, p1
+			try:
+				self.__db.renameCategory(fromCategory, toCategory)
+			except (PWManError) as e:
+				self.__err("move", str(e))
+			self.__undo.do("move %s" % params,
+				       "move %s %s" % (
+				       escapeCmd(toCategory), escapeCmd(fromCategory)))
+		else:
+			self.__err("move", "Invalid parameters.")
 	do_mv = do_move
 	do_rename = do_move
 
