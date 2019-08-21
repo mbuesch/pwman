@@ -140,7 +140,22 @@ def completion(func):
 		return completions
 	return wrapper
 
-class PWMan(Cmd):
+class PWManMeta(type):
+	def __new__(cls, name, bases, dct):
+		for name, attr in dct.items():
+			# Fixup command docstrings.
+			if (name.startswith("do_") and
+			    not getattr(attr, "_pwman_fixed", False)):
+				# Remove leading double-tabs.
+				attr.__doc__, n = re.subn("^\t\t", "\t", attr.__doc__,
+							  0, re.MULTILINE)
+				# Tabs to spaces.
+				attr.__doc__, n = re.subn("\t", " " * 8, attr.__doc__,
+							  0, re.MULTILINE)
+				attr._pwman_fixed = True
+		return super().__new__(cls, name, bases, dct)
+
+class PWMan(Cmd, metaclass=PWManMeta):
 	class CommandError(Exception): pass
 	class Quit(Exception): pass
 
