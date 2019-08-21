@@ -6,68 +6,44 @@
 # Licensed under the GNU/GPL version 2 or later.
 """
 
+import argparse
 import libpwman
-import getopt
 import sys
 
-
-def usage(f=sys.stdout):
-	def p(*args, **kwargs):
-		print(*args, **kwargs, file=f)
-	p("pwman v%d - lightweight password manager" % libpwman.VERSION)
-	p("")
-	p("Usage: %s [OPTIONS] [COMMANDS]" % sys.argv[0])
-	p("")
-	p("If COMMANDS are given, run these commands.")
-	p("Starts in interactive mode, otherwise.")
-	p("")
-	p("Options:")
-	p(" -d|--database PATH      Use PATH as database file.")
-	p("                         If not given, %s is used." % (
-	  libpwman.database.getDefaultDatabase()))
-	p(" -U|--commit-clear-undo  The commit command clears undo queue.")
-	p(" -t|--timeout SECONDS    Sets the session timeout. Default is 10 minutes.")
-
 def main():
-	dbFile = None
-	commitClearsUndo = False
-	timeout = 600
-	try:
-		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hd:Ut:",
-			[ "help", "database=", "commit-clear-undo",
-			  "timeout=", ])
-		for (o, v) in opts:
-			if o in ("-h", "--help"):
-				usage()
-				return 0
-			if o in ("-d", "--database"):
-				dbFile = v
-			if o in ("-U", "--commit-clear-undo"):
-				commitClearsUndo = True
-			if o in ("-t", "--timeout"):
-				timeout = int(v)
-	except (getopt.GetoptError, ValueError) as e:
-		usage(sys.stderr)
-		return 1
-	commands = args
+	p = argparse.ArgumentParser()
+	p.add_argument("commands", nargs="*", metavar="COMMAND",
+		       help="Run this command. Starts in interactive mode, if no COMMAND is given.")
+	p.add_argument("-d", "--database", type=str, default=None, metavar="PATH",
+		       help="Use PATH as database file. If not given, %s is used." % (
+			    libpwman.database.getDefaultDatabase()))
+	p.add_argument("-U", "--commit-clear-undo", action="store_true",
+		       help="The commit command clears undo queue.")
+	p.add_argument("-t", "--timeout", type=int, default=600, metavar="SECONDS",
+		       help="Sets the session timeout in seconds. Default is 10 minutes.")
+	args = p.parse_args()
+
+	dbFile = args.database
 	if not dbFile:
 		dbFile = libpwman.database.getDefaultDatabase()
 	if not dbFile:
 		print("No database file specified", file=sys.stderr)
 		return 1
-	if not commands: # not interactive mode
-		print("Opening database '%s'..." % dbFile)
-	passphrase = libpwman.util.readPassphrase("Master passphrase",
-				not libpwman.util.fileExists(dbFile))
+	dbExists = libpwman.util.fileExists(dbFile)
+	if not args.commands: # not interactive mode
+		if dbExists:
+			print("Opening database '%s'..." % dbFile)
+		else:
+			print("Creating NEW database '%s'..." % dbFile)
+	passphrase = libpwman.util.readPassphrase("Master passphrase", verify=not dbExists)
 	if passphrase is None:
 		return 1
 	try:
 		p = libpwman.PWMan(dbFile, passphrase,
-				   commitClearsUndo=commitClearsUndo,
-				   timeout=timeout)
-		if commands:
-			for command in commands:
+				   commitClearsUndo=args.commit_clear_undo,
+				   timeout=args.timeout)
+		if args.commands:
+			for command in args.commands:
 				p.runOneCommand(command)
 		else:
 			p.interactive()
