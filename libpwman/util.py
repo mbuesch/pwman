@@ -38,7 +38,10 @@ def stdout(text, flush=True):
 	if isinstance(text, str):
 		stream = sys.stdout
 	else:
-		stream = sys.stdout.buffer
+		stream = getattr(sys.stdout, "buffer", None)
+		if stream is None:
+			stream = sys.stdout
+			text = text.decode("UTF-8", "ignore")
 	stream.write(text)
 	if flush:
 		stream.flush()
