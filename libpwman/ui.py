@@ -110,6 +110,9 @@ class PWMan(Cmd):
 					 "Python optimization level 2 (-OO). "
 					 "Please call with python3 -O or less.")
 
+		# argument delimiter shall be space.
+		readline.set_completer_delims(" ")
+
 		self.__db = PWManDatabase(filename, passphrase)
 		self.prompt = "pwman$ "
 
