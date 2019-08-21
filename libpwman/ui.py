@@ -16,6 +16,7 @@ import time
 import re
 import readline
 import signal
+import functools
 from copy import copy, deepcopy
 from cmd import Cmd
 
@@ -100,6 +101,17 @@ class PWMan(Cmd):
 	class CommandError(Exception): pass
 	class Quit(Exception): pass
 
+	def completion(func):
+		@functools.wraps(func)
+		def wrapper(self, text, line, begidx, endidx):
+			self._timeout.poke()
+
+			paramIdx = self._calcParamIndex(line, endidx)
+			text = self._getParam(line, paramIdx, ignoreFirst=True)
+
+			return func(self, text, line, begidx, endidx)
+		return wrapper
+
 	def __init__(self, filename, passphrase,
 		     commitClearsUndo=False, timeout=-1):
 		super().__init__()
@@ -116,7 +128,7 @@ class PWMan(Cmd):
 		self.__db = PWManDatabase(filename, passphrase)
 		self.prompt = "pwman$ "
 
-		self.__timeout = PWManTimeout(timeout)
+		self._timeout = PWManTimeout(timeout)
 		self.__commitClearsUndo = commitClearsUndo
 		self.__undo = UndoStack()
 
@@ -133,20 +145,20 @@ class PWMan(Cmd):
 		print("%s%s" % (source, message))
 
 	def precmd(self, line):
-		self.__timeout.poke()
-		first = self.__getParam(line, 0, unescape=False)
+		self._timeout.poke()
+		first = self._getParam(line, 0, unescape=False)
 		if first.endswith('?'):
 			return "help %s" % first[:-1]
 		return line
 
 	def postcmd(self, stop, line):
-		self.__timeout.poke()
+		self._timeout.poke()
 
 	def default(self, line):
 		self.__err(None, "Unknown command: %s\nType 'help' for more help." % line)
 
 	def emptyline(self):
-		self.__timeout.poke()
+		self._timeout.poke()
 		# Don't repeat the last command
 
 	def __dumpEntry(self, entry):
@@ -171,17 +183,16 @@ class PWMan(Cmd):
 							    entryAttr.data))
 		return "\n".join(res) + "\n"
 
+	@completion
 	def __complete_category_title(self, text, line, begidx, endidx):
 		# Generic [category] [title] completion
-		self.__timeout.poke()
-		paramIdx = self.__calcParamIndex(line, endidx)
-		text = self.__getParam(line, paramIdx, ignoreFirst=True)
+		paramIdx = self._calcParamIndex(line, endidx)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self.__getParam(line, 0, ignoreFirst=True),
+			return self.__getEntryTitleCompletions(self._getParam(line, 0, ignoreFirst=True),
 							       text)
 		return []
 
@@ -317,7 +328,7 @@ class PWMan(Cmd):
 		contents of the category. If category and entry
 		are given, list the contents of the entry.\n
 		Aliases: ls cat"""
-		category, title = self.__getParams(params, 0, 2)
+		category, title = self._getParams(params, 0, 2)
 		if not category and not title:
 			self.__info(None, "Categories:")
 			self.__info(None, "\t" + "\n\t".join(self.__db.getCategoryNames()))
@@ -346,7 +357,7 @@ class PWMan(Cmd):
 		they are asked for interactively.\n
 		Aliases: n add"""
 		if params:
-			category, title, user, pw = self.__getParams(params, 0, 4)
+			category, title, user, pw = self._getParams(params, 0, 4)
 		else:
 			self.__info("new", "Create new entry:")
 			category = input("\tCategory: ")
@@ -372,14 +383,14 @@ class PWMan(Cmd):
 
 	def __do_edit_entry(self, params, commandName,
 			    entry2data, data2entry):
-		category, title = self.__getParams(params, 0, 2)
+		category, title = self._getParams(params, 0, 2)
 		if not category or not title:
 			self.__err(commandName, "Invalid parameters. "
 				"Need to supply category and title.")
 		oldEntry = self.__db.getEntry(category, title)
 		if not oldEntry:
 			self.__err(commandName, "Entry does not exist")
-		newData = self.__skipParams(params, 2).strip()
+		newData = self._skipParams(params, 2).strip()
 		try:
 			self.__db.editEntry(data2entry(category, title, newData))
 		except (PWManError) as e:
@@ -403,21 +414,20 @@ class PWMan(Cmd):
 			lambda cat, tit, data: PWManEntry(cat, tit, user=data))
 	do_eu = do_edit_user
 
+	@completion
 	def complete_edit_user(self, text, line, begidx, endidx):
-		self.__timeout.poke()
-		paramIdx = self.__calcParamIndex(line, endidx)
-		text = self.__getParam(line, paramIdx, ignoreFirst=True)
+		paramIdx = self._calcParamIndex(line, endidx)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self.__getParam(line, 0, ignoreFirst=True),
+			return self.__getEntryTitleCompletions(self._getParam(line, 0, ignoreFirst=True),
 							       text)
 		elif paramIdx == 2:
 			# User data
-			entry = self.__db.getEntry(self.__getParam(line, 0, ignoreFirst=True),
-						   self.__getParam(line, 1, ignoreFirst=True))
+			entry = self.__db.getEntry(self._getParam(line, 0, ignoreFirst=True),
+						   self._getParam(line, 1, ignoreFirst=True))
 			return [ escapeCmd(entry.user) ]
 		return []
 	complete_eu = complete_edit_user
@@ -435,21 +445,20 @@ class PWMan(Cmd):
 			lambda cat, tit, data: PWManEntry(cat, tit, pw=data))
 	do_ep = do_edit_pw
 
+	@completion
 	def complete_edit_pw(self, text, line, begidx, endidx):
-		self.__timeout.poke()
-		paramIdx = self.__calcParamIndex(line, endidx)
-		text = self.__getParam(line, paramIdx, ignoreFirst=True)
+		paramIdx = self._calcParamIndex(line, endidx)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self.__getParam(line, 0, ignoreFirst=True),
+			return self.__getEntryTitleCompletions(self._getParam(line, 0, ignoreFirst=True),
 							       text)
 		elif paramIdx == 2:
 			# Password data
-			entry = self.__db.getEntry(self.__getParam(line, 0, ignoreFirst=True),
-						   self.__getParam(line, 1, ignoreFirst=True))
+			entry = self.__db.getEntry(self._getParam(line, 0, ignoreFirst=True),
+						   self._getParam(line, 1, ignoreFirst=True))
 			return [ escapeCmd(entry.pw) ]
 		return []
 	complete_ep = complete_edit_pw
@@ -462,8 +471,8 @@ class PWMan(Cmd):
 		The NEWDATA must _not_ be escaped (however, category and
 		title must be escaped).\n
 		Aliases: eb"""
-		category, title = self.__getParams(params, 0, 2)
-		data = self.__skipParams(params, 2).strip()
+		category, title = self._getParams(params, 0, 2)
+		data = self._skipParams(params, 2).strip()
 		if not category:
 			self.__err("edit_bulk", "Category parameter is required.")
 		if not title:
@@ -484,21 +493,20 @@ class PWMan(Cmd):
 			       escapeCmd(origEntryBulk.data or "")))
 	do_eb = do_edit_bulk
 
+	@completion
 	def complete_edit_bulk(self, text, line, begidx, endidx):
-		self.__timeout.poke()
-		paramIdx = self.__calcParamIndex(line, endidx)
-		text = self.__getParam(line, paramIdx, ignoreFirst=True)
+		paramIdx = self._calcParamIndex(line, endidx)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self.__getParam(line, 0, ignoreFirst=True),
+			return self.__getEntryTitleCompletions(self._getParam(line, 0, ignoreFirst=True),
 							       text)
 		elif paramIdx == 2:
 			# Bulk data
-			entry = self.__db.getEntry(self.__getParam(line, 0, ignoreFirst=True),
-						   self.__getParam(line, 1, ignoreFirst=True))
+			entry = self.__db.getEntry(self._getParam(line, 0, ignoreFirst=True),
+						   self._getParam(line, 1, ignoreFirst=True))
 			if entry:
 				entryBulk = self.__db.getEntryBulk(entry)
 				if entryBulk:
@@ -511,7 +519,7 @@ class PWMan(Cmd):
 		Command: remove category [title]\n
 		Remove an existing database entry.\n
 		Aliases: rm del"""
-		category, title = self.__getParams(params, 0, 2)
+		category, title = self._getParams(params, 0, 2)
 		if not category:
 			self.__err("remove", "Category parameter is required.")
 		if not title:
@@ -570,7 +578,7 @@ class PWMan(Cmd):
 		Rename an existing category:
 		Command: move category newCategory\n
 		Aliases: mv rename"""
-		p0, p1, p2, p3 = self.__getParams(params, 0, 4)
+		p0, p1, p2, p3 = self._getParams(params, 0, 4)
 		if p0 and p1 and p2:
 			# Entry move
 			fromCategory, fromTitle, toCategory, toTitle = p0, p1, p2, p3
@@ -662,7 +670,7 @@ class PWMan(Cmd):
 		p, i = [], 0
 		mTitle, mUser, mPw, mBulk, mAttrData, mAttrName = (False,) * 6
 		while True:
-			param = self.__getParam(params, i)
+			param = self._getParam(params, i)
 			if not param:
 				break
 			if param == "-t" and not p:
@@ -700,10 +708,9 @@ class PWMan(Cmd):
 			self.__info(None, self.__dumpEntry(entry))
 	do_f = do_find
 
+	@completion
 	def complete_find(self, text, line, begidx, endidx):
-		self.__timeout.poke()
-		paramIdx = self.__calcParamIndex(line, endidx)
-		text = self.__getParam(line, paramIdx, ignoreFirst=True)
+		paramIdx = self._calcParamIndex(line, endidx)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
@@ -715,7 +722,7 @@ class PWMan(Cmd):
 		Command: totp [CATEGORY TITLE] OR [TITLE]\n
 		Generates a token using the Time-Based One-Time Password Algorithm.\n
 		Aliases: t"""
-		first, second = self.__getParams(params, 0, 2)
+		first, second = self._getParams(params, 0, 2)
 		if not first:
 			self.__err("totp", "First parameter is required.")
 		if second:
@@ -755,7 +762,7 @@ class PWMan(Cmd):
 		Command: totp_key category title\n
 		Show Time-Based One-Time Password Algorithm key and parameters.\n
 		Aliases: tk"""
-		category, title = self.__getParams(params, 0, 2)
+		category, title = self._getParams(params, 0, 2)
 		if not category:
 			self.__err("totp_key", "Category parameter is required.")
 		if not title:
@@ -786,7 +793,7 @@ class PWMan(Cmd):
 		DIGITS default to 6, if not provided.
 		HASH defaults to SHA1, if not provided.\n
 		Aliases: et"""
-		category, title, key, digits, _hash = self.__getParams(params, 0, 5)
+		category, title, key, digits, _hash = self._getParams(params, 0, 5)
 		if not category:
 			self.__err("edit_totp", "Category parameter is required.")
 		if not title:
@@ -816,12 +823,12 @@ class PWMan(Cmd):
 			       escapeCmd(origEntryTotp.hmacHash or "")))
 	do_et = do_edit_totp
 
+	@completion
 	def complete_edit_totp(self, text, line, begidx, endidx):
-		self.__timeout.poke()
-		paramIdx = self.__calcParamIndex(line, endidx)
+		paramIdx = self._calcParamIndex(line, endidx)
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
-		category, title = self.__getParams(line, 0, 2, ignoreFirst=True)
+		category, title = self._getParams(line, 0, 2, ignoreFirst=True)
 		if category and title:
 			entry = self.__db.getEntry(category, title)
 			if entry:
@@ -841,7 +848,7 @@ class PWMan(Cmd):
 		Command: edit_attr category title NAME [DATA]\n
 		Edit or delete an entry attribute.\n
 		Aliases: ea"""
-		category, title, name, data = self.__getParams(params, 0, 4)
+		category, title, name, data = self._getParams(params, 0, 4)
 		if not category:
 			self.__err("edit_attr", "Category parameter is required.")
 		if not title:
@@ -863,12 +870,12 @@ class PWMan(Cmd):
 			       escapeCmd(origEntryAttr.data or "")))
 	do_ea = do_edit_attr
 
+	@completion
 	def complete_edit_attr(self, text, line, begidx, endidx):
-		self.__timeout.poke()
-		paramIdx = self.__calcParamIndex(line, endidx)
+		paramIdx = self._calcParamIndex(line, endidx)
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
-		category, title, name = self.__getParams(line, 0, 3, ignoreFirst=True)
+		category, title, name = self._getParams(line, 0, 3, ignoreFirst=True)
 		if category and title:
 			entry = self.__db.getEntry(category, title)
 			if entry:
@@ -924,7 +931,7 @@ class PWMan(Cmd):
 			    "\nsuccessfully redone with:\n" +
 			    "    " + "\n    ".join(cmd.doCommands))
 
-	def __skipParams(self, line, count,
+	def _skipParams(self, line, count,
 			 lineIncludesCommand=False, unescape=True):
 		# Return a parameter string with the first 'count'
 		# parameters skipped.
@@ -945,7 +952,7 @@ class PWMan(Cmd):
 			s = unescapeCmd(s)
 		return s
 
-	def __calcParamIndex(self, line, endidx):
+	def _calcParamIndex(self, line, endidx):
 		# Returns the parameter index into the commandline
 		# given the character end-index. This honors space-escape.
 		line = self.__sanitizeCmdline(line)
@@ -960,7 +967,7 @@ class PWMan(Cmd):
 		# non-whitespace string. The line remains the same size.
 		return line.replace('\\ ', '_S')
 
-	def __getParam(self, line, paramIndex,
+	def _getParam(self, line, paramIndex,
 		       ignoreFirst=False, unescape=True):
 		"""Returns the full parameter from the commandline.
 		"""
@@ -988,13 +995,13 @@ class PWMan(Cmd):
 			p = unescapeCmd(p)
 		return p
 
-	def __getParams(self, line, paramIndex, count,
+	def _getParams(self, line, paramIndex, count,
 			ignoreFirst=False, unescape=True):
 		"""Returns a generator of the specified parameters from the commandline.
 		paramIndex: start index.
 		count: Number of paramerts to fetch.
 		"""
-		return ( self.__getParam(line, i, ignoreFirst, unescape)
+		return ( self._getParam(line, i, ignoreFirst, unescape)
 			 for i in range(paramIndex, paramIndex + count) )
 
 	def __mayQuit(self):
