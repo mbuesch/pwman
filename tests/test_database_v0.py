@@ -10,14 +10,14 @@ class Test_Database_v0(TestCase):
 		db = PWManDatabase(filename="tests/test_database_v0.db",
 				   passphrase="test")
 
-		self.assertEqual(sorted(db.getCategoryNames()),
+		self.assertEqual(db.getCategoryNames(),
 				 sorted([ "testcategory", "testcategory2", "testcategory3" ]))
 
-		self.assertEqual(sorted(db.getEntryTitles("testcategory")),
+		self.assertEqual(db.getEntryTitles("testcategory"),
 				 sorted([ "testtitle", "foo", "biz" ]))
-		self.assertEqual(sorted(db.getEntryTitles("testcategory2")),
+		self.assertEqual(db.getEntryTitles("testcategory2"),
 				 sorted([ "testtitle2" ]))
-		self.assertEqual(sorted(db.getEntryTitles("testcategory3")),
+		self.assertEqual(db.getEntryTitles("testcategory3"),
 				 sorted([ "testtitle3" ]))
 
 		entry = db.getEntry("testcategory", "testtitle")
