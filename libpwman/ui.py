@@ -1015,10 +1015,12 @@ class PWMan(Cmd):
 				if self.__mayQuit():
 					self.do_cls("")
 					break
-			except (EscapeError, self.CommandError) as e:
+			except EscapeError as e:
 				self.__warn(None, str(e))
+			except self.CommandError as e:
+				print(str(e), file=sys.stderr)
 			except (KeyboardInterrupt, EOFError) as e:
-				self.__info(None, "")
+				print("")
 			except (CSQLError) as e:
 				self.__warn(None, "SQL error: %s" % str(e))
 
