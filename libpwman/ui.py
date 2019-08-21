@@ -632,6 +632,8 @@ class PWMan(Cmd):
 		The database is cleared before importing the file!\n
 		Aliases: None"""
 		try:
+			if not params.strip():
+				raise IOError("FILEPATH is empty.")
 			with open(params, "rb") as f:
 				data = f.read().decode("UTF-8")
 			self.__db.importSqlScript(data)
