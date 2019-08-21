@@ -11,20 +11,22 @@ import getopt
 import sys
 
 
-def usage():
-	print("pwman v%d - lightweight password manager" % libpwman.VERSION)
-	print("")
-	print("Usage: %s [OPTIONS] [COMMANDS]" % sys.argv[0])
-	print("")
-	print("If COMMANDS are given, run these commands.")
-	print("Starts in interactive mode, otherwise.")
-	print("")
-	print("Options:")
-	print(" -d|--database PATH      Use PATH as database file.")
-	print("                         If not given, %s is used." %\
-					libpwman.database.getDefaultDatabase())
-	print(" -U|--commit-clear-undo  The commit command clears undo queue.")
-	print(" -t|--timeout SECONDS    Sets the session timeout. Default is 10 minutes.")
+def usage(f=sys.stdout):
+	def p(*args, **kwargs):
+		print(*args, **kwargs, file=f)
+	p("pwman v%d - lightweight password manager" % libpwman.VERSION)
+	p("")
+	p("Usage: %s [OPTIONS] [COMMANDS]" % sys.argv[0])
+	p("")
+	p("If COMMANDS are given, run these commands.")
+	p("Starts in interactive mode, otherwise.")
+	p("")
+	p("Options:")
+	p(" -d|--database PATH      Use PATH as database file.")
+	p("                         If not given, %s is used." % (
+	  libpwman.database.getDefaultDatabase()))
+	p(" -U|--commit-clear-undo  The commit command clears undo queue.")
+	p(" -t|--timeout SECONDS    Sets the session timeout. Default is 10 minutes.")
 
 def main():
 	dbFile = None
@@ -46,15 +48,16 @@ def main():
 			if o in ("-t", "--timeout"):
 				timeout = int(v)
 	except (getopt.GetoptError, ValueError) as e:
-		usage()
+		usage(sys.stderr)
 		return 1
 	commands = args
 	if not dbFile:
 		dbFile = libpwman.database.getDefaultDatabase()
 	if not dbFile:
-		print("No database file specified")
+		print("No database file specified", file=sys.stderr)
 		return 1
-	print("Opening database '%s'..." % dbFile)
+	if not commands: # not interactive mode
+		print("Opening database '%s'..." % dbFile)
 	passphrase = libpwman.util.readPassphrase("Master passphrase",
 				not libpwman.util.fileExists(dbFile))
 	if passphrase is None:
@@ -69,13 +72,14 @@ def main():
 		else:
 			p.interactive()
 	except (libpwman.PWManError) as e:
-		print("Error: " + str(e))
+		print("Error: " + str(e), file=sys.stderr)
 		return 1
 	except (libpwman.PWManTimeout) as e:
 		libpwman.util.clearScreen()
-		print("pwman session timeout after %d seconds of inactivity." % e.seconds)
+		print("pwman session timeout after %d seconds of inactivity." % (
+		      e.seconds), file=sys.stderr)
 		p.flunkDirty()
-		print("exiting...")
+		print("exiting...", file=sys.stderr)
 		return 1
 	return 0
 

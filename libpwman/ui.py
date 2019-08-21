@@ -118,12 +118,16 @@ class PWMan(Cmd):
 		self.__undo = UndoStack()
 
 	def __err(self, source, message):
-		source = " " + source + ":" if source else ""
+		source = (" " + source + ":") if source else ""
 		raise self.CommandError("***%s %s" % (source, message))
 
+	def __warn(self, source, message):
+		source = (" " + source + ":") if source else ""
+		print("***%s %s" % (source, message))
+
 	def __info(self, source, message):
-		source = " " + source + ":" if source else ""
-		print("+++%s %s\n" % (source, message))
+		source = ("+++ " + source + ": ") if source else ""
+		print("%s%s" % (source, message))
 
 	def precmd(self, line):
 		self.__timeout.poke()
@@ -240,18 +244,18 @@ class PWMan(Cmd):
 					msg += " Alias%s: %s" %\
 					("es" if len(aliases) > 1 else "",
 					", ".join(aliases))
-				print(msg)
-		print("Misc commands:")
+				self.__info(None, msg)
+		self.__info(None, "Misc commands:")
 		printCmdHelp(self.cmdHelpMisc)
-		print("\nDatabase commands:")
+		self.__info(None, "\nDatabase commands:")
 		printCmdHelp(self.cmdHelpDatabase)
-		print("\nSearching/listing commands:")
+		self.__info(None, "\nSearching/listing commands:")
 		printCmdHelp(self.cmdHelpShow)
-		print("\nEditing commands:")
+		self.__info(None, "\nEditing commands:")
 		printCmdHelp(self.cmdHelpEdit)
-		print("\nHistory commands:")
+		self.__info(None, "\nHistory commands:")
 		printCmdHelp(self.cmdHelpHist)
-		print("\nType 'command?' or 'help command' for more help on a command.")
+		self.__info(None, "\nType 'command?' or 'help command' for more help on a command.")
 	do_h = do_help
 
 	def do_quit(self, params):
@@ -292,15 +296,12 @@ class PWMan(Cmd):
 		Aliases: None"""
 		p = readPassphrase("Current master passphrase")
 		if p != self.__db.getPassphrase():
-			stdout("Passphrase mismatch! ")
-			for i in range(3):
-				stdout(".")
-				time.sleep(0.5)
-			print("")
+			time.sleep(1)
+			self.__warn(None, "Passphrase mismatch! ")
 			return
 		p = readPassphrase("Master passphrase", verify=True)
 		if p is None:
-			print("Passphrase not changed.")
+			self.__info(None, "Passphrase not changed.")
 			return
 		if p != self.__db.getPassphrase():
 			self.__db.setPassphrase(p)
@@ -315,15 +316,15 @@ class PWMan(Cmd):
 		Aliases: ls cat"""
 		category, title = self.__getParams(params, 0, 2)
 		if not category and not title:
-			stdout("Categories:\n\t")
-			stdout("\n\t".join(self.__db.getCategoryNames()) + "\n")
+			self.__info(None, "Categories:")
+			self.__info(None, "\t" + "\n\t".join(self.__db.getCategoryNames()))
 		elif category and not title:
-			stdout("Entries in category '%s':\n\t" % category)
-			stdout("\n\t".join(self.__db.getEntryTitles(category)) + "\n")
+			self.__info(None, "Entries in category '%s':" % category)
+			self.__info(None, "\t" + "\n\t".join(self.__db.getEntryTitles(category)))
 		elif category and title:
 			entry = self.__db.getEntry(category, title)
 			if entry:
-				stdout(self.__dumpEntry(entry))
+				self.__info(None, self.__dumpEntry(entry))
 			else:
 				self.__err("list", "'%s/%s' not found" % (category, title))
 		else:
@@ -344,7 +345,7 @@ class PWMan(Cmd):
 		if params:
 			category, title, user, pw = self.__getParams(params, 0, 4)
 		else:
-			stdout("Create new entry:\n")
+			self.__info("new", "Create new entry:")
 			category = input("\tCategory: ")
 			title = input("\tEntry title: ")
 			user = input("\tUsername: ")
@@ -515,7 +516,7 @@ class PWMan(Cmd):
 			for title in self.__db.getEntryTitles(category):
 				p = "%s %s" % (escapeCmd(category),
 					       escapeCmd(title))
-				print("remove %s" % p)
+				self.__info("remove", "running: remove %s" % p)
 				self.do_remove(p)
 			return
 		oldEntry = self.__db.getEntry(category, title)
@@ -691,7 +692,7 @@ class PWMan(Cmd):
 		if not entries:
 			self.__err("find", "'%s' not found" % pattern)
 		for entry in entries:
-			stdout(self.__dumpEntry(entry) + "\n\n")
+			self.__info(None, self.__dumpEntry(entry))
 	do_f = do_find
 
 	def complete_find(self, text, line, begidx, endidx):
@@ -738,7 +739,7 @@ class PWMan(Cmd):
 				     hmacHash=entryTotp.hmacHash)
 		except OtpError as e:
 			self.__err("totp", "Failed to generate TOTP: %s" % str(e))
-		stdout("%s\n" % token)
+		self.__info(None, "%s" % token)
 	do_t = do_totp
 
 	complete_totp = __complete_category_title
@@ -764,9 +765,9 @@ class PWMan(Cmd):
 						   digits=6,
 						   hmacHash="SHA1")
 			enc = ""
-		stdout("TOTP key:     %s%s\n" % (entryTotp.key, enc))
-		stdout("TOTP digits:  %d\n" % entryTotp.digits)
-		stdout("TOTP hash:    %s\n" % entryTotp.hmacHash)
+		self.__info(None, "TOTP key:     %s%s" % (entryTotp.key, enc))
+		self.__info(None, "TOTP digits:  %d" % entryTotp.digits)
+		self.__info(None, "TOTP hash:    %s" % entryTotp.hmacHash)
 	do_tk = do_totp_key
 
 	complete_totp_key = __complete_category_title
@@ -993,10 +994,10 @@ class PWMan(Cmd):
 
 	def __mayQuit(self):
 		if self.__db.isDirty():
-			print("Warning: Uncommitted changes. " \
-				"Operation not performed. Use command 'commit' " \
-				"to write the changes to the database. Use " \
-				"command 'quit!' to quit without saving.")
+			self.__warn(None,
+				    "Warning: Uncommitted changes. Operation not performed.\n"
+				    "Use command 'commit' to write the changes to the database.\n"
+				    "Use command 'quit!' to quit without saving.")
 			return False
 		return True
 
@@ -1013,11 +1014,11 @@ class PWMan(Cmd):
 					self.do_cls("")
 					break
 			except (EscapeError, self.CommandError) as e:
-				stdout(str(e) + "\n")
+				self.__warn(None, str(e))
 			except (KeyboardInterrupt, EOFError) as e:
-				stdout("\n")
+				self.__info(None, "")
 			except (CSQLError) as e:
-				stdout("SQL error: %s\n" % str(e))
+				self.__warn(None, "SQL error: %s" % str(e))
 
 	def runOneCommand(self, command):
 		try:

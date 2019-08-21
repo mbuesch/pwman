@@ -10,6 +10,7 @@ from libpwman.exception import *
 from libpwman.util import *
 
 import os
+import sys
 from dataclasses import dataclass
 
 __all__ = [
@@ -106,7 +107,8 @@ class PWManDatabase(CryptSQL):
 	def __migrateVersion(self, dbVer):
 		if dbVer == self.DB_VER[0]:
 			print("Migrating database from version %s to version %s..." % (
-			      dbVer, self.DB_VER[-1]))
+			      dbVer, self.DB_VER[-1]),
+			      file=sys.stderr)
 
 			self.__initTables()
 
@@ -560,7 +562,8 @@ class PWManDatabase(CryptSQL):
 
 	def flunkDirty(self):
 		if self.isDirty():
-			print("WARNING: Dropping uncommitted data")
+			print("WARNING: Dropping uncommitted data",
+			      file=sys.stderr)
 			self.setDirty(False)
 
 	def commit(self):

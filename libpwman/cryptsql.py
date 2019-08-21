@@ -16,9 +16,9 @@ import functools
 from libpwman.fileobj import *
 
 def missingMod(name, debpack=None):
-	print("Python '%s' module is not installed." % name)
+	print("Python '%s' module is not installed." % name, file=sys.stderr)
 	if debpack:
-		print("On Debian do:  aptitude install %s" % debpack)
+		print("On Debian do:  apt install %s" % debpack, file=sys.stderr)
 	sys.exit(1)
 
 try:

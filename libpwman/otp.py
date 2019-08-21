@@ -66,7 +66,3 @@ def totp(key, nrDigits=6, hmacHash="SHA1", t=None):
 		t = time.time()
 	t = (int(round(t)) // 30) - 1
 	return hotp(key, t, nrDigits, hmacHash)
-
-if __name__ == "__main__":
-	import sys
-	print(totp(sys.argv[1]))

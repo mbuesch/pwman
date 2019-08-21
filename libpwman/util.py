@@ -64,10 +64,11 @@ def readPassphrase(prompt, verify=False):
 			p1 = getpass.getpass(prompt + " (verify): ")
 			if p0 == p1:
 				return p0
-			print("Passwords don't match. Try again...")
+			print("Passwords don't match. Try again...",
+			      file=sys.stderr)
 	except (EOFError, KeyboardInterrupt) as e:
 		print("")
 		return None
 	except (getpass.GetPassWarning) as e:
-		print(str(e))
+		print(str(e), file=sys.stderr)
 		return None
