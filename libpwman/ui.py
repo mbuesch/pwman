@@ -97,20 +97,52 @@ class PWManTimeout(Exception):
 	def __timeout(self, signum, frame):
 		raise self
 
+# PWMan completion decorator that does common things and workarounds.
+def completion(func):
+	@functools.wraps(func)
+	def wrapper(self, text, line, begidx, endidx):
+		self._timeout.poke()
+
+		# Find the real begidx that takes space escapes into account.
+		sline = self._patchSpaceEscapes(line)
+		realBegidx = endidx
+		while realBegidx > 0:
+			if sline[realBegidx - 1] == " ":
+				break
+			realBegidx -= 1
+
+		if begidx == realBegidx:
+			textPrefix = ""
+		else:
+			# Workaround: Patch the begidx to fully
+			# honor all escapes. Remember the text
+			# between the real begidx and the orig begidx.
+			# It must be removed from the results.
+			textPrefix = line[realBegidx : begidx]
+			begidx = realBegidx
+
+		# Fixup text.
+		# By fetching the parameter again it is ensured that
+		# it is properly unescaped.
+		paramIdx = self._calcParamIndex(line, endidx)
+		text = self._getParam(line, paramIdx, ignoreFirst=True)
+
+		# Call the PWMan completion handler.
+		completions = func(self, text, line, begidx, endidx)
+
+		# If we fixed begidx in the workaround above,
+		# we need to remove the additional prefix from the results,
+		# because Cmd/readline won't expect it.
+		if textPrefix:
+			for i, comp in enumerate(copy(completions)):
+				if comp.startswith(textPrefix):
+					completions[i] = comp[len(textPrefix) : ]
+		return completions
+	return wrapper
+
 class PWMan(Cmd):
 	class CommandError(Exception): pass
 	class Quit(Exception): pass
-
-	def completion(func):
-		@functools.wraps(func)
-		def wrapper(self, text, line, begidx, endidx):
-			self._timeout.poke()
-
-			paramIdx = self._calcParamIndex(line, endidx)
-			text = self._getParam(line, paramIdx, ignoreFirst=True)
-
-			return func(self, text, line, begidx, endidx)
-		return wrapper
 
 	def __init__(self, filename, passphrase,
 		     commitClearsUndo=False, timeout=-1):
@@ -935,7 +967,7 @@ class PWMan(Cmd):
 			 lineIncludesCommand=False, unescape=True):
 		# Return a parameter string with the first 'count'
 		# parameters skipped.
-		sline = self.__sanitizeCmdline(line)
+		sline = self._patchSpaceEscapes(line)
 		if lineIncludesCommand:
 			count += 1
 		i = 0
@@ -955,14 +987,14 @@ class PWMan(Cmd):
 	def _calcParamIndex(self, line, endidx):
 		# Returns the parameter index into the commandline
 		# given the character end-index. This honors space-escape.
-		line = self.__sanitizeCmdline(line)
+		line = self._patchSpaceEscapes(line)
 		startidx = endidx - 1
 		while startidx > 0 and not line[startidx].isspace():
 			startidx -= 1
 		return len([l for l in line[:startidx].split() if l]) - 1
 
-	def __sanitizeCmdline(self, line):
-		# Sanitize a commandline for simple whitespace based splitting.
+	def _patchSpaceEscapes(self, line):
+		# Patch a commandline for simple whitespace based splitting.
 		# We just replace the space escape sequence by a random
 		# non-whitespace string. The line remains the same size.
 		return line.replace('\\ ', '_S')
@@ -971,7 +1003,7 @@ class PWMan(Cmd):
 		       ignoreFirst=False, unescape=True):
 		"""Returns the full parameter from the commandline.
 		"""
-		sline = self.__sanitizeCmdline(line)
+		sline = self._patchSpaceEscapes(line)
 		if ignoreFirst:
 			paramIndex += 1
 		inParam = False
