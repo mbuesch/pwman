@@ -125,7 +125,7 @@ def completion(func):
 		# By fetching the parameter again it is ensured that
 		# it is properly unescaped.
 		paramIdx = self._calcParamIndex(line, endidx)
-		text = self._getParam(line, paramIdx, ignoreFirst=True)
+		text = self._getComplParam(line, paramIdx)
 
 		# Call the PWMan completion handler.
 		completions = func(self, text, line, begidx, endidx)
@@ -202,7 +202,9 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		self._timeout.poke()
 
 	def default(self, line):
-		self.__err(None, "Unknown command: %s\nType 'help' for more help." % line)
+		self.__err(None,
+			   "Unknown command: %s\n"
+			   "Type 'help' for more help." % line)
 
 	def emptyline(self):
 		self._timeout.poke()
@@ -239,7 +241,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self._getParam(line, 0, ignoreFirst=True),
+			return self.__getEntryTitleCompletions(self._getComplParam(line, 0),
 							       text)
 		return []
 
@@ -469,12 +471,12 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self._getParam(line, 0, ignoreFirst=True),
+			return self.__getEntryTitleCompletions(self._getComplParam(line, 0),
 							       text)
 		elif paramIdx == 2:
 			# User data
-			entry = self.__db.getEntry(self._getParam(line, 0, ignoreFirst=True),
-						   self._getParam(line, 1, ignoreFirst=True))
+			entry = self.__db.getEntry(self._getComplParam(line, 0),
+						   self._getComplParam(line, 1))
 			return [ escapeCmd(entry.user) ]
 		return []
 	complete_eu = complete_edit_user
@@ -500,12 +502,12 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self._getParam(line, 0, ignoreFirst=True),
+			return self.__getEntryTitleCompletions(self._getComplParam(line, 0),
 							       text)
 		elif paramIdx == 2:
 			# Password data
-			entry = self.__db.getEntry(self._getParam(line, 0, ignoreFirst=True),
-						   self._getParam(line, 1, ignoreFirst=True))
+			entry = self.__db.getEntry(self._getComplParam(line, 0),
+						   self._getComplParam(line, 1))
 			return [ escapeCmd(entry.pw) ]
 		return []
 	complete_ep = complete_edit_pw
@@ -548,12 +550,12 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self._getParam(line, 0, ignoreFirst=True),
+			return self.__getEntryTitleCompletions(self._getComplParam(line, 0),
 							       text)
 		elif paramIdx == 2:
 			# Bulk data
-			entry = self.__db.getEntry(self._getParam(line, 0, ignoreFirst=True),
-						   self._getParam(line, 1, ignoreFirst=True))
+			entry = self.__db.getEntry(self._getComplParam(line, 0),
+						   self._getComplParam(line, 1))
 			if entry:
 				entryBulk = self.__db.getEntryBulk(entry)
 				if entryBulk:
@@ -875,7 +877,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		paramIdx = self._calcParamIndex(line, endidx)
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
-		category, title = self._getParams(line, 0, 2, ignoreFirst=True)
+		category, title = self._getComplParams(line, 0, 2)
 		if category and title:
 			entry = self.__db.getEntry(category, title)
 			if entry:
@@ -922,7 +924,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		paramIdx = self._calcParamIndex(line, endidx)
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
-		category, title, name = self._getParams(line, 0, 3, ignoreFirst=True)
+		category, title, name = self._getComplParams(line, 0, 3)
 		if category and title:
 			entry = self.__db.getEntry(category, title)
 			if entry:
@@ -1042,14 +1044,22 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			p = unescapeCmd(p)
 		return p
 
+	def _getComplParam(self, line, paramIndex, unescape=True):
+		return self._getParam(line, paramIndex,
+				      ignoreFirst=True, unescape=unescape)
+
 	def _getParams(self, line, paramIndex, count,
-			ignoreFirst=False, unescape=True):
+		       ignoreFirst=False, unescape=True):
 		"""Returns a generator of the specified parameters from the commandline.
 		paramIndex: start index.
 		count: Number of paramerts to fetch.
 		"""
 		return ( self._getParam(line, i, ignoreFirst, unescape)
 			 for i in range(paramIndex, paramIndex + count) )
+
+	def _getComplParams(self, line, paramIndex, count, unescape=True):
+		return self._getParams(line, paramIndex, count,
+				       ignoreFirst=True, unescape=unescape)
 
 	def __mayQuit(self):
 		if self.__db.isDirty():
