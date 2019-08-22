@@ -75,8 +75,12 @@ def run_ui(dbPath, commitClearsUndo, timeout, commands):
 
 def main():
 	p = argparse.ArgumentParser()
-	p.add_argument("commands", nargs="*", metavar="COMMAND",
+	g = p.add_mutually_exclusive_group()
+	g.add_argument("commands", nargs="*", metavar="COMMAND", default=(),
 		       help="Run this command. Starts in interactive mode, if no COMMAND is given.")
+	g.add_argument("-p", "--call-pymod", type=str, metavar="PYTHONSCRIPT.py",
+		       help="Calls the Python function run(database) from Python module PYTHONSCRIPT. "
+			    "An open PWManDatabase object is passed to run().")
 	p.add_argument("-d", "--database", type=str, default=None, metavar="PATH",
 		       help="Use PATH as database file. If not given, %s is used." % (
 			    libpwman.database.getDefaultDatabase()))
@@ -84,9 +88,6 @@ def main():
 		       help="The commit command clears undo queue.")
 	p.add_argument("-t", "--timeout", type=int, default=600, metavar="SECONDS",
 		       help="Sets the session timeout in seconds. Default is 10 minutes.")
-	p.add_argument("-p", "--call-pymod", type=str, metavar="PYTHONSCRIPT.py",
-		       help="Calls the Python function run(database) from Python module PYTHONSCRIPT. "
-			    "An open PWManDatabase object is passed to run().")
 	args = p.parse_args()
 
 	dbPath = pathlib.Path(args.database) if args.database else None
