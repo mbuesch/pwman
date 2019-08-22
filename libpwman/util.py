@@ -5,28 +5,16 @@
 # Licensed under the GNU/GPL version 2 or later.
 """
 
-import os
 import sys
-import errno
 import curses
 import getpass
 
 __all__ = [
-	"fileExists",
 	"uniq",
 	"stdout",
 	"clearScreen",
 	"readPassphrase",
 ]
-
-def fileExists(path):
-	try:
-		os.stat(path)
-	except (OSError) as e:
-		if e.errno == errno.ENOENT:
-			return False
-		raise ValueError("fileExists(): " + str(e))
-	return True
 
 def uniq(l, sort=True):
 	l = list(set(l))

@@ -1,13 +1,14 @@
 from pwman_tstlib import *
 initTest(__file__)
 
+import pathlib
 from libpwman.database import *
 
 class Test_Database_v0(TestCase):
 	"""Legacy version 0 database format.
 	"""
 	def test_v0(self):
-		db = PWManDatabase(filename="tests/test_database_v0.db",
+		db = PWManDatabase(filename=pathlib.Path("tests", "test_database_v0.db"),
 				   passphrase="test")
 
 		self.assertEqual(db.getCategoryNames(),

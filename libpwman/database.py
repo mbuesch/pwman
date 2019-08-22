@@ -10,6 +10,7 @@ from libpwman.exception import *
 from libpwman.util import *
 
 import os
+import pathlib
 import sys
 from dataclasses import dataclass
 
@@ -26,10 +27,10 @@ __all__ = [
 def getDefaultDatabase():
 	db = os.getenv("PWMAN_DATABASE")
 	if db:
-		return db
-	home = os.getenv("HOME")
+		return pathlib.Path(db)
+	home = pathlib.Path.home()
 	if home:
-		return home + "/.pwman.db"
+		return home / ".pwman.db"
 	return None
 
 @dataclass

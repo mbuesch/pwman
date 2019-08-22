@@ -1,9 +1,10 @@
 from pwman_tstlib import *
 initTest(__file__)
 
+import importlib
+import pathlib
 import shutil
 import tempfile
-import importlib
 
 class Test_UI(TestCase):
 	"""User interface.
@@ -27,7 +28,7 @@ class Test_UI(TestCase):
 		importlib.reload(libpwman.ui)
 		self.dbFile = tempfile.NamedTemporaryFile(suffix="_" + self.id())
 		print("DB file:", self.dbFile.name)
-		shutil.copy("tests/test_database_v1.db",
+		shutil.copy(pathlib.Path("tests", "test_database_v1.db"),
 			    self.dbFile.name)
 		self.ui = libpwman.PWMan(filename=self.dbFile.name,
 					 passphrase="test")
