@@ -85,7 +85,8 @@ class CryptSQLCursor(object):
 			raise CSQLError("Database error: " + str(e))
 
 class CryptSQL(object):
-	def __init__(self):
+	def __init__(self, readOnly=True):
+		self.__readOnly = readOnly
 		self.__reset()
 
 	def __reset(self):
@@ -238,6 +239,9 @@ class CryptSQL(object):
 		return val
 
 	def commit(self, passphrase):
+		if self.__readOnly:
+			raise CSQLError("The database is read-only. "
+					"Cannot commit changes.")
 		assert isinstance(passphrase, str),\
 		       "CryptSQL: Passphrase is not 'str'."
 		try:

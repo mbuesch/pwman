@@ -69,9 +69,9 @@ class PWManDatabase(CryptSQL):
 	DB_TYPE	= "PWMan database"
 	DB_VER	= ("0", "1")
 
-	def __init__(self, filename, passphrase):
+	def __init__(self, filename, passphrase, readOnly=True):
 		try:
-			super().__init__()
+			super().__init__(readOnly=readOnly)
 			self.__openFile(filename, passphrase)
 		except (CSQLError) as e:
 			raise PWManError(str(e))

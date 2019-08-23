@@ -200,7 +200,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		# argument delimiter shall be space.
 		readline.set_completer_delims(" ")
 
-		self.__db = PWManDatabase(filename, passphrase)
+		self.__db = PWManDatabase(filename, passphrase, readOnly=False)
 		self.prompt = "pwman$ "
 
 		self._timeout = PWManTimeout(timeout)

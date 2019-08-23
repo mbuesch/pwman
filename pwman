@@ -39,13 +39,15 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 	if dbPassphrase is None:
 		return 1
 	db = libpwman.database.PWManDatabase(filename=dbPath,
-					     passphrase=dbPassphrase)
+					     passphrase=dbPassphrase,
+					     readOnly=True)
 
 	try:
 		# Try to open the old database with the passphrase
 		# of the new database.
 		oldDb = libpwman.database.PWManDatabase(filename=oldDbPath,
-							passphrase=dbPassphrase)
+							passphrase=dbPassphrase,
+							readOnly=True)
 	except PWManError:
 		# The attempt failed. Ask the user for the proper passphrase.
 		dbPassphrase = getPassphrase(oldDbPath, interactiveMode=True,
@@ -53,7 +55,8 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 		if dbPassphrase is None:
 			return 1
 		oldDb = libpwman.database.PWManDatabase(filename=oldDbPath,
-							passphrase=dbPassphrase)
+							passphrase=dbPassphrase,
+							readOnly=True)
 
 	diff = libpwman.dbdiff.PWManDatabaseDiff(db=db, oldDb=oldDb)
 	if diffFormat == "unified":
@@ -91,7 +94,8 @@ def run_script(dbPath, pyModName):
 	if passphrase is None:
 		return 1
 	db = libpwman.database.PWManDatabase(filename=dbPath,
-					     passphrase=passphrase)
+					     passphrase=passphrase,
+					     readOnly=False)
 	try:
 		run(db)
 	except Exception as e:
