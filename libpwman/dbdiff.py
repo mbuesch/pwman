@@ -31,8 +31,8 @@ class PWManDatabaseDiff(object):
 	def getUnifiedDiff(self, contextLines=3):
 		diff = difflib.unified_diff(a=self.__dumpDb(self.__oldDb).splitlines(),
 					    b=self.__dumpDb(self.__db).splitlines(),
-					    fromfile=str(self.__oldDb.filename),
-					    tofile=str(self.__db.filename),
+					    fromfile=str(self.__oldDb.getFilename()),
+					    tofile=str(self.__db.getFilename()),
 					    n=contextLines,
 					    lineterm="")
 		return "\n".join(diff)
@@ -40,8 +40,8 @@ class PWManDatabaseDiff(object):
 	def getContextDiff(self, contextLines=3):
 		diff = difflib.context_diff(a=self.__dumpDb(self.__oldDb).splitlines(),
 					    b=self.__dumpDb(self.__db).splitlines(),
-					    fromfile=str(self.__oldDb.filename),
-					    tofile=str(self.__db.filename),
+					    fromfile=str(self.__oldDb.getFilename()),
+					    tofile=str(self.__db.getFilename()),
 					    n=contextLines,
 					    lineterm="")
 		return "\n".join(diff)
@@ -58,8 +58,8 @@ class PWManDatabaseDiff(object):
 					    charjunk=None)
 		diff = htmldiff.make_file(fromlines=self.__dumpDb(self.__oldDb).splitlines(),
 					  tolines=self.__dumpDb(self.__db).splitlines(),
-					  fromdesc=str(self.__oldDb.filename),
-					  todesc=str(self.__db.filename),
+					  fromdesc=str(self.__oldDb.getFilename()),
+					  todesc=str(self.__db.getFilename()),
 					  context=True,
 					  numlines=contextLines)
 		return "".join(diff)
