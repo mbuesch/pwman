@@ -172,7 +172,8 @@ class PWManMeta(type):
 		for name, attr in dct.items():
 			# Fixup command docstrings.
 			if (name.startswith("do_") and
-			    not getattr(attr, "_pwman_fixed", False)):
+			    not getattr(attr, "_pwman_fixed", False) and
+			    attr.__doc__):
 				# Remove leading double-tabs.
 				attr.__doc__, n = re.subn("^\t\t", "\t", attr.__doc__,
 							  0, re.MULTILINE)
