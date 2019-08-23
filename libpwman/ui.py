@@ -19,6 +19,7 @@ import signal
 import functools
 from copy import copy, deepcopy
 from cmd import Cmd
+from dataclasses import dataclass, field
 
 __all__ = [
 	"PWMan",
@@ -722,33 +723,19 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		If no OPTS are given, the search uses these OPTS:
 		  -t -u -p -b -a\n
 		Aliases: f"""
-		p, i = [], 0
-		mTitle, mUser, mPw, mBulk, mAttrData, mAttrName = (False,) * 6
-		while True:
-			param = self._getParam(params, i)
-			if not param:
-				break
-			if param == "-t" and not p:
-				mTitle = True
-			elif param == "-u" and not p:
-				mUser = True
-			elif param == "-p" and not p:
-				mPw = True
-			elif param == "-b" and not p:
-				mBulk = True
-			elif param == "-a" and not p:
-				mAttrData = True
-			elif param == "-A" and not p:
-				mAttrName = True
-			else:
-				p.append(param)
-			i += 1
-		if len(p) <= 0 or len(p) > 2:
-			self.__err("find", "Invalid parameters.")
-		category = p[0] if len(p) > 1 else None
-		pattern = p[1] if len(p) > 1 else p[0]
+		opts, args = self._getOpts(params, ("-t", "-u", "-p", "-b", "-a", "-A"))
+		mTitle = "-t" in opts
+		mUser = "-u" in opts
+		mPw = "-p" in opts
+		mBulk = "-b" in opts
+		mAttrData = "-a" in opts
+		mAttrName = "-A" in opts
 		if not any( (mTitle, mUser, mPw, mBulk, mAttrData) ):
 			mTitle, mUser, mPw, mBulk, mAttrData = (True,) * 5
+		if len(args) < 1 or len(args) > 2:
+			self.__err("find", "Invalid parameters.")
+		category = args[0] if len(args) > 1 else None
+		pattern = args[1] if len(args) > 1 else args[0]
 		entries = self.__db.findEntries(pattern=pattern,
 						inCategory=category,
 						matchTitle=mTitle,
@@ -1066,6 +1053,63 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	def _getComplParams(self, line, paramIndex, count, unescape=True):
 		return self._getParams(line, paramIndex, count,
 				       ignoreFirst=True, unescape=unescape)
+
+	@dataclass
+	class Opts(object):
+		__opts : list = field(default_factory=list)
+
+		def append(self, optName, optValue=None):
+			self.__opts.append( (optName, optValue) )
+
+		def __contains__(self, optName):
+			return optName in (o[0] for o in self.__opts)
+
+		def __bool__(self):
+			return bool(self.__opts)
+
+		def getValue(self, optName):
+			return [ o[1] for o in self.__opts if o[0] == optName ][0]
+
+	def _getOpts(self, line, possibleOpts,
+		     ignoreFirst=False, unescape=True):
+		"""Parses the command options in 'line' and returns a tuple
+		(opts, trailingParams).
+		opts is an instance of Opts that holds the actual options.
+		trailingParams are the trailing parameters.
+		possibleOpts is a tuple of the possible options.
+		"""
+		possibleOptsPlain = [ o.replace(":", "") for o in possibleOpts ]
+		opts = self.Opts()
+		trailingParams = []
+		i = 0
+		while True:
+			p = self._getParam(line, i,
+					   ignoreFirst=ignoreFirst,
+					   unescape=unescape)
+			if not p:
+				break
+			if trailingParams:
+				trailingParams.append(p)
+			else:
+				try:
+					optIdx = possibleOptsPlain.index(p)
+				except ValueError:
+					trailingParams.append(p)
+					i += 1
+					continue
+				if possibleOpts[optIdx].endswith(":"):
+					i += 1
+					arg = self._getParam(line, i,
+							     ignoreFirst=ignoreFirst,
+							     unescape=unescape)
+					if not arg:
+						self.__err(None, "Option '%s' "
+							   "requires an argument." % p)
+					opts.append(p, arg)
+				else:
+					opts.append(p)
+			i += 1
+		return opts, trailingParams
 
 	def __mayQuit(self):
 		if self.__db.isDirty():
