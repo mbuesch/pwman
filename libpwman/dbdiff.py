@@ -6,7 +6,6 @@
 """
 
 from libpwman.database import *
-from libpwman.ui import dumpEntry
 
 import difflib
 
@@ -24,7 +23,7 @@ class PWManDatabaseDiff(object):
 		for category in db.getCategoryNames():
 			for title in db.getEntryTitles(category):
 				entry = db.getEntry(category, title)
-				dump = dumpEntry(db, entry, showTotpKey=True)
+				dump = db.dumpEntry(entry, showTotpKey=True)
 				ret.append(dump + "\n")
 		return "".join(ret)
 

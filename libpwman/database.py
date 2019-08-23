@@ -219,6 +219,33 @@ class PWManDatabase(CryptSQL):
 				  pw=data[4],
 				  entryId=data[0])
 
+	def dumpEntry(self, entry, showTotpKey=False):
+		res = []
+		res.append("===  %s  ===" % entry.category)
+		res.append("\t---  %s  ---" % entry.title)
+		if entry.user:
+			res.append("\tUser:\t\t%s" % entry.user)
+		if entry.pw:
+			res.append("\tPassword:\t%s" % entry.pw)
+		entryBulk = self.getEntryBulk(entry)
+		if entryBulk:
+			res.append("\tBulk data:\t%s" % entryBulk.data)
+		entryTotp = self.getEntryTotp(entry)
+		if entryTotp:
+			if showTotpKey:
+				res.append("\tTOTP key:\t%s" % entryTotp.key)
+				res.append("\tTOTP digits:\t%d" % entryTotp.digits)
+				res.append("\tTOTP hash:\t%s" % entryTotp.hmacHash)
+			else:
+				res.append("\tTOTP:\t\tavailable")
+		entryAttrs = self.getEntryAttrs(entry)
+		if entryAttrs:
+			res.append("\tAttributes:")
+			for entryAttr in entryAttrs:
+				res.append("\t    %s:\t%s" % (entryAttr.name,
+							      entryAttr.data))
+		return "\n".join(res) + "\n"
+
 	def findEntries(self, pattern,
 			leftAnchor=False, rightAnchor=False,
 			inCategory=None,
