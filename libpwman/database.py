@@ -69,9 +69,10 @@ class PWManDatabase(CryptSQL):
 	DB_TYPE	= "PWMan database"
 	DB_VER	= ("0", "1")
 
-	def __init__(self, filename, passphrase, readOnly=True):
+	def __init__(self, filename, passphrase, readOnly=True, silent=False):
 		try:
 			super().__init__(readOnly=readOnly)
+			self.__silent = silent
 			self.__openFile(filename, passphrase)
 		except (CSQLError) as e:
 			raise PWManError(str(e))
@@ -107,9 +108,10 @@ class PWManDatabase(CryptSQL):
 
 	def __migrateVersion(self, dbVer):
 		if dbVer == self.DB_VER[0]:
-			print("Migrating database from version %s to version %s..." % (
-			      dbVer, self.DB_VER[-1]),
-			      file=sys.stderr)
+			if not self.__silent:
+				print("Migrating database from version %s to version %s..." % (
+				      dbVer, self.DB_VER[-1]),
+				      file=sys.stderr)
 
 			self.__initTables()
 
@@ -602,3 +604,14 @@ class PWManDatabase(CryptSQL):
 	def importSqlScript(self, *args, **kwargs):
 		self.setDirty()
 		super().importSqlScript(*args, **kwargs)
+
+	def getOnDiskDb(self):
+		"""Get a read-only instance of PWManDatabase that contains
+		the current on-disk data. The on-disk data is the data
+		at the last commit.
+		"""
+		db = self.__class__(filename=self.getFilename(),
+				    passphrase=self.getPassphrase(),
+				    readOnly=True,
+				    silent=True)
+		return db
