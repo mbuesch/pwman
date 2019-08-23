@@ -106,16 +106,24 @@ def run_ui(dbPath, commitClearsUndo, timeout, commands):
 	passphrase = getPassphrase(dbPath, interactiveMode=not commands)
 	if passphrase is None:
 		return 1
-	p = libpwman.PWMan(filename=dbPath,
-			   passphrase=passphrase,
-			   commitClearsUndo=commitClearsUndo,
-			   timeout=timeout)
-	if commands:
-		for command in commands:
-			p.runOneCommand(command)
-	else:
-		p.interactive()
-	p.flunkDirty()
+	try:
+		p = libpwman.PWMan(filename=dbPath,
+				   passphrase=passphrase,
+				   commitClearsUndo=commitClearsUndo,
+				   timeout=timeout)
+		if commands:
+			for command in commands:
+				p.runOneCommand(command)
+		else:
+			p.interactive()
+		p.flunkDirty()
+	except libpwman.PWManTimeout as e:
+		libpwman.util.clearScreen()
+		print("pwman session timeout after %d seconds of inactivity." % (
+		      e.seconds), file=sys.stderr)
+		p.flunkDirty()
+		print("exiting...", file=sys.stderr)
+		return 1
 	return 0
 
 def main():
@@ -165,18 +173,11 @@ def main():
 					  commitClearsUndo=args.commit_clear_undo,
 					  timeout=args.timeout,
 					  commands=args.commands)
-	except (libpwman.database.CSQLError) as e:
+	except libpwman.database.CSQLError as e:
 		print("SQL error: " + str(e), file=sys.stderr)
 		return 1
-	except (libpwman.PWManError) as e:
+	except libpwman.PWManError as e:
 		print("Error: " + str(e), file=sys.stderr)
-		return 1
-	except (libpwman.PWManTimeout) as e:
-		libpwman.util.clearScreen()
-		print("pwman session timeout after %d seconds of inactivity." % (
-		      e.seconds), file=sys.stderr)
-		p.flunkDirty()
-		print("exiting...", file=sys.stderr)
 		return 1
 	return exitcode
 
