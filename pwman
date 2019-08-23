@@ -13,16 +13,61 @@ import pathlib
 import sys
 import traceback
 
-def getPassphrase(dbPath, interactiveMode):
+def getPassphrase(dbPath, interactiveMode, infoFile=sys.stdout):
 	dbExists = dbPath.exists()
 	if interactiveMode:
 		if dbExists:
-			print("Opening database '%s'..." % dbPath)
+			print("Opening database '%s'..." % dbPath,
+			      file=infoFile)
 		else:
-			print("Creating NEW database '%s'..." % dbPath)
+			print("Creating NEW database '%s'..." % dbPath,
+			      file=infoFile)
 	passphrase = libpwman.util.readPassphrase("Master passphrase",
 						  verify=not dbExists)
 	return passphrase
+
+def run_diff(dbPath, oldDbPath, diffFormat):
+	for p in (dbPath, oldDbPath):
+		if not p.exists():
+			print("Database '%s' does not exist." % p,
+			      file=sys.stderr)
+			return 1
+
+	# Open the new database
+	dbPassphrase = getPassphrase(dbPath, interactiveMode=True,
+				     infoFile=sys.stderr)
+	if dbPassphrase is None:
+		return 1
+	db = libpwman.database.PWManDatabase(filename=dbPath,
+					     passphrase=dbPassphrase)
+
+	try:
+		# Try to open the old database with the passphrase
+		# of the new database.
+		oldDb = libpwman.database.PWManDatabase(filename=oldDbPath,
+							passphrase=dbPassphrase)
+	except PWManError:
+		# The attempt failed. Ask the user for the proper passphrase.
+		dbPassphrase = getPassphrase(oldDbPath, interactiveMode=True,
+					     infoFile=sys.stderr)
+		if dbPassphrase is None:
+			return 1
+		oldDb = libpwman.database.PWManDatabase(filename=oldDbPath,
+							passphrase=dbPassphrase)
+
+	diff = libpwman.dbdiff.PWManDatabaseDiff(db=db, oldDb=oldDb)
+	if diffFormat == "unified":
+		print(diff.getUnifiedDiff())
+	elif diffFormat == "context":
+		print(diff.getContextDiff())
+	elif diffFormat == "ndiff":
+		print(diff.getNdiffDiff())
+	elif diffFormat == "html":
+		print(diff.getHtmlDiff())
+	else:
+		assert 0, "Invalid diffFormat"
+		return 1
+	return 0
 
 def run_script(dbPath, pyModName):
 	try:
@@ -75,14 +120,23 @@ def run_ui(dbPath, commitClearsUndo, timeout, commands):
 
 def main():
 	p = argparse.ArgumentParser()
-	g = p.add_mutually_exclusive_group()
-	g.add_argument("commands", nargs="*", metavar="COMMAND", default=(),
-		       help="Run this command. Starts in interactive mode, if no COMMAND is given.")
-	g.add_argument("-p", "--call-pymod", type=str, metavar="PYTHONSCRIPT.py",
-		       help="Calls the Python function run(database) from Python module PYTHONSCRIPT. "
-			    "An open PWManDatabase object is passed to run().")
-	p.add_argument("-d", "--database", type=str, default=None, metavar="PATH",
-		       help="Use PATH as database file. If not given, %s is used." % (
+	grp = p.add_mutually_exclusive_group()
+	grp.add_argument("commands", nargs="*", metavar="COMMAND", default=(),
+			 help="Run this command. Starts in interactive mode, "
+			      "if no COMMAND is given.")
+	grp.add_argument("-p", "--call-pymod", type=str, metavar="PYTHONSCRIPT.py",
+			 help="Calls the Python function run(database) from "
+			      "Python module PYTHONSCRIPT. An open PWManDatabase "
+			      "object is passed to run().")
+	grp.add_argument("-D", "--diff", type=pathlib.Path, default=None, metavar="OLD_DB_PATH",
+			 help="Diff the database (see -d|--database) to the "
+			      "older version specified as OLD_DB_PATH.")
+	p.add_argument("-F", "--diff-format", type=lambda x: str(x).lower().strip(),
+		       default="unified",
+		       choices=("unified", "context", "ndiff", "html"),
+		       help="Select the diff format for the -D|--diff argument.")
+	p.add_argument("-d", "--database", type=pathlib.Path, default=None, metavar="DB_PATH",
+		       help="Use DB_PATH as database file. If not given, %s is used." % (
 			    libpwman.database.getDefaultDatabase()))
 	p.add_argument("-U", "--commit-clear-undo", action="store_true",
 		       help="The commit command clears undo queue.")
@@ -90,7 +144,7 @@ def main():
 		       help="Sets the session timeout in seconds. Default is 10 minutes.")
 	args = p.parse_args()
 
-	dbPath = pathlib.Path(args.database) if args.database else None
+	dbPath = args.database
 	if not dbPath:
 		dbPath = libpwman.database.getDefaultDatabase()
 	if not dbPath:
@@ -99,7 +153,11 @@ def main():
 
 	exitcode = 1
 	try:
-		if args.call_pymod:
+		if args.diff:
+			exitcode = run_diff(dbPath=dbPath,
+					    oldDbPath=args.diff,
+					    diffFormat=args.diff_format)
+		elif args.call_pymod:
 			exitcode = run_script(dbPath=dbPath,
 					      pyModName=args.call_pymod)
 		else:

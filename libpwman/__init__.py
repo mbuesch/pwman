@@ -6,6 +6,7 @@ if sys.version_info.major <= 2:
 del sys
 
 import libpwman.database
+import libpwman.dbdiff
 import libpwman.exception
 import libpwman.ui
 import libpwman.util

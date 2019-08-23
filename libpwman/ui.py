@@ -25,6 +25,33 @@ __all__ = [
 	"PWManTimeout",
 ]
 
+def dumpEntry(db, entry, showTotpKey=False):
+	res = []
+	res.append("===  %s  ===" % entry.category)
+	res.append("\t---  %s  ---" % entry.title)
+	if entry.user:
+		res.append("\tUser:\t\t%s" % entry.user)
+	if entry.pw:
+		res.append("\tPassword:\t%s" % entry.pw)
+	entryBulk = db.getEntryBulk(entry)
+	if entryBulk:
+		res.append("\tBulk data:\t%s" % entryBulk.data)
+	entryTotp = db.getEntryTotp(entry)
+	if entryTotp:
+		if showTotpKey:
+			res.append("\tTOTP key:\t%s" % entryTotp.key)
+			res.append("\tTOTP digits:\t%d" % entryTotp.digits)
+			res.append("\tTOTP hash:\t%s" % entryTotp.hmacHash)
+		else:
+			res.append("\tTOTP:\t\tavailable")
+	entryAttrs = db.getEntryAttrs(entry)
+	if entryAttrs:
+		res.append("\tAttributes:")
+		for entryAttr in entryAttrs:
+			res.append("\t    %s:\t%s" % (entryAttr.name,
+						      entryAttr.data))
+	return "\n".join(res) + "\n"
+
 class EscapeError(Exception):
 	pass
 
@@ -210,28 +237,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		self._timeout.poke()
 		# Don't repeat the last command
 
-	def __dumpEntry(self, entry):
-		res = []
-		res.append("===  %s  ===" % entry.category)
-		res.append("\t---  %s  ---" % entry.title)
-		if entry.user:
-			res.append("\tUser:\t\t%s" % entry.user)
-		if entry.pw:
-			res.append("\tPassword:\t%s" % entry.pw)
-		entryBulk = self.__db.getEntryBulk(entry)
-		if entryBulk:
-			res.append("\tBulk data:\t%s" % entryBulk.data)
-		entryTotp = self.__db.getEntryTotp(entry)
-		if entryTotp:
-			res.append("\tTOTP:\t\tavailable")
-		entryAttrs = self.__db.getEntryAttrs(entry)
-		if entryAttrs:
-			res.append("\tAttributes:")
-			for entryAttr in entryAttrs:
-				res.append("\t\t%s:\t%s" % (entryAttr.name,
-							    entryAttr.data))
-		return "\n".join(res) + "\n"
-
 	@completion
 	def __complete_category_title(self, text, line, begidx, endidx):
 		# Generic [category] [title] completion
@@ -387,7 +392,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		elif category and title:
 			entry = self.__db.getEntry(category, title)
 			if entry:
-				self.__info(None, self.__dumpEntry(entry))
+				self.__info(None, dumpEntry(self.__db, entry))
 			else:
 				self.__err("list", "'%s/%s' not found" % (category, title))
 		else:
@@ -754,7 +759,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		if not entries:
 			self.__err("find", "'%s' not found" % pattern)
 		for entry in entries:
-			self.__info(None, self.__dumpEntry(entry))
+			self.__info(None, dumpEntry(self.__db, entry))
 	do_f = do_find
 
 	@completion
