@@ -69,17 +69,18 @@ class PWManDatabase(CryptSQL):
 	DB_TYPE	= "PWMan database"
 	DB_VER	= ("0", "1")
 
-	def __init__(self, filename, passphrase, readOnly=True, silent=False):
+	def __init__(self, filename, passphrase, key=None, readOnly=True, silent=False):
 		try:
 			super().__init__(readOnly=readOnly)
 			self.__silent = silent
 			self.__dirty = False
-			self.__openFile(filename, passphrase)
+			self.__openFile(filename, passphrase, key)
 		except (CSQLError) as e:
 			raise PWManError(str(e))
 
-	def __openFile(self, filename, passphrase):
+	def __openFile(self, filename, passphrase, key):
 		super().setPassphrase(passphrase)
+		self.setKey(key)
 		self.open(filename)
 		self.setDirty(False)
 		initDBVer = False
@@ -614,6 +615,7 @@ class PWManDatabase(CryptSQL):
 		"""
 		db = self.__class__(filename=self.getFilename(),
 				    passphrase=self.getPassphrase(),
+				    key=self.getKey(),
 				    readOnly=True,
 				    silent=True)
 		return db

@@ -86,6 +86,7 @@ class CryptSQL(object):
 		self.__db = None
 		self.__filename = None
 		self.__passphrase = None
+		self.__key = None
 
 	def getPassphrase(self):
 		try:
@@ -97,9 +98,16 @@ class CryptSQL(object):
 		assert isinstance(passphrase, str),\
 		       "CryptSQL: Passphrase is not 'str'."
 		try:
+			self.__key = None
 			self.__passphrase = passphrase.encode("UTF-8")
 		except UnicodeError as e:
 			raise CSQLError("Cannot UTF-8-encode passphrase.")
+
+	def getKey(self):
+		return self.__key
+
+	def setKey(self, key):
+		self.__key = key
 
 	def getFilename(self):
 		return self.__filename
@@ -170,7 +178,10 @@ class CryptSQL(object):
 				raise CSQLError("Unknown compression: %s" % compress)
 			try:
 				# Decrypt payload
-				key = kdfMethod()
+				if self.__key is None:
+					key = kdfMethod()
+				else:
+					key = self.__key
 				cipher = cipher.new(key,
 						    mode=cipherMode,
 						    IV=cipherIV)
@@ -182,6 +193,8 @@ class CryptSQL(object):
 
 				# Import the SQL database
 				self.__db.cursor().executescript(payload.decode("UTF-8"))
+				self.__key = key
+
 			except (CSQLError, zlib.error, sql.Error, sql.DatabaseError, UnicodeError) as e:
 				raise CSQLError("Failed to decrypt database. "
 						"Wrong passphrase?")
@@ -293,7 +306,9 @@ class CryptSQL(object):
 			)
 
 			# Write to the file
+			self.__key = None
 			fc.writeFile(self.__filename)
+			self.__key = key
 
 		except FileObjError as e:
 			raise CSQLError("File error: %s" % str(e))
