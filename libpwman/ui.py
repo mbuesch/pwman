@@ -6,6 +6,7 @@
 """
 
 from libpwman.database import *
+from libpwman.dbdiff import *
 from libpwman.exception import *
 from libpwman.otp import *
 from libpwman.undo import *
@@ -13,6 +14,7 @@ from libpwman.util import *
 
 import functools
 import os
+import pathlib
 import re
 import readline
 import signal
@@ -243,6 +245,34 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			 for t in self.__db.getEntryTitles(category)
 			 if t.lower().startswith(text.lower()) ]
 
+	def __getPathCompletions(self, text):
+		"""Return an escaped file system path completion.
+		'text' is the unescaped partial path string.
+		"""
+		try:
+			path = pathlib.Path(text)
+			trailingChar = text[-1] if text else ""
+			sep = os.path.sep
+			base = path.parts[-1] if path.parts else ""
+			dirPath = pathlib.Path(*path.parts[:-1])
+			dirPathListing = [ f for f in dirPath.iterdir()
+					   if f.parts[-1].startswith(base) ]
+			if (path.is_dir() and
+			    (trailingChar in (sep, "/", "\\") or
+			     len(dirPathListing) <= 1)):
+				# path is an unambiguous directory.
+				# Show its contents.
+				useListing = path.iterdir()
+			else:
+				# path is a file or an ambiguous directory.
+				# Show the alternatives.
+				useListing = dirPathListing
+			return [ escapeCmd(str(f)) + (escapeCmd(sep) if f.is_dir() else " ")
+				 for f in useListing ]
+		except OSError:
+			pass
+		return []
+
 	cmdHelpMisc = (
 		("help", ("h",), "Show help about commands"),
 		("quit", ("q", "exit", "^D"), "Quit pwman"),
@@ -261,6 +291,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		("find", ("f",), "Search the database for patterns"),
 		("totp", ("t",), "Generate TOTP token"),
 		("totp_key", ("tk",), "Show TOTP key and parameters"),
+		("diff", (), "Show the database differences"),
 	)
 
 	cmdHelpEdit = (
@@ -914,6 +945,74 @@ class PWMan(Cmd, metaclass=PWManMeta):
 						return [ escapeCmd(entryAttr.data) + " " ]
 		return []
 	complete_ea = complete_edit_attr
+
+	__diff_opts = ("-u", "-c", "-n")
+	def do_diff(self, params):
+		"""--- Diff the current database to another database ---
+		Command: diff [OPTS] [DATABASE_FILE]\n
+		If no DATABASE_FILE is provided: Diffs the latest changes in the
+		currently open database to the committed changes in the current database.
+		This can be used to review changes before commit.\n
+		If DATABASE_FILE is provided: Diffs the latest changes in the
+		currently opened database to the contents of DATABASE_FILE.\n
+		OPTS may be one of:
+		-u  Generate a unified diff (default if no OPT is given).
+		-c  Generate a context diff
+		-n  Generate an ndiff\n
+		Aliases: None"""
+		opts = self._getOpts(params, self.__diff_opts)
+		if opts.nrParams > 1:
+			self.__err("diff", "Too many arguments.")
+		optUnified = "-u" in opts
+		optContext = "-c" in opts
+		optNdiff = "-n" in opts
+		numFmtOpts = int(optUnified) + int(optContext) + int(optNdiff)
+		if not 0 <= numFmtOpts <= 1:
+			self.__err("diff", "Multiple format OPTions. "
+					   "Only one is allowed.")
+		if numFmtOpts == 0:
+			optUnified = True
+		dbFile = opts.getParam(0) if opts.nrParams > 0 else None
+		try:
+			if dbFile:
+				path = pathlib.Path(dbFile)
+				if not path.exists():
+					self.__err("diff", "'%s' does not exist." % dbFile)
+				passphrase = readPassphrase(
+						"Master passphrase of '%s'" % dbFile,
+						verify=False)
+				if passphrase is None:
+					self.__err("diff", "Could not get passphrase.")
+				oldDb = PWManDatabase(filename=path,
+						      passphrase=passphrase,
+						      readOnly=True)
+			else:
+				oldDb = self.__db.getOnDiskDb()
+			diff = PWManDatabaseDiff(db=self.__db, oldDb=oldDb)
+			if optUnified:
+				diffText = diff.getUnifiedDiff()
+			elif optContext:
+				diffText = diff.getContextDiff()
+			elif optNdiff:
+				diffText = diff.getNdiffDiff()
+			else:
+				assert(0)
+			self.__info(None, diffText)
+		except PWManError as e:
+			self.__err("diff", "Failed: %s" % str(e))
+
+	@completion
+	def complete_diff(self, text, line, begidx, endidx):
+		paramIdx = self._calcParamIndex(line, endidx)
+		if text == "-":
+			return self.__diff_opts
+		opts = self._getOpts(line, self.__diff_opts, ignoreFirst=True)
+		optName, value = opts.atCmdIndex(paramIdx)
+		if optName: # -... option
+			return [ text + " " ]
+		if opts.nrParams <= 1: # trailing param
+			return self.__getPathCompletions(text)
+		return []
 
 	def do_undo(self, params):
 		"""--- Undo the last command ---
