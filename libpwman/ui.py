@@ -185,11 +185,17 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		readline.set_completer_delims(" ")
 
 		self.__db = PWManDatabase(filename, passphrase, readOnly=False)
-		self.prompt = "pwman$ "
+		self.__updatePrompt()
 
 		self._timeout = PWManTimeout(timeout)
 		self.__commitClearsUndo = commitClearsUndo
 		self.__undo = UndoStack()
+
+	def __updatePrompt(self):
+		if self.__db.isDirty():
+			self.prompt = "*pwman$ "
+		else:
+			self.prompt = "pwman$ "
 
 	def __err(self, source, message):
 		source = (" " + source + ":") if source else ""
@@ -211,6 +217,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		return line
 
 	def postcmd(self, stop, line):
+		self.__updatePrompt()
 		self._timeout.poke()
 
 	def default(self, line):
