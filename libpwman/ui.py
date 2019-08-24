@@ -102,43 +102,49 @@ class PWManTimeout(Exception):
 def completion(func):
 	@functools.wraps(func)
 	def wrapper(self, text, line, begidx, endidx):
-		self._timeout.poke()
+		try:
+			self._timeout.poke()
 
-		# Find the real begidx that takes space escapes into account.
-		sline = self._patchSpaceEscapes(line)
-		realBegidx = endidx
-		while realBegidx > 0:
-			if sline[realBegidx - 1] == " ":
-				break
-			realBegidx -= 1
+			# Find the real begidx that takes space escapes into account.
+			sline = self._patchSpaceEscapes(line)
+			realBegidx = endidx
+			while realBegidx > 0:
+				if sline[realBegidx - 1] == " ":
+					break
+				realBegidx -= 1
 
-		if begidx == realBegidx:
-			textPrefix = ""
-		else:
-			# Workaround: Patch the begidx to fully
-			# honor all escapes. Remember the text
-			# between the real begidx and the orig begidx.
-			# It must be removed from the results.
-			textPrefix = line[realBegidx : begidx]
-			begidx = realBegidx
+			if begidx == realBegidx:
+				textPrefix = ""
+			else:
+				# Workaround: Patch the begidx to fully
+				# honor all escapes. Remember the text
+				# between the real begidx and the orig begidx.
+				# It must be removed from the results.
+				textPrefix = line[realBegidx : begidx]
+				begidx = realBegidx
 
-		# Fixup text.
-		# By fetching the parameter again it is ensured that
-		# it is properly unescaped.
-		paramIdx = self._calcParamIndex(line, endidx)
-		text = self._getComplParam(line, paramIdx)
+			# Fixup text.
+			# By fetching the parameter again it is ensured that
+			# it is properly unescaped.
+			paramIdx = self._calcParamIndex(line, endidx)
+			text = self._getComplParam(line, paramIdx)
 
-		# Call the PWMan completion handler.
-		completions = func(self, text, line, begidx, endidx)
+			# Call the PWMan completion handler.
+			completions = func(self, text, line, begidx, endidx)
 
-		# If we fixed begidx in the workaround above,
-		# we need to remove the additional prefix from the results,
-		# because Cmd/readline won't expect it.
-		if textPrefix:
-			for i, comp in enumerate(copy(completions)):
-				if comp.startswith(textPrefix):
-					completions[i] = comp[len(textPrefix) : ]
-		return completions
+			# If we fixed begidx in the workaround above,
+			# we need to remove the additional prefix from the results,
+			# because Cmd/readline won't expect it.
+			if textPrefix:
+				for i, comp in enumerate(copy(completions)):
+					if comp.startswith(textPrefix):
+						completions[i] = comp[len(textPrefix) : ]
+			return completions
+		except Exception as e:
+			print("\nException in completion handler:\n\n%s" % (
+			      traceback.format_exc()),
+			      file=sys.stderr)
+			return []
 	return wrapper
 
 class PWManMeta(type):
