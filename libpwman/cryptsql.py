@@ -48,20 +48,16 @@ class CryptSQLCursor(object):
 		self.__db = db
 		self.__c = db.cursor()
 
-	def sqlExec(self, code, params=[], dbCommit=True):
+	def sqlExec(self, code, params=[]):
 		try:
 			self.__c.execute(code, params)
-			if dbCommit:
-				self.__db.commit()
 			return self
 		except (sql.Error, sql.DatabaseError) as e:
 			raise CSQLError("Database error: " + str(e))
 
-	def sqlExecScript(self, code, dbCommit=True):
+	def sqlExecScript(self, code):
 		try:
 			self.__c.executescript(code)
-			if dbCommit:
-				self.__db.commit()
 			return self
 		except (sql.Error, sql.DatabaseError) as e:
 			raise CSQLError("Database error: " + str(e))
@@ -254,8 +250,7 @@ class CryptSQL(object):
 		if not self.__db or not self.__filename:
 			raise CSQLError("Database is not open")
 
-		self.__db.commit()
-		self.sqlExec("VACUUM;", dbCommit=True)
+		self.vacuum()
 
 		# Dump the database
 		payload = self.sqlPlainDump()
@@ -299,11 +294,16 @@ class CryptSQL(object):
 		except FileObjError as e:
 			raise CSQLError("File error: %s" % str(e))
 
-	def sqlExec(self, code, params=[], dbCommit=True):
-		return CryptSQLCursor(self.__db).sqlExec(code, params, dbCommit)
+	def vacuum(self):
+		self.__db.commit()
+		self.sqlExec("VACUUM;")
+		self.__db.commit()
 
-	def sqlExecScript(self, code, dbCommit=True):
-		return CryptSQLCursor(self.__db).sqlExecScript(code, dbCommit)
+	def sqlExec(self, code, params=[]):
+		return CryptSQLCursor(self.__db).sqlExec(code, params)
+
+	def sqlExecScript(self, code):
+		return CryptSQLCursor(self.__db).sqlExecScript(code)
 
 	def sqlCreateFunction(self, name, nrParams, func):
 		self.__db.create_function(name, nrParams, func)

@@ -143,7 +143,7 @@ class PWManDatabase(CryptSQL):
 						 (info[0], info[1]))
 			c = self.sqlExec("DROP TABLE IF EXISTS pw;")
 			c = self.sqlExec("DROP TABLE IF EXISTS info;")
-			c = self.sqlExec("VACUUM;")
+			self.vacuum()
 		else:
 			assert(0)
 
