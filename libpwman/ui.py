@@ -291,6 +291,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		("masterp", (), "Change the master passphrase"),
 		("dbdump", (), "Dump the database"),
 		("dbimport", (), "Import a database dump file"),
+		("drop", (), "Drop all uncommitted changes"),
 	)
 
 	cmdHelpShow = (
@@ -740,6 +741,12 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		if paramIdx == 0:
 			return self.__getPathCompletions(text)
 		return []
+
+	def do_drop(self, params):
+		"""--- Drop all uncommitted changes ---
+		Command: drop\n
+		Aliases: None"""
+		self.__db.dropUncommitted()
 
 	def do_find(self, params):
 		"""--- Search the database ---

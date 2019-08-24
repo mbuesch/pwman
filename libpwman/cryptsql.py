@@ -237,6 +237,9 @@ class CryptSQL(object):
 			raise CSQLError("__randomInt(): Sanity check failed.")
 		return val
 
+	def dropUncommitted(self):
+		self.__db.rollback()
+
 	def commit(self, passphrase):
 		if self.__readOnly:
 			raise CSQLError("The database is read-only. "

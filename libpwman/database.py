@@ -596,6 +596,10 @@ class PWManDatabase(CryptSQL):
 			      file=sys.stderr)
 			self.setDirty(False)
 
+	def dropUncommitted(self):
+		super().dropUncommitted()
+		self.setDirty(False)
+
 	def commit(self):
 		self.__garbageCollect()
 		super().commit(self.__passphrase)

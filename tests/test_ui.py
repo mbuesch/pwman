@@ -53,6 +53,7 @@ class Test_UI(TestCase):
 		self.ui.do_dbdump("")
 		self.assertRaises(libpwman.PWMan.CommandError,
 				  lambda: self.ui.do_dbimport("/does/not/exist"))
+		self.ui.do_drop("")
 
 		self.ui.do_list("")
 		self.ui.do_find("test")
