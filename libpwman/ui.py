@@ -702,7 +702,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		If no OPTS are given, the search uses these OPTS:
 		  -t -u -p -b -a\n
 		Aliases: f"""
-		opts, args = self._getOpts(params, ("-t", "-u", "-p", "-b", "-a", "-A"))
+		opts = self._getOpts(params, ("-t", "-u", "-p", "-b", "-a", "-A"))
 		mTitle = "-t" in opts
 		mUser = "-u" in opts
 		mPw = "-p" in opts
@@ -711,10 +711,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		mAttrName = "-A" in opts
 		if not any( (mTitle, mUser, mPw, mBulk, mAttrData) ):
 			mTitle, mUser, mPw, mBulk, mAttrData = (True,) * 5
-		if len(args) < 1 or len(args) > 2:
+		if opts.nrParams < 1 or opts.nrParams > 2:
 			self.__err("find", "Invalid parameters.")
-		category = args[0] if len(args) > 1 else None
-		pattern = args[1] if len(args) > 1 else args[0]
+		category = opts.getParam(0) if opts.nrParams > 1 else None
+		pattern = opts.getParam(1) if opts.nrParams > 1 else opts.getParam(0)
 		entries = self.__db.findEntries(pattern=pattern,
 						inCategory=category,
 						matchTitle=mTitle,
@@ -1036,30 +1036,61 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	@dataclass
 	class Opts(object):
 		__opts : list = field(default_factory=list)
+		__params : list = field(default_factory=list)
+		__atCmdIndex : dict = field(default_factory=dict)
 
-		def append(self, optName, optValue=None):
+		def _appendOpt(self, cmdIndex, optName, optValue=None):
 			self.__opts.append( (optName, optValue) )
+			self.__atCmdIndex[cmdIndex] = (optName, optValue)
+
+		def _appendParam(self, cmdIndex, param):
+			self.__params.append(param)
+			self.__atCmdIndex[cmdIndex] = (None, param)
 
 		def __contains__(self, optName):
+			"""Check if we have a specific "-X" style option.
+			"""
 			return optName in (o[0] for o in self.__opts)
 
-		def __bool__(self):
+		@property
+		def hasOpts(self):
+			"""Do we have -X style options?
+			"""
 			return bool(self.__opts)
 
-		def getValue(self, optName):
-			return [ o[1] for o in self.__opts if o[0] == optName ][0]
+		def getOpt(self, optName):
+			"""Get an option value by "-X" style name.
+			"""
+			if optName in self:
+				return [ o[1] for o in self.__opts if o[0] == optName ][-1]
+			return None
+
+		@property
+		def nrParams(self):
+			"""The number of trailing parameters.
+			"""
+			return len(self.__params)
+
+		def getParam(self, index):
+			"""Get a trailing parameter at index.
+			"""
+			return self.__params[index]
+
+		def atCmdIndex(self, cmdIndex):
+			"""Get an item (option or parameter) at command line index cmdIndex.
+			Returns (optName, optValue) if it is an option.
+			Returns (None, parameter) if it is a parameter.
+			Returns (None, None) if it does not exist.
+			"""
+			return self.__atCmdIndex.get(cmdIndex, (None, None))
 
 	def _getOpts(self, line, possibleOpts,
 		     ignoreFirst=False, unescape=True):
-		"""Parses the command options in 'line' and returns a tuple
-		(opts, trailingParams).
-		opts is an instance of Opts that holds the actual options.
-		trailingParams are the trailing parameters.
+		"""Parses the command options in 'line' and returns an Opts instance.
 		possibleOpts is a tuple of the possible options.
 		"""
 		possibleOptsPlain = [ o.replace(":", "") for o in possibleOpts ]
 		opts = self.Opts()
-		trailingParams = []
 		i = 0
 		while True:
 			p = self._getParam(line, i,
@@ -1067,13 +1098,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 					   unescape=unescape)
 			if not p:
 				break
-			if trailingParams:
-				trailingParams.append(p)
+			if opts.nrParams:
+				opts._appendParam(i, p)
 			else:
 				try:
 					optIdx = possibleOptsPlain.index(p)
 				except ValueError:
-					trailingParams.append(p)
+					opts._appendParam(i, p)
 					i += 1
 					continue
 				if possibleOpts[optIdx].endswith(":"):
@@ -1084,11 +1115,11 @@ class PWMan(Cmd, metaclass=PWManMeta):
 					if not arg:
 						self.__err(None, "Option '%s' "
 							   "requires an argument." % p)
-					opts.append(p, arg)
+					opts._appendOpt(i, p, arg)
 				else:
-					opts.append(p)
+					opts._appendOpt(i, p)
 			i += 1
-		return opts, trailingParams
+		return opts
 
 	def __mayQuit(self):
 		if self.__db.isDirty():
