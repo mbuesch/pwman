@@ -280,20 +280,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			pass
 		return []
 
-	cmdHelpMisc = (
-		("help", ("h",), "Show help about commands"),
-		("quit", ("q", "exit", "^D"), "Quit pwman"),
-		("cls", (), "Clear screen and undo buffers"),
-	)
-
-	cmdHelpDatabase = (
-		("commit", ("c", "w"), "Commit / write database file"),
-		("masterp", (), "Change the master passphrase"),
-		("dbdump", (), "Dump the database"),
-		("dbimport", (), "Import a database dump file"),
-		("drop", (), "Drop all uncommitted changes"),
-	)
-
 	cmdHelpShow = (
 		("list", ("ls", "cat"), "List/print entry contents"),
 		("find", ("f",), "Search the database for patterns"),
@@ -309,13 +295,24 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		("edit_bulk", ("eb",), "Edit the 'bulk' field of an entry"),
 		("edit_totp", ("et",), "Edit the TOTP key and parameters"),
 		("edit_attr", ("ea",), "Edit an entry attribute"),
-		("move", ("mv", "rename"), "Move/rename and existing entry"),
-		("remove", ("rm", "del"), "Remove and existing entry"),
-	)
-
-	cmdHelpHist = (
+		("move", ("mv", "rename"), "Move/rename an existing entry"),
+		("remove", ("rm", "del"), "Remove an existing entry"),
 		("undo", (), "Undo the last command"),
 		("redo", (), "Redo the last undone command"),
+	)
+
+	cmdHelpDatabase = (
+		("commit", ("c", "w"), "Commit/write database file"),
+		("masterp", (), "Change the master passphrase"),
+		("dbdump", (), "Dump the database"),
+		("dbimport", (), "Import a database dump file"),
+		("drop", (), "Drop all uncommitted changes"),
+	)
+
+	cmdHelpMisc = (
+		("help", ("h",), "Show help about commands"),
+		("quit", ("q", "exit", "^D"), "Quit pwman"),
+		("cls", (), "Clear screen and undo buffers"),
 	)
 
 	def do_help(self, params):
@@ -335,16 +332,14 @@ class PWMan(Cmd, metaclass=PWManMeta):
 					("es" if len(aliases) > 1 else "",
 					", ".join(aliases))
 				self.__info(None, msg)
-		self.__info(None, "Misc commands:")
-		printCmdHelp(self.cmdHelpMisc)
-		self.__info(None, "\nDatabase commands:")
-		printCmdHelp(self.cmdHelpDatabase)
 		self.__info(None, "\nSearching/listing commands:")
 		printCmdHelp(self.cmdHelpShow)
 		self.__info(None, "\nEditing commands:")
 		printCmdHelp(self.cmdHelpEdit)
-		self.__info(None, "\nHistory commands:")
-		printCmdHelp(self.cmdHelpHist)
+		self.__info(None, "\nDatabase commands:")
+		printCmdHelp(self.cmdHelpDatabase)
+		self.__info(None, "\nMisc commands:")
+		printCmdHelp(self.cmdHelpMisc)
 		self.__info(None, "\nType 'command?' or 'help command' for more help on a command.")
 	do_h = do_help
 
