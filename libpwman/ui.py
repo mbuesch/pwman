@@ -11,12 +11,14 @@ from libpwman.otp import *
 from libpwman.undo import *
 from libpwman.util import *
 
-import sys
-import time
+import functools
+import os
 import re
 import readline
 import signal
-import functools
+import sys
+import time
+import traceback
 from copy import copy, deepcopy
 from cmd import Cmd
 from dataclasses import dataclass, field
