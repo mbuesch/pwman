@@ -58,6 +58,7 @@ class Test_UI(TestCase):
 		self.ui.do_find("test")
 		self.ui.do_totp("testcat1 testtitle1")
 		self.ui.do_totp_key("testcat1 testtitle1")
+		self.ui.do_diff("")
 
 		self.ui.do_new("a b c")
 		self.ui.do_edit_user("a b c")
