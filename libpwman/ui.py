@@ -704,6 +704,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		except (IOError) as e:
 			self.__err("dbdump", "Failed to write dump: %s" % e.strerror)
 
+	@completion
+	def complete_dbdump(self, text, line, begidx, endidx):
+		paramIdx = self._calcParamIndex(line, endidx)
+		if paramIdx == 0:
+			return self.__getPathCompletions(text)
+		return []
+
 	def do_dbimport(self, params):
 		"""--- Import an SQL database dump ---
 		Command: dbimport FILEPATH\n
@@ -719,6 +726,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			self.__info("dbimport", "success.")
 		except (CSQLError, IOError, UnicodeError) as e:
 			self.__err("dbimport", "Failed to import dump: %s" % str(e))
+
+	@completion
+	def complete_dbimport(self, text, line, begidx, endidx):
+		paramIdx = self._calcParamIndex(line, endidx)
+		if paramIdx == 0:
+			return self.__getPathCompletions(text)
+		return []
 
 	def do_find(self, params):
 		"""--- Search the database ---
