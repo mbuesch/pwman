@@ -73,14 +73,15 @@ class PWManDatabase(CryptSQL):
 		try:
 			super().__init__(readOnly=readOnly)
 			self.__silent = silent
+			self.__dirty = False
 			self.__openFile(filename, passphrase)
 		except (CSQLError) as e:
 			raise PWManError(str(e))
 
 	def __openFile(self, filename, passphrase):
-		self.open(filename, passphrase)
-		self.__passphrase = passphrase
-		self.__dirty = False
+		super().setPassphrase(passphrase)
+		self.open(filename)
+		self.setDirty(False)
 		initDBVer = False
 		if self.sqlIsEmpty():
 			initDBVer = True
@@ -172,11 +173,8 @@ class PWManDatabase(CryptSQL):
 		c = self.sqlExec("DELETE FROM totp "
 				 "WHERE entry NOT IN (SELECT id FROM entries);")
 
-	def getPassphrase(self):
-		return self.__passphrase
-
 	def setPassphrase(self, passphrase):
-		self.__passphrase = passphrase
+		super().setPassphrase(passphrase)
 		self.setDirty()
 
 	def getCategoryNames(self):
@@ -602,7 +600,7 @@ class PWManDatabase(CryptSQL):
 
 	def commit(self):
 		self.__garbageCollect()
-		super().commit(self.__passphrase)
+		super().commit()
 		self.setDirty(False)
 
 	def importSqlScript(self, *args, **kwargs):

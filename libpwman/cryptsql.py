@@ -83,27 +83,32 @@ class CryptSQLCursor(object):
 class CryptSQL(object):
 	def __init__(self, readOnly=True):
 		self.__readOnly = readOnly
-		self.__reset()
-
-	def __reset(self):
 		self.__db = None
 		self.__filename = None
+		self.__passphrase = None
+
+	def getPassphrase(self):
+		try:
+			return self.__passphrase.decode("UTF-8")
+		except UnicodeError as e:
+			raise CSQLError("Cannot UTF-8-decode passphrase.")
+
+	def setPassphrase(self, passphrase):
+		assert isinstance(passphrase, str),\
+		       "CryptSQL: Passphrase is not 'str'."
+		try:
+			self.__passphrase = passphrase.encode("UTF-8")
+		except UnicodeError as e:
+			raise CSQLError("Cannot UTF-8-encode passphrase.")
 
 	def getFilename(self):
 		return self.__filename
 
-	def __parseFile(self, filename, passphrase):
-		assert isinstance(passphrase, str),\
-		       "CryptSQL: Passphrase is not 'str'."
+	def __parseFile(self, filename):
 		try:
 			fc = FileObjCollection.parseFile(filename)
 			if fc is None:
 				return
-
-			try:
-				passphrase = passphrase.encode("UTF-8")
-			except UnicodeError as e:
-				raise CSQLError("Cannot UTF-8-encode passphrase.")
 
 			head = fc.getOne(b"HEAD", "Invalid file header object")
 			if head.getData() != CSQL_HEADER:
@@ -151,7 +156,7 @@ class CryptSQL(object):
 				if kdfMac != b"HMAC":
 					raise CSQLError("Unknown kdf-mac: %s" % kdfMac)
 				kdfMethod = lambda: hashlib.pbkdf2_hmac(hash_name=kdfHash,
-									password=passphrase,
+									password=self.__passphrase,
 									salt=kdfSalt,
 									iterations=kdfIter,
 									dklen=keyLen)
@@ -186,21 +191,23 @@ class CryptSQL(object):
 	def isOpen(self):
 		return bool(self.__db)
 
-	def open(self, filename, passphrase):
+	def open(self, filename):
 		if self.isOpen():
 			raise CSQLError("A database is already open")
-		self.__reset()
 		self.__db = sql.connect(":memory:")
 		self.__db.text_factory = str
 		try:
-			self.__parseFile(filename, passphrase)
+			self.__parseFile(filename)
 		except (CSQLError) as e:
-			self.__reset()
+			self.__db = None
+			self.__filename = None
 			raise
 		self.__filename = filename
 
 	def close(self):
-		self.__reset()
+		self.__db = None
+		self.__filename = None
+		self.__passphrase = None
 
 	@staticmethod
 	def __padData(data, align):
@@ -240,16 +247,10 @@ class CryptSQL(object):
 	def dropUncommitted(self):
 		self.__db.rollback()
 
-	def commit(self, passphrase):
+	def commit(self):
 		if self.__readOnly:
 			raise CSQLError("The database is read-only. "
 					"Cannot commit changes.")
-		assert isinstance(passphrase, str),\
-		       "CryptSQL: Passphrase is not 'str'."
-		try:
-			passphrase = passphrase.encode("UTF-8")
-		except UnicodeError as e:
-			raise CSQLError("Cannot UTF-8-encode passphrase.")
 		if not self.__db or not self.__filename:
 			raise CSQLError("Database is not open")
 
@@ -264,7 +265,7 @@ class CryptSQL(object):
 		kdfIter = self.__randomInt(10000) + 1000000
 		keyLen = 256 // 8
 		key = hashlib.pbkdf2_hmac(hash_name=kdfHash,
-					  password=passphrase,
+					  password=self.__passphrase,
 					  salt=kdfSalt,
 					  iterations=kdfIter,
 					  dklen=keyLen)
