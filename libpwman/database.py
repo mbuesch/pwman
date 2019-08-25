@@ -31,7 +31,7 @@ def getDefaultDatabase():
 	home = pathlib.Path.home()
 	if home:
 		return home / ".pwman.db"
-	return None
+	return pathlib.Path(".pwman.db")
 
 @dataclass
 class PWManEntry(object):
