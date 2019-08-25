@@ -22,7 +22,10 @@ def getPassphrase(dbPath, interactiveMode, infoFile=sys.stdout):
 		else:
 			print("Creating NEW database '%s'..." % dbPath,
 			      file=infoFile)
-	passphrase = libpwman.util.readPassphrase("Master passphrase",
+		promptSuffix = ""
+	else:
+		promptSuffix = " (%s)" % dbPath
+	passphrase = libpwman.util.readPassphrase("Master passphrase%s" % promptSuffix,
 						  verify=not dbExists)
 	return passphrase
 
