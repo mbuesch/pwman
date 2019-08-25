@@ -689,28 +689,58 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	complete_mv = complete_move
 	complete_rename = complete_move
 
+	__dbdump_opts = ("-s", "-h")
 	def do_dbdump(self, params):
-		"""--- Dump the SQL database as SQL script ---
-		Command: dbdump [filepath]\n
-		If filepath is given, the database is dumped
+		"""--- Dump the pwman SQL database ---
+		Command: dbdump [OPTS] [FILEPATH]\n
+		If FILEPATH is given, the database is dumped
 		unencrypted to the file.
-		If filepath is omitted, the database is dumped
+		If FILEPATH is omitted, the database is dumped
 		unencrypted to stdout.\n
+		OPTS may be one of:
+		  -s   Dump format SQL. (default)
+		  -h   Dump format human readable text.\n
+		WARNING: The database dump is not encrypted.\n
 		Aliases: None"""
+		opts = self._getOpts(params, self.__dbdump_opts)
+		if opts.nrParams > 1:
+			self.__err("dbdump", "Too many arguments.")
+		optFmtSqlDump = "-s" in opts
+		optFmtHumanReadable = "-h" in opts
+		numFmtOpts = int(optFmtSqlDump) + int(optFmtHumanReadable)
+		if not 0 <= numFmtOpts <= 1:
+			self.__err("dbdump", "Multiple format OPTions. "
+					     "Only one is allowed.")
+		if numFmtOpts == 0:
+			optFmtSqlDump = True
+		dumpFile = opts.getParam(0) if opts.nrParams > 0 else None
 		try:
-			dump = self.__db.sqlPlainDump() + b"\n"
-			if params:
-				with open(params, "wb") as f:
+			if optFmtSqlDump:
+				dump = self.__db.sqlPlainDump() + b"\n"
+			elif optFmtHumanReadable:
+				dump = self.__db.dumpEntries().encode("UTF-8") + b"\n"
+			else:
+				assert(0)
+			if dumpFile:
+				with open(dumpFile, "wb") as f:
 					f.write(dump)
 			else:
 				stdout(dump)
-		except (IOError) as e:
+		except UnicodeError as e:
+			self.__err("dbdump", "Unicode error.")
+		except IOError as e:
 			self.__err("dbdump", "Failed to write dump: %s" % e.strerror)
 
 	@completion
 	def complete_dbdump(self, text, line, begidx, endidx):
 		paramIdx = self._calcParamIndex(line, endidx)
-		if paramIdx == 0:
+		if text == "-":
+			return self.__dbdump_opts
+		opts = self._getOpts(line, self.__dbdump_opts, ignoreFirst=True)
+		optName, value = opts.atCmdIndex(paramIdx)
+		if optName: # -... option
+			return [ text + " " ]
+		if opts.nrParams <= 1: # trailing param
 			return self.__getPathCompletions(text)
 		return []
 
