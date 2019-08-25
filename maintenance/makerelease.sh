@@ -3,6 +3,8 @@
 srcdir="$(dirname "$0")"
 [ "$(echo "$srcdir" | cut -c1)" = '/' ] || srcdir="$PWD/$srcdir"
 
+srcdir="$srcdir/.."
+
 die() { echo "$*"; exit 1; }
 
 # Import the makerelease.lib
@@ -15,7 +17,7 @@ done
 
 hook_get_version()
 {
-	version="$(cat libpwman.py | grep -e VERSION | head -n1 | cut -d'=' -f2 | tr -d ' ')"
+	version="$(cat libpwman/version.py | grep -Ee 'VERSION\s+=' | head -n1 | cut -d'=' -f2 | tr -d ' ')"
 }
 
 hook_regression_tests()
