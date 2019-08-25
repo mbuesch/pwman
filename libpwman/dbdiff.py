@@ -18,47 +18,43 @@ class PWManDatabaseDiff(object):
 		self.__db = db
 		self.__oldDb = oldDb
 
-	def __dumpDb(self, db):
-		ret = []
-		for category in db.getCategoryNames():
-			for title in db.getEntryTitles(category):
-				entry = db.getEntry(category, title)
-				dump = db.dumpEntry(entry, showTotpKey=True)
-				ret.append(dump + "\n")
-		return "".join(ret)
-
 	def getUnifiedDiff(self, contextLines=3):
-		diff = difflib.unified_diff(a=self.__dumpDb(self.__oldDb).splitlines(),
-					    b=self.__dumpDb(self.__db).splitlines(),
-					    fromfile=str(self.__oldDb.getFilename()),
-					    tofile=str(self.__db.getFilename()),
-					    n=contextLines,
-					    lineterm="")
+		diff = difflib.unified_diff(
+			a=self.__oldDb.dumpEntries(showTotpKey=True).splitlines(),
+			b=self.__db.dumpEntries(showTotpKey=True).splitlines(),
+			fromfile=str(self.__oldDb.getFilename()),
+			tofile=str(self.__db.getFilename()),
+			n=contextLines,
+			lineterm="")
 		return "\n".join(diff)
 
 	def getContextDiff(self, contextLines=3):
-		diff = difflib.context_diff(a=self.__dumpDb(self.__oldDb).splitlines(),
-					    b=self.__dumpDb(self.__db).splitlines(),
-					    fromfile=str(self.__oldDb.getFilename()),
-					    tofile=str(self.__db.getFilename()),
-					    n=contextLines,
-					    lineterm="")
+		diff = difflib.context_diff(
+			a=self.__oldDb.dumpEntries(showTotpKey=True).splitlines(),
+			b=self.__db.dumpEntries(showTotpKey=True).splitlines(),
+			fromfile=str(self.__oldDb.getFilename()),
+			tofile=str(self.__db.getFilename()),
+			n=contextLines,
+			lineterm="")
 		return "\n".join(diff)
 
 	def getNdiffDiff(self):
-		diff = difflib.ndiff(a=self.__dumpDb(self.__oldDb).splitlines(),
-				     b=self.__dumpDb(self.__db).splitlines(),
-				     linejunk=None,
-				     charjunk=None)
+		diff = difflib.ndiff(
+			a=self.__oldDb.dumpEntries(showTotpKey=True).splitlines(),
+			b=self.__db.dumpEntries(showTotpKey=True).splitlines(),
+			linejunk=None,
+			charjunk=None)
 		return "\n".join(diff)
 
 	def getHtmlDiff(self, contextLines=3):
-		htmldiff = difflib.HtmlDiff(linejunk=None,
-					    charjunk=None)
-		diff = htmldiff.make_file(fromlines=self.__dumpDb(self.__oldDb).splitlines(),
-					  tolines=self.__dumpDb(self.__db).splitlines(),
-					  fromdesc=str(self.__oldDb.getFilename()),
-					  todesc=str(self.__db.getFilename()),
-					  context=True,
-					  numlines=contextLines)
+		htmldiff = difflib.HtmlDiff(
+			linejunk=None,
+			charjunk=None)
+		diff = htmldiff.make_file(
+			fromlines=self.__oldDb.dumpEntries(showTotpKey=True).splitlines(),
+			tolines=self.__db.dumpEntries(showTotpKey=True).splitlines(),
+			fromdesc=str(self.__oldDb.getFilename()),
+			todesc=str(self.__db.getFilename()),
+			context=True,
+			numlines=contextLines)
 		return "".join(diff)

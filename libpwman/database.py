@@ -221,6 +221,8 @@ class PWManDatabase(CryptSQL):
 				  entryId=data[0])
 
 	def dumpEntry(self, entry, showTotpKey=False):
+		"""Returns a human readable dump string of an entry.
+		"""
 		res = []
 		res.append("===  %s  ===" % entry.category)
 		res.append("\t---  %s  ---" % entry.title)
@@ -246,6 +248,17 @@ class PWManDatabase(CryptSQL):
 				res.append("\t    %s:\t%s" % (entryAttr.name,
 							      entryAttr.data))
 		return "\n".join(res) + "\n"
+
+	def dumpEntries(self, showTotpKey=False):
+		"""Returns a human readable dump string of all entries.
+		"""
+		ret = []
+		for category in self.getCategoryNames():
+			for title in self.getEntryTitles(category):
+				entry = self.getEntry(category, title)
+				dump = self.dumpEntry(entry, showTotpKey)
+				ret.append(dump)
+		return "\n".join(ret)
 
 	def findEntries(self, pattern,
 			leftAnchor=False, rightAnchor=False,
