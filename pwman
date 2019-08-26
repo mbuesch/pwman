@@ -135,6 +135,8 @@ def run_ui(dbPath, commitClearsUndo, timeout, commands):
 
 def main():
 	p = argparse.ArgumentParser()
+	p.add_argument("-v", "--version", action="store_true",
+		       help="show the pwman version and exit")
 	grp = p.add_mutually_exclusive_group()
 	grp.add_argument("-p", "--call-pymod", type=str, metavar="PYTHONSCRIPT.py",
 			 help="Calls the Python function run(database) from "
@@ -159,6 +161,10 @@ def main():
 	p.add_argument("-t", "--timeout", type=int, default=600, metavar="SECONDS",
 		       help="Sets the session timeout in seconds. Default is 10 minutes.")
 	args = p.parse_args()
+
+	if args.version:
+		print("pwman version %d" % libpwman.VERSION)
+		return 0
 
 	exitcode = 1
 	try:
