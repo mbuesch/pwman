@@ -9,4 +9,4 @@ __all__ = [
 	"VERSION",
 ]
 
-VERSION = 1
+VERSION = 2
