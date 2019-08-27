@@ -158,8 +158,9 @@ def main():
 			    libpwman.database.getDefaultDatabase()))
 	p.add_argument("-U", "--commit-clear-undo", action="store_true",
 		       help="The commit command clears undo queue.")
-	p.add_argument("-t", "--timeout", type=int, default=600, metavar="SECONDS",
-		       help="Sets the session timeout in seconds. Default is 10 minutes.")
+	if libpwman.util.osIsPosix:
+		p.add_argument("-t", "--timeout", type=int, default=600, metavar="SECONDS",
+			       help="Sets the session timeout in seconds. Default is 10 minutes.")
 	args = p.parse_args()
 
 	if args.version:
@@ -178,7 +179,7 @@ def main():
 		else:
 			exitcode = run_ui(dbPath=args.database,
 					  commitClearsUndo=args.commit_clear_undo,
-					  timeout=args.timeout,
+					  timeout=args.timeout if libpwman.util.osIsPosix else None,
 					  commands=args.command)
 	except libpwman.database.CSQLError as e:
 		print("SQL error: " + str(e), file=sys.stderr)

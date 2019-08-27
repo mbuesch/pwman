@@ -17,13 +17,15 @@ import os
 import pathlib
 import re
 import readline
-import signal
 import sys
 import time
 import traceback
 from copy import copy, deepcopy
 from cmd import Cmd
 from dataclasses import dataclass, field
+
+if osIsPosix:
+	import signal
 
 __all__ = [
 	"PWMan",
@@ -90,13 +92,18 @@ def unescapeCmd(s):
 
 class PWManTimeout(Exception):
 	def __init__(self, seconds):
-		self.seconds = seconds
-		if seconds > 0:
-			signal.signal(signal.SIGALRM, self.__timeout)
-			self.poke()
+		if seconds is not None and seconds >= 0:
+			self.seconds = seconds
+			if osIsPosix:
+				signal.signal(signal.SIGALRM, self.__timeout)
+				self.poke()
+			else:
+				raise PWManError("Timeout is not supported on this OS.")
+		else:
+			self.seconds = None
 
 	def poke(self):
-		if self.seconds > 0:
+		if self.seconds is not None:
 			signal.alarm(self.seconds)
 
 	def __timeout(self, signum, frame):
@@ -172,7 +179,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	class Quit(Exception): pass
 
 	def __init__(self, filename, passphrase,
-		     commitClearsUndo=False, timeout=-1):
+		     commitClearsUndo=False, timeout=None):
 		super().__init__()
 
 		if sys.flags.optimize >= 2:

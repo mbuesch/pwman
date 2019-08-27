@@ -5,16 +5,22 @@
 # Licensed under the GNU/GPL version 2 or later.
 """
 
-import sys
 import curses
 import getpass
+import os
+import sys
 
 __all__ = [
+	"osIsWindows",
+	"osIsPosix",
 	"uniq",
 	"stdout",
 	"clearScreen",
 	"readPassphrase",
 ]
+
+osIsWindows = os.name == "nt" or os.name == "ce"
+osIsPosix = os.name == "posix"
 
 def uniq(l, sort=True):
 	l = list(set(l))
