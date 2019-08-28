@@ -204,7 +204,8 @@ class CryptSQL(object):
 				self.__db.cursor().executescript(payload.decode("UTF-8"))
 				self.__key = key
 
-			except (CSQLError, zlib.error, sql.Error, sql.DatabaseError, UnicodeError) as e:
+			except (CSQLError, zlib.error, sql.Error,
+				sql.DatabaseError, UnicodeError, Exception) as e:
 				raise CSQLError("Failed to decrypt database. "
 						"Wrong passphrase?")
 		except FileObjError as e:
@@ -275,23 +276,26 @@ class CryptSQL(object):
 		# Dump the database
 		payload = self.sqlPlainDump()
 
-		# Encrypt payload
-		kdfHash = "SHA512"
-		kdfSalt = self.__random(34)
-		kdfIter = self.__randomInt(10000) + 1000000
-		keyLen = 256 // 8
-		key = hashlib.pbkdf2_hmac(hash_name=kdfHash,
-					  password=self.__passphrase,
-					  salt=kdfSalt,
-					  iterations=kdfIter,
-					  dklen=keyLen)
-		cipherBlockSize = 128 // 8
-		cipherIV = self.__random(cipherBlockSize)
-		enc = pyaes.Encrypter(pyaes.AESModeOfOperationCBC(key=key,
-								  iv=cipherIV),
-				      padding=pyaes.PADDING_DEFAULT)
-		payload = enc.feed(payload)
-		payload += enc.feed()
+		try:
+			# Encrypt payload
+			kdfHash = "SHA512"
+			kdfSalt = self.__random(34)
+			kdfIter = self.__randomInt(10000) + 1000000
+			keyLen = 256 // 8
+			key = hashlib.pbkdf2_hmac(hash_name=kdfHash,
+						  password=self.__passphrase,
+						  salt=kdfSalt,
+						  iterations=kdfIter,
+						  dklen=keyLen)
+			cipherBlockSize = 128 // 8
+			cipherIV = self.__random(cipherBlockSize)
+			enc = pyaes.Encrypter(pyaes.AESModeOfOperationCBC(key=key,
+									  iv=cipherIV),
+					      padding=pyaes.PADDING_DEFAULT)
+			payload = enc.feed(payload)
+			payload += enc.feed()
+		except Exception as e:
+			raise CSQLError("Failed to encrypt: %s" % str(e))
 
 		try:
 			# Assemble file objects
