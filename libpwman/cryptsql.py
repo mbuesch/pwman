@@ -121,21 +121,19 @@ class CryptSQL(object):
 				return
 
 			head = fc.getOne(b"HEAD", "Invalid file header object")
-			if head.getData() != CSQL_HEADER:
+			if head != CSQL_HEADER:
 				raise CSQLError("Invalid file header")
-			cipher = fc.getOne(b"CIPHER", "Invalid CYPHER object").getData()
-			cipherMode = fc.getOne(b"CIPHER_MODE", "Invalid CYPHER_MODE object").getData()
+			cipher = fc.getOne(b"CIPHER", "Invalid CYPHER object")
+			cipherMode = fc.getOne(b"CIPHER_MODE", "Invalid CYPHER_MODE object")
 			cipherIV = fc.getOne(b"CIPHER_IV")
-			if cipherIV:
-				cipherIV = cipherIV.getData()
-			keyLen = fc.getOne(b"KEY_LEN", "Invalid KEY_LEN object").getData()
-			kdfMethod = fc.getOne(b"KDF_METHOD", "Invalid KDF_METHOD object").getData()
-			kdfSalt = fc.getOne(b"KDF_SALT", "Invalid KDF_SALT object").getData()
-			kdfIter = fc.getOne(b"KDF_ITER", "Invalid KDF_ITER object").getData()
-			kdfHash = fc.getOne(b"KDF_HASH", "Invalid KDF_HASH object").getData()
-			kdfMac = fc.getOne(b"KDF_MAC", "Invalid KDF_MAC object").getData()
-			compress = fc.getOne(b"COMPRESS", "Invalid COMPRESS object").getData()
-			payload = fc.getOne(b"PAYLOAD", "Invalid PAYLOAD object").getData()
+			keyLen = fc.getOne(b"KEY_LEN", "Invalid KEY_LEN object")
+			kdfMethod = fc.getOne(b"KDF_METHOD", "Invalid KDF_METHOD object")
+			kdfSalt = fc.getOne(b"KDF_SALT", "Invalid KDF_SALT object")
+			kdfIter = fc.getOne(b"KDF_ITER", "Invalid KDF_ITER object")
+			kdfHash = fc.getOne(b"KDF_HASH", "Invalid KDF_HASH object")
+			kdfMac = fc.getOne(b"KDF_MAC", "Invalid KDF_MAC object")
+			compress = fc.getOne(b"COMPRESS", "Invalid COMPRESS object")
+			payload = fc.getOne(b"PAYLOAD", "Invalid PAYLOAD object")
 			if cipher == b"AES" and cipherMode == b"CBC":
 				decrypter = lambda c: pyaes.Decrypter(c, padding=pyaes.PADDING_NONE)
 				cipher = pyaes.AESModeOfOperationCBC

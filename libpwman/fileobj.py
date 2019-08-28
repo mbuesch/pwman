@@ -100,14 +100,16 @@ class FileObjCollection(object):
 		return raw
 
 	def get(self, name):
-		return [o for o in self.objects if o.getName() == name]
+		return [ o.getData()
+			 for o in self.objects
+			 if o.getName() == name ]
 
-	def getOne(self, name, errorMsg=None):
+	def getOne(self, name, errorMsg=None, default=None):
 		objs = self.get(name)
 		if len(objs) != 1:
 			if errorMsg:
 				raise FileObjError(errorMsg)
-			return None
+			return default
 		return objs[0]
 
 	@classmethod
