@@ -13,7 +13,7 @@ call :install windows-curses
 if ERRORLEVEL 1 exit /B 1
 call :install pyreadline
 if ERRORLEVEL 1 exit /B 1
-call :install pycrypto
+call :install pyaes
 if ERRORLEVEL 1 exit /B 1
 
 

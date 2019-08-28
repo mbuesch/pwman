@@ -15,16 +15,18 @@ import functools
 
 from libpwman.fileobj import *
 
-def missingMod(name, debpack=None):
-	print("Python '%s' module is not installed." % name, file=sys.stderr)
+def missingMod(name, debpack=None, pip=None):
+	print("ERROR: The Python '%s' module is not installed." % name, file=sys.stderr)
 	if debpack:
-		print("On Debian do:  apt install %s" % debpack, file=sys.stderr)
+		print("Debian:  apt install %s" % debpack, file=sys.stderr)
+	if pip:
+		print("PyPi:  pip3 install %s" % pip, file=sys.stderr)
 	sys.exit(1)
 
 try:
-	import Crypto.Cipher.AES as AES
+	import pyaes
 except (ImportError) as e:
-	missingMod("Crypto", "python3-crypto")
+	missingMod("pyaes", "python3-pyaes", "pyaes")
 
 
 __all__ = [
@@ -134,17 +136,17 @@ class CryptSQL(object):
 			kdfMac = fc.getOne(b"KDF_MAC", "Invalid KDF_MAC object").getData()
 			compress = fc.getOne(b"COMPRESS", "Invalid COMPRESS object").getData()
 			payload = fc.getOne(b"PAYLOAD", "Invalid PAYLOAD object").getData()
-			if cipher == b"AES":
-				cipher = AES
+			if cipher == b"AES" and cipherMode == b"CBC":
+				decrypter = lambda c: pyaes.Decrypter(c, padding=pyaes.PADDING_NONE)
+				cipher = pyaes.AESModeOfOperationCBC
+				cipherBlockSize = 128 // 8
 			else:
-				raise CSQLError("Unknown cipher: %s" % cipher.decode("UTF-8", "ignore"))
-			if cipherMode == b"CBC":
-				cipherMode = AES.MODE_CBC
-			else:
-				raise CSQLError("Unknown cipher mode: %s" % cipherMode.decode("UTF-8", "ignore"))
+				raise CSQLError("Unknown cipher/mode: %s/%s" % (
+					cipher.decode("UTF-8", "ignore"),
+					cipherMode.decode("UTF-8", "ignore")))
 			if not cipherIV:
-				cipherIV = b'\x00' * cipher.block_size
-			if len(cipherIV) != cipher.block_size:
+				cipherIV = b'\x00' * cipherBlockSize
+			if len(cipherIV) != cipherBlockSize:
 				raise CSQLError("Invalid IV len: %d" % len(cipherIV))
 			if keyLen == b"256":
 				keyLen = 256 // 8
@@ -182,10 +184,9 @@ class CryptSQL(object):
 					key = kdfMethod()
 				else:
 					key = self.__key
-				cipher = cipher.new(key,
-						    mode=cipherMode,
-						    IV=cipherIV)
-				payload = cipher.decrypt(payload)
+				dec = decrypter(cipher(key=key, iv=cipherIV))
+				payload = dec.feed(payload)
+				payload += dec.feed()
 				payload = self.__unpadData(payload)
 
 				# Decompress payload
@@ -282,11 +283,14 @@ class CryptSQL(object):
 					  salt=kdfSalt,
 					  iterations=kdfIter,
 					  dklen=keyLen)
-		cipherIV = self.__random(AES.block_size)
-		aes = AES.new(key,
-			      mode=AES.MODE_CBC,
-			      IV=cipherIV)
-		payload = aes.encrypt(self.__padData(payload, aes.block_size))
+		cipherBlockSize = 128 // 8
+		cipherIV = self.__random(cipherBlockSize)
+		enc = pyaes.Encrypter(pyaes.AESModeOfOperationCBC(key=key,
+								  iv=cipherIV),
+				      padding=pyaes.PADDING_NONE)
+		payload = self.__padData(payload, cipherBlockSize)
+		payload = enc.feed(payload)
+		payload += enc.feed()
 
 		try:
 			# Assemble file objects
