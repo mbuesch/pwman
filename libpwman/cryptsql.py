@@ -133,9 +133,18 @@ class CryptSQL(object):
 			kdfHash = fc.getOne(b"KDF_HASH", "Invalid KDF_HASH object")
 			kdfMac = fc.getOne(b"KDF_MAC", "Invalid KDF_MAC object")
 			compress = fc.getOne(b"COMPRESS", "Invalid COMPRESS object")
+			paddingMethod = fc.getOne(b"PADDING", default=b"PWMAN")
 			payload = fc.getOne(b"PAYLOAD", "Invalid PAYLOAD object")
+			if paddingMethod not in (b"PWMAN", b"PKCS7"):
+				raise CSQLError("Unknown padding: %s" % (
+						paddingMethod.decode("UTF-8", "ignore")))
 			if cipher == b"AES" and cipherMode == b"CBC":
-				decrypter = lambda c: pyaes.Decrypter(c, padding=pyaes.PADDING_NONE)
+				if paddingMethod == b"PKCS7":
+					decrypter = lambda c: pyaes.Decrypter(c,\
+							padding=pyaes.PADDING_DEFAULT)
+				else:
+					decrypter = lambda c: pyaes.Decrypter(c,\
+							padding=pyaes.PADDING_NONE)
 				cipher = pyaes.AESModeOfOperationCBC
 				cipherBlockSize = 128 // 8
 			else:
@@ -185,7 +194,8 @@ class CryptSQL(object):
 				dec = decrypter(cipher(key=key, iv=cipherIV))
 				payload = dec.feed(payload)
 				payload += dec.feed()
-				payload = self.__unpadData(payload)
+				if paddingMethod == b"PWMAN":
+					payload = self.__unpad_PWMAN(payload)
 
 				# Decompress payload
 				payload = compress.decompress(payload)
@@ -222,18 +232,12 @@ class CryptSQL(object):
 		self.__passphrase = None
 
 	@staticmethod
-	def __padData(data, align):
-		data += b"\xFF"
-		nrPad = (align - (len(data) % align))
-		if nrPad != 0 and nrPad != align:
-			data += b"\x00" * nrPad
-		return data
-
-	@staticmethod
-	def __unpadData(data):
+	def __unpad_PWMAN(data):
+		"""Strip legacy padding.
+		"""
 		index = data.rfind(b"\xFF")
 		if index < 0 or index >= len(data):
-			raise CSQLError("unpadData: error")
+			raise CSQLError("unpad_PWMAN: error")
 		return data[:index]
 
 	def __random(self, nrBytes):
@@ -285,8 +289,7 @@ class CryptSQL(object):
 		cipherIV = self.__random(cipherBlockSize)
 		enc = pyaes.Encrypter(pyaes.AESModeOfOperationCBC(key=key,
 								  iv=cipherIV),
-				      padding=pyaes.PADDING_NONE)
-		payload = self.__padData(payload, cipherBlockSize)
+				      padding=pyaes.PADDING_DEFAULT)
 		payload = enc.feed(payload)
 		payload += enc.feed()
 
@@ -304,6 +307,7 @@ class CryptSQL(object):
 				FileObj(b"KDF_HASH", kdfHash.encode("UTF-8")),
 				FileObj(b"KDF_MAC", b"HMAC"),
 				FileObj(b"COMPRESS", b"NONE"),
+				FileObj(b"PADDING", b"PKCS7"),
 				FileObj(b"PAYLOAD", payload),
 			)
 
