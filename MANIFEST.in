@@ -5,3 +5,4 @@ include gitconfig.sh
 include pwman.cmd
 
 graft maintenance
+graft tests
