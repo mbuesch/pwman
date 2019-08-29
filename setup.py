@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 
 from distutils.core import setup
+try:
+	from cx_Freeze import setup, Executable
+	cx_Freeze = True
+except ImportError:
+	cx_Freeze = False
 import warnings
 import os
 import sys
@@ -11,6 +16,40 @@ from libpwman import VERSION
 basedir = os.path.abspath(os.path.dirname(__file__))
 for base in (os.getcwd(), basedir):
 	sys.path.insert(0, base)
+
+isWindows = os.name.lower() in {"nt", "ce"}
+isPosix = os.name.lower() == "posix"
+
+# Create freeze executable list.
+extraKeywords = {}
+if cx_Freeze:
+	guiBase = "Win32GUI" if isWindows else None
+	freezeExecutables = [
+		("pwman", None, None),
+	]
+	executables = []
+	for script, exe, base in freezeExecutables:
+		if exe:
+			if isWindows:
+				exe += ".exe"
+			executables.append(Executable(script=script,
+						      targetName=exe,
+						      base=base))
+		else:
+			executables.append(Executable(script=script,
+						      base=base))
+	extraKeywords["executables"] = executables
+	extraKeywords["options"] = {
+			"build_exe" : {
+				"packages" : [ "readline",
+					       "pyreadline",
+					       "curses",
+					       "_curses",
+					       "sqlite3",
+					       "sqlite3.dump", ],
+				"excludes" : [ "tkinter", ],
+			}
+		}
 
 warnings.filterwarnings("ignore", r".*'python_requires'.*")
 warnings.filterwarnings("ignore", r".*'long_description_content_type'.*")
@@ -42,4 +81,5 @@ setup(
 	],
 	long_description=readmeText,
 	long_description_content_type="text/x-rst",
+	**extraKeywords
 )

@@ -4,5 +4,6 @@ include README.rst
 include gitconfig.sh
 include pwman.cmd
 
+graft doc
 graft maintenance
 graft tests
