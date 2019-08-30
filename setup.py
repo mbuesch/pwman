@@ -58,7 +58,7 @@ with open(os.path.join(basedir, "README.rst"), "rb") as fd:
 	readmeText = fd.read().decode("UTF-8")
 
 setup(
-	name		= "pwman",
+	name		= "pwman-python",
 	version		= VERSION_STRING,
 	description	= "Commandline password manager",
 	author		= "Michael Buesch",

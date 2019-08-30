@@ -32,6 +32,6 @@ hook_regression_tests()
 	sh "$1/tests/run.sh"
 }
 
-project=pwman
+project=pwman-python
 default_archives=py-sdist-xz
 makerelease "$@"
