@@ -694,7 +694,17 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	do_mv = do_move
 	do_rename = do_move
 
-	complete_move = __complete_category_title
+	@completion
+	def complete_move(self, text, line, begidx, endidx):
+		paramIdx = self._calcParamIndex(line, endidx)
+		if paramIdx in (0, 2):
+			# Category completion
+			return self.__getCategoryCompletions(text)
+		elif paramIdx in (1, 3):
+			# Entry title completion
+			category = self._getComplParam(line, 0 if paramIdx == 1 else 2)
+			return self.__getEntryTitleCompletions(category, text)
+		return []
 	complete_mv = complete_move
 	complete_rename = complete_move
 
