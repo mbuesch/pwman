@@ -1,6 +1,7 @@
 include COPYING
 include README.html
 include README.rst
+include examplescript.py
 include gitconfig.sh
 include pwman.cmd
 
