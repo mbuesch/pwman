@@ -151,6 +151,8 @@ def completion(func):
 					if comp.startswith(textPrefix):
 						completions[i] = comp[len(textPrefix) : ]
 			return completions
+		except (EscapeError, CSQLError, PWManError, PWManTimeout) as e:
+			return []
 		except Exception as e:
 			print("\nException in completion handler:\n\n%s" % (
 			      traceback.format_exc()),
