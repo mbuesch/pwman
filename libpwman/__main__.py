@@ -137,7 +137,9 @@ def run_ui(dbPath, commitClearsUndo, timeout, commands):
 	return 0
 
 def main():
-	p = argparse.ArgumentParser()
+	p = argparse.ArgumentParser(
+		description="Commandline password manager - "
+			    "pwman version %s" % libpwman.__version__)
 	p.add_argument("-v", "--version", action="store_true",
 		       help="show the pwman version and exit")
 	grp = p.add_mutually_exclusive_group()
