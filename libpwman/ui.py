@@ -708,7 +708,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	complete_mv = complete_move
 	complete_rename = complete_move
 
-	__dbdump_opts = ("-s", "-h")
+	__dbdump_opts = ("-s", "-h", "-c")
 	def do_dbdump(self, params):
 		"""--- Dump the pwman SQL database ---
 		Command: dbdump [OPTS] [FILEPATH]\n
@@ -718,7 +718,8 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		unencrypted to stdout.\n
 		OPTS may be one of:
 		  -s   Dump format SQL. (default)
-		  -h   Dump format human readable text.\n
+		  -h   Dump format human readable text.
+		  -c   Dump format CSV.\n
 		WARNING: The database dump is not encrypted.\n
 		Aliases: None"""
 		opts = self._getOpts(params, self.__dbdump_opts)
@@ -726,7 +727,8 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			self.__err("dbdump", "Too many arguments.")
 		optFmtSqlDump = "-s" in opts
 		optFmtHumanReadable = "-h" in opts
-		numFmtOpts = int(optFmtSqlDump) + int(optFmtHumanReadable)
+		optFmtCsv = "-c" in opts
+		numFmtOpts = int(optFmtSqlDump) + int(optFmtHumanReadable) + int(optFmtCsv)
 		if not 0 <= numFmtOpts <= 1:
 			self.__err("dbdump", "Multiple format OPTions. "
 					     "Only one is allowed.")
@@ -737,7 +739,11 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			if optFmtSqlDump:
 				dump = self.__db.sqlPlainDump() + b"\n"
 			elif optFmtHumanReadable:
-				dump = self.__db.dumpEntries().encode("UTF-8") + b"\n"
+				dump = self.__db.dumpEntries(showTotpKey=True)
+				dump = dump.encode("UTF-8") + b"\n"
+			elif optFmtCsv:
+				dump = self.__db.dumpEntriesCsv(showTotpKey=True)
+				dump = dump.encode("UTF-8")
 			else:
 				assert(0)
 			if dumpFile:

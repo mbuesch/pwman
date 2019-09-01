@@ -9,6 +9,8 @@ from libpwman.cryptsql import *
 from libpwman.exception import *
 from libpwman.util import *
 
+import csv
+import io
 import os
 import pathlib
 import sys
@@ -219,46 +221,6 @@ class PWManDatabase(CryptSQL):
 				  user=data[3],
 				  pw=data[4],
 				  entryId=data[0])
-
-	def dumpEntry(self, entry, showTotpKey=False):
-		"""Returns a human readable dump string of an entry.
-		"""
-		res = []
-		res.append("===  %s  ===" % entry.category)
-		res.append("\t---  %s  ---" % entry.title)
-		if entry.user:
-			res.append("\tUser:\t\t%s" % entry.user)
-		if entry.pw:
-			res.append("\tPassword:\t%s" % entry.pw)
-		entryBulk = self.getEntryBulk(entry)
-		if entryBulk:
-			res.append("\tBulk data:\t%s" % entryBulk.data)
-		entryTotp = self.getEntryTotp(entry)
-		if entryTotp:
-			if showTotpKey:
-				res.append("\tTOTP key:\t%s" % entryTotp.key)
-				res.append("\tTOTP digits:\t%d" % entryTotp.digits)
-				res.append("\tTOTP hash:\t%s" % entryTotp.hmacHash)
-			else:
-				res.append("\tTOTP:\t\tavailable")
-		entryAttrs = self.getEntryAttrs(entry)
-		if entryAttrs:
-			res.append("\tAttributes:")
-			for entryAttr in entryAttrs:
-				res.append("\t    %s:\t%s" % (entryAttr.name,
-							      entryAttr.data))
-		return "\n".join(res) + "\n"
-
-	def dumpEntries(self, showTotpKey=False):
-		"""Returns a human readable dump string of all entries.
-		"""
-		ret = []
-		for category in self.getCategoryNames():
-			for title in self.getEntryTitles(category):
-				entry = self.getEntry(category, title)
-				dump = self.dumpEntry(entry, showTotpKey)
-				ret.append(dump)
-		return "\n".join(ret)
 
 	def findEntries(self, pattern,
 			leftAnchor=False, rightAnchor=False,
@@ -632,3 +594,90 @@ class PWManDatabase(CryptSQL):
 				    readOnly=True,
 				    silent=True)
 		return db
+
+	def dumpEntry(self, entry, showTotpKey=False):
+		"""Returns a human readable dump string of an entry.
+		"""
+		res = []
+		res.append("===  %s  ===" % entry.category)
+		res.append("\t---  %s  ---" % entry.title)
+		if entry.user:
+			res.append("\tUser:\t\t%s" % entry.user)
+		if entry.pw:
+			res.append("\tPassword:\t%s" % entry.pw)
+		entryBulk = self.getEntryBulk(entry)
+		if entryBulk:
+			res.append("\tBulk data:\t%s" % entryBulk.data)
+		entryTotp = self.getEntryTotp(entry)
+		if entryTotp:
+			if showTotpKey:
+				res.append("\tTOTP key:\t%s" % entryTotp.key)
+				res.append("\tTOTP digits:\t%d" % entryTotp.digits)
+				res.append("\tTOTP hash:\t%s" % entryTotp.hmacHash)
+			else:
+				res.append("\tTOTP:\t\tavailable")
+		entryAttrs = self.getEntryAttrs(entry)
+		if entryAttrs:
+			res.append("\tAttributes:")
+			for entryAttr in entryAttrs:
+				res.append("\t    %s:\t%s" % (entryAttr.name,
+							      entryAttr.data))
+		return "\n".join(res) + "\n"
+
+	def dumpEntries(self, showTotpKey=False):
+		"""Returns a human readable dump string of all entries.
+		"""
+		ret = []
+		for category in self.getCategoryNames():
+			for title in self.getEntryTitles(category):
+				entry = self.getEntry(category, title)
+				dump = self.dumpEntry(entry, showTotpKey)
+				ret.append(dump)
+		return "\n".join(ret)
+
+	def dumpEntriesCsv(self, showTotpKey=False):
+		"""Returns a CSV format dump string of all entries.
+		"""
+		csvHeads = [
+			"Category",
+			"Title",
+			"User",
+			"Password",
+			"Bulk data",
+			"TOTP key",
+			"TOTP digits",
+			"TOTP hash",
+		]
+		rows = []
+		attrNames = set()
+		for category in self.getCategoryNames():
+			for title in self.getEntryTitles(category):
+				entry = self.getEntry(category, title)
+				row = {
+					"Category"	: entry.category,
+					"Title"		: entry.title,
+					"User"		: entry.user,
+					"Password"	: entry.pw,
+				}
+				entryBulk = self.getEntryBulk(entry)
+				if entryBulk:
+					row["Bulk data"] = entryBulk.data
+				entryTotp = self.getEntryTotp(entry)
+				if entryTotp:
+					row["TOTP key"] = entryTotp.key
+					row["TOTP digits"] = entryTotp.digits
+					row["TOTP hash"] = entryTotp.hmacHash
+				entryAttrs = self.getEntryAttrs(entry)
+				if entryAttrs:
+					for entryAttr in entryAttrs:
+						attrNames.add(entryAttr.name)
+						row[entryAttr.name] = entryAttr.data
+				rows.append(row)
+		csvHeads.extend(sorted(attrNames))
+
+		f = io.StringIO()
+		w = csv.DictWriter(f, fieldnames=csvHeads, dialect="excel")
+		w.writeheader()
+		for r in rows:
+			w.writerow(r)
+		return f.getvalue()
