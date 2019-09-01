@@ -5,18 +5,21 @@ https://bues.ch/h/pwman
 
 pwman is a commandline based password manager. It encrypts the password database file using strong AES-256 encryption.
 
-pwman has support for:
+pwman has support for the following things:
 
 * Store arbitrary attributes and text data along with the passwords and login credentials.
 * Generate two factor authentication tokens (`TOTP <https://en.wikipedia.org/wiki/Time-based_One-time_Password_algorithm>`_).
 * Database compare (diff). In pwman prompt, at pwman command line and as `git diff` extension.
 * Shell-style Tab-completion for all commands.
-* Export of the complete database as SQL text dump and plain text.
+* Custom Python scripts for arbitrary database processing.
+* Export of the complete database as SQL text dump, CSV dump and human readable plain text dump.
 
 Install pwman
 =============
 
-Execute the following commands to install the application:
+pwman does not have to be installed. The `pwman` script can be run directly from the source tree.
+
+However if you want to install pwman, it can be done either directly from the source tree by running the following commands:
 
 .. code:: sh
 
@@ -24,6 +27,12 @@ Execute the following commands to install the application:
 	sudo -i  # Or any other command to become root
 	./setup.py install
 
+Or it can be installed vi `PyPi <https://pypi.org/>`_ by running the following commands:
+
+.. code:: sh
+
+	pip3 install -U pyaes
+	pip3 install -U pwman-python
 
 Run pwman
 =========
