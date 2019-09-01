@@ -11,7 +11,7 @@ import warnings
 import os
 import sys
 
-from libpwman import VERSION_STRING
+from libpwman import __version__
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 for base in (os.getcwd(), basedir):
@@ -60,7 +60,7 @@ with open(os.path.join(basedir, "README.rst"), "rb") as fd:
 
 setup(
 	name		= "pwman-python",
-	version		= VERSION_STRING,
+	version		= __version__,
 	description	= "Commandline password manager",
 	author		= "Michael Buesch",
 	author_email	= "m@bues.ch",

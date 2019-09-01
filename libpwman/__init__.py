@@ -15,3 +15,5 @@ import libpwman.version
 from libpwman.exception import *
 from libpwman.ui import *
 from libpwman.version import *
+
+__version__ = VERSION_STRING

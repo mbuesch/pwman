@@ -167,7 +167,7 @@ def main():
 	args = p.parse_args()
 
 	if args.version:
-		print("pwman version %s" % libpwman.VERSION_STRING)
+		print("pwman version %s" % libpwman.__version__)
 		return 0
 
 	exitcode = 1

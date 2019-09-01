@@ -60,7 +60,7 @@ exit /B 0
 
 
 :detect_version
-	py -c "from libpwman.version import VERSION_STRING; print(VERSION_STRING)" > version.txt
+	py -c "import libpwman; print(libpwman.__version__)" > version.txt
 	if ERRORLEVEL 1 goto error_version
 	set /p version= < version.txt
 	del version.txt
