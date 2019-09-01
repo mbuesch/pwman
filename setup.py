@@ -52,6 +52,7 @@ if cx_Freeze:
 		}
 
 warnings.filterwarnings("ignore", r".*'python_requires'.*")
+warnings.filterwarnings("ignore", r".*'install_requires'.*")
 warnings.filterwarnings("ignore", r".*'long_description_content_type'.*")
 
 with open(os.path.join(basedir, "README.rst"), "rb") as fd:
@@ -65,6 +66,7 @@ setup(
 	author_email	= "m@bues.ch",
 	url		= "https://bues.ch/h/pwman",
 	python_requires = ">=3.7",
+	install_requires = [ "pyaes", ],
 	packages	= [ "libpwman", ],
 	scripts		= [ "pwman", ],
 	keywords	= "password manager command line TOTP 2FA",
