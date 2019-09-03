@@ -223,29 +223,46 @@ class PWManDatabase(CryptSQL):
 				  entryId=data[0])
 
 	def findEntries(self, pattern,
-			leftAnchor=False, rightAnchor=False,
+			useRegexp=False,
+			search=True,
 			inCategory=None,
-			matchTitle=False, matchUser=False, matchPw=False,
-			matchBulk=False, matchAttrName=False, matchAttrData=False):
-		if not leftAnchor:
-			pattern = "%" + pattern
-		if not rightAnchor:
-			pattern = pattern + "%"
+			matchCategory=False,
+			matchTitle=False,
+			matchUser=False,
+			matchPw=False,
+			matchBulk=False,
+			matchAttrName=False,
+			matchAttrData=False):
+		if useRegexp:
+			self.setRegexpFlags(search=search,
+					    ignoreCase=True,
+					    multiLine=True,
+					    dotAll=True)
+		else:
+			if search:
+				pattern = "%" + pattern + "%"
 
 		def dump(sql, params):
 			pass
 #			print(sql, "\nparams =", params)
 
+		def match(leftHand):
+			if useRegexp:
+				return "%s REGEXP ?" % leftHand
+			return "%s LIKE ?" % leftHand
+
 		IDs = set()
 
-		if matchTitle or matchUser or matchPw:
+		if matchCategory or matchTitle or matchUser or matchPw:
 			conditions = []
+			if matchCategory:
+				conditions.append( (match("entries.category"), pattern) )
 			if matchTitle:
-				conditions.append( ("entries.title LIKE ?", pattern) )
+				conditions.append( (match("entries.title"), pattern) )
 			if matchUser:
-				conditions.append( ("entries.user LIKE ?", pattern) )
+				conditions.append( (match("entries.user"), pattern) )
 			if matchPw:
-				conditions.append( ("entries.pw LIKE ?", pattern) )
+				conditions.append( (match("entries.pw"), pattern) )
 			sql = "SELECT id FROM entries WHERE "
 			params = []
 			if inCategory:
@@ -258,7 +275,7 @@ class PWManDatabase(CryptSQL):
 			IDs.update(entryId[0] for entryId in (c.fetchAll() or []))
 
 		if matchBulk:
-			conditions = [ ("bulk.data LIKE ?", pattern) ]
+			conditions = [ (match("bulk.data"), pattern) ]
 			sql = "SELECT entries.id "\
 			      "FROM entries, bulk "\
 			      "WHERE bulk.entry = entries.id AND "
@@ -266,7 +283,7 @@ class PWManDatabase(CryptSQL):
 			if inCategory:
 				sql += "entries.category = ? AND "
 				params.append(inCategory)
-			sql += "bulk.data LIKE ?;"
+			sql += match("bulk.data") + ";"
 			params.append(pattern)
 			dump(sql, params)
 			c = self.sqlExec(sql, params)
@@ -275,9 +292,9 @@ class PWManDatabase(CryptSQL):
 		if matchAttrName or matchAttrData:
 			conditions = []
 			if matchAttrName:
-				conditions.append( ("entryattr.name LIKE ?", pattern) )
+				conditions.append( (match("entryattr.name"), pattern) )
 			if matchAttrData:
-				conditions.append( ("entryattr.data LIKE ?", pattern) )
+				conditions.append( (match("entryattr.data"), pattern) )
 			sql = "SELECT entries.id "\
 			      "FROM entries, entryattr "\
 			      "WHERE entryattr.entry = entries.id AND "

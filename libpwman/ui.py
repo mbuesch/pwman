@@ -765,7 +765,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		optName, value = opts.atCmdIndex(paramIdx)
 		if optName: # -... option
 			return [ text + " " ]
-		if opts.nrParams <= 1: # trailing param
+		if (opts.nrParams == 0 and not text) or (opts.nrParams == 1 and text): # trailing param
 			return self.__getPathCompletions(text)
 		return []
 
@@ -798,36 +798,47 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		Aliases: None"""
 		self.__db.dropUncommitted()
 
+	__find_opts = ("-c", "-t", "-u", "-p", "-b", "-a", "-A", "-r")
 	def do_find(self, params):
 		"""--- Search the database ---
-		Command: find [OPTS] [category] PATTERN\n
-		Searches the database for patterns. If 'category' is given, only search
-		in the specified category. PATTERN may use unix globbing wildcards.\n
+		Command: find [OPTS] [IN_CATEGORY] PATTERN\n
+		Searches the database for patterns. If 'IN_CATEGORY' is given, only search
+		in the specified category.
+		PATTERN may either use SQL LIKE wildcards (without -r)
+		or Python Regular Expression special characters (with -r).\n
 		OPTS may be one or multiple of:
-		  -t   Only match 'title'
-		  -u   Only match 'user'
-		  -p   Only match 'password'
-		  -b   Only match 'bulk'
-		  -a   Only match 'attribute data'
-		  -A   Also match 'attribute name'\n
-		If no OPTS are given, the search uses these OPTS:
-		  -t -u -p -b -a\n
+		  -c   Match 'category'       (only if no IN_CATEGORY parameter)
+		  -t   Match 'title'          (*)
+		  -u   Match 'user'           (*)
+		  -p   Match 'password'       (*)
+		  -b   Match 'bulk'           (*)
+		  -a   Match 'attribute data' (*)
+		  -A   Match 'attribute name'
+		  -r   Use Python Regular Expression matching\n
+		(*) = These OPTS are enabled by default, if and only if
+		      none of them are specified by the user.\n
 		Aliases: f"""
-		opts = self._getOpts(params, ("-t", "-u", "-p", "-b", "-a", "-A"))
+		opts = self._getOpts(params, self.__find_opts)
+		mCategory = "-c" in opts
 		mTitle = "-t" in opts
 		mUser = "-u" in opts
 		mPw = "-p" in opts
 		mBulk = "-b" in opts
 		mAttrData = "-a" in opts
 		mAttrName = "-A" in opts
+		regexp = "-r" in opts
 		if not any( (mTitle, mUser, mPw, mBulk, mAttrData) ):
 			mTitle, mUser, mPw, mBulk, mAttrData = (True,) * 5
 		if opts.nrParams < 1 or opts.nrParams > 2:
 			self.__err("find", "Invalid parameters.")
-		category = opts.getParam(0) if opts.nrParams > 1 else None
+		inCategory = opts.getParam(0) if opts.nrParams > 1 else None
 		pattern = opts.getParam(1) if opts.nrParams > 1 else opts.getParam(0)
+		if inCategory and mCategory:
+			self.__err("find", "-c and [IN_CATEGORY] cannot be used at the same time.")
 		entries = self.__db.findEntries(pattern=pattern,
-						inCategory=category,
+						useRegexp=regexp,
+						inCategory=inCategory,
+						matchCategory=mCategory,
 						matchTitle=mTitle,
 						matchUser=mUser,
 						matchPw=mPw,
@@ -843,8 +854,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	@completion
 	def complete_find(self, text, line, begidx, endidx):
 		paramIdx = self._calcParamIndex(line, endidx)
-		if paramIdx == 0:
-			# Category completion
+		if text == "-":
+			return self.__find_opts
+		opts = self._getOpts(line, self.__find_opts, ignoreFirst=True)
+		optName, value = opts.atCmdIndex(paramIdx)
+		if optName: # -... option
+			return [ text + " " ]
+		if (opts.nrParams == 0 and not text) or (opts.nrParams == 1 and text): # category
 			return self.__getCategoryCompletions(text)
 		return []
 	complete_f = complete_find
@@ -1088,7 +1104,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		optName, value = opts.atCmdIndex(paramIdx)
 		if optName: # -... option
 			return [ text + " " ]
-		if opts.nrParams <= 1: # trailing param
+		if (opts.nrParams == 0 and not text) or (opts.nrParams == 1 and text): # trailing param
 			return self.__getPathCompletions(text)
 		return []
 
