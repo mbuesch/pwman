@@ -5,13 +5,14 @@
 # Licensed under the GNU/GPL version 2 or later.
 """
 
-import sys
-import os
-import zlib
+import functools
 import hashlib
+import os
+import re
 import secrets
 import sqlite3 as sql
-import functools
+import sys
+import zlib
 
 from libpwman.fileobj import *
 
@@ -219,6 +220,8 @@ class CryptSQL(object):
 			raise CSQLError("A database is already open")
 		self.__db = sql.connect(":memory:")
 		self.__db.text_factory = str
+		self.setRegexpFlags()
+		self.__db.create_function("regexp", 2, self._sqlRegexpMatch)
 		try:
 			self.__parseFile(filename)
 		except (CSQLError) as e:
@@ -322,6 +325,28 @@ class CryptSQL(object):
 
 		except FileObjError as e:
 			raise CSQLError("File error: %s" % str(e))
+
+	def setRegexpFlags(self, search=True, ignoreCase=True, multiLine=True, dotAll=True):
+		"""Change the behavior of the REGEXP operator.
+		"""
+		if search:
+			self._regexpMatch = re.search
+		else:
+			self._regexpMatch = re.match
+		self._regexpFlags = 0
+		if ignoreCase:
+			self._regexpFlags |= re.IGNORECASE
+		if multiLine:
+			self._regexpFlags |= re.MULTILINE
+		if dotAll:
+			self._regexpFlags |= re.DOTALL
+
+	def _sqlRegexpMatch(self, pattern, string):
+		"""Default implementation of the REGEXP operator.
+		"""
+		return 0 if self._regexpMatch(pattern,
+					      string,
+					      self._regexpFlags) is None else 1
 
 	def vacuum(self):
 		self.__db.commit()
