@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+#
 # Simple password manager
+# Encrypted database
+#
 # Copyright (c) 2011-2019 Michael Buesch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
+#
 """
 
 from libpwman.cryptsql import *
@@ -27,6 +31,9 @@ __all__ = [
 ]
 
 def getDefaultDatabase():
+	"""Get the default database path.
+	Returns a pathlib.Path() instance.
+	"""
 	db = os.getenv("PWMAN_DATABASE")
 	if db:
 		return pathlib.Path(db)
@@ -37,6 +44,8 @@ def getDefaultDatabase():
 
 @dataclass
 class PWManEntry(object):
+	"""Database entry data structure.
+	"""
 	category	: str
 	title		: str
 	user		: str = None
@@ -45,6 +54,8 @@ class PWManEntry(object):
 
 @dataclass
 class PWManEntryAttr(object):
+	"""Entry attribute data structure.
+	"""
 	name		: str
 	data		: str = None
 	entry		: PWManEntry = None
@@ -52,12 +63,16 @@ class PWManEntryAttr(object):
 
 @dataclass
 class PWManEntryBulk(object):
+	"""Entry bulk-data data structure.
+	"""
 	data		: str = None
 	entry		: PWManEntry = None
 	bulkId		: int = None
 
 @dataclass
 class PWManEntryTOTP(object):
+	"""Entry TOTP-data data structure.
+	"""
 	key		: str
 	digits		: int = 6
 	hmacHash	: str = "SHA1"
@@ -65,13 +80,20 @@ class PWManEntryTOTP(object):
 	totpId		: int = None
 
 class PWManDatabase(CryptSQL):
-	"""pwman database.
+	"""Encrypted pwman database.
 	"""
 
 	DB_TYPE	= "PWMan database"
 	DB_VER	= ("0", "1")
 
 	def __init__(self, filename, passphrase, key=None, readOnly=True, silent=False):
+		"""filename: Path to the database file.
+		             If it does not exist, a new file is created.
+		passphrase: The passphrase string for the database file.
+		key: An optional key to use instead of the passphrase. Don't use it.
+		readOnly: Open the filename read-only. Commits will raise an exception.
+		silent: Do not print information messages to the console.
+		"""
 		try:
 			super().__init__(readOnly=readOnly)
 			self.__silent = silent
@@ -81,10 +103,12 @@ class PWManDatabase(CryptSQL):
 			raise PWManError(str(e))
 
 	def __openFile(self, filename, passphrase, key):
+		"""Open the database file and parse the contents.
+		"""
 		super().setPassphrase(passphrase)
 		self.setKey(key)
 		self.open(filename)
-		self.setDirty(False)
+		self.__setDirty(False)
 		initDBVer = False
 		if self.sqlIsEmpty():
 			initDBVer = True
@@ -111,6 +135,8 @@ class PWManDatabase(CryptSQL):
 			self.setGlobalAttr("db_version", self.DB_VER[-1], setDirty=False)
 
 	def __migrateVersion(self, dbVer):
+		"""Migrate the database format to the latest version.
+		"""
 		if dbVer == self.DB_VER[0]:
 			if not self.__silent:
 				print("Migrating database from version %s to version %s..." % (
@@ -147,11 +173,13 @@ class PWManDatabase(CryptSQL):
 						 (info[0], info[1]))
 			c = self.sqlExec("DROP TABLE IF EXISTS pw;")
 			c = self.sqlExec("DROP TABLE IF EXISTS info;")
-			self.vacuum()
+			self.sqlVacuum()
 		else:
 			assert(0)
 
 	def __initTables(self):
+		"""Create the SQL tables, if they don't exist.
+		"""
 		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
 				 "globalattr(id INTEGER PRIMARY KEY AUTOINCREMENT, "
 					    "name TEXT, data TEXT);")
@@ -169,6 +197,8 @@ class PWManDatabase(CryptSQL):
 				      "entry INTEGER, key TEXT, digits INTEGER, hash TEXT);")
 
 	def __garbageCollect(self):
+		"""Remove rows from the SQL database that are not needed anymore.
+		"""
 		c = self.sqlExec("DELETE FROM bulk "
 				 "WHERE entry NOT IN (SELECT id FROM entries);")
 		c = self.sqlExec("DELETE FROM entryattr "
@@ -178,9 +208,12 @@ class PWManDatabase(CryptSQL):
 
 	def setPassphrase(self, passphrase):
 		super().setPassphrase(passphrase)
-		self.setDirty()
+		self.__setDirty()
 
 	def getCategoryNames(self):
+		"""Get all category names in the database.
+		Returns a sorted list of strings.
+		"""
 		c = self.sqlExec("SELECT category FROM entries;")
 		categories = c.fetchAll()
 		if not categories:
@@ -188,6 +221,10 @@ class PWManDatabase(CryptSQL):
 		return uniq(c[0] for c in categories)
 
 	def getEntryTitles(self, category):
+		"""Get all titles from one category in the database.
+		category: The category name string.
+		Returns a sorted list of strings.
+		"""
 		c = self.sqlExec("SELECT title FROM entries WHERE category=?;",
 				 (category,))
 		titles = c.fetchAll()
@@ -197,6 +234,10 @@ class PWManDatabase(CryptSQL):
 		return titles
 
 	def renameCategory(self, category, toCategory):
+		"""Change the name of a category.
+		category: The old name string of the category.
+		toCategory: The new name string of the category.
+		"""
 		categories = self.getCategoryNames()
 		if category not in categories:
 			raise PWManError("Source category does not exist.")
@@ -206,9 +247,14 @@ class PWManDatabase(CryptSQL):
 				 "WHERE category=?;",
 				 (toCategory,
 				  category))
-		self.setDirty()
+		self.__setDirty()
 
 	def getEntry(self, category, title):
+		"""Get an entry from the database.
+		category: The name string of the category to get an entry from.
+		title: The title string of the entry to get.
+		Returns a PWManEntry() instance.
+		"""
 		c = self.sqlExec("SELECT id, category, title, user, pw FROM entries "
 				 "WHERE category=? AND title=?;",
 				 (category,
@@ -233,6 +279,20 @@ class PWManDatabase(CryptSQL):
 			matchBulk=False,
 			matchAttrName=False,
 			matchAttrData=False):
+		"""Search the database for entries that match a pattern.
+		useRegexp: If True, then the pattern is a regular expression string.
+		           If False, then the pattern is a SQL LIKE pattern string.
+		inCategory: If specified as non-zero length string, then only search
+		            the category with this name.
+		matchCategory: Match the pattern to the category name string of an entry.
+		matchTitle: Match the pattern to the title string of an entry.
+		matchUser: Match the pattern to the user string of an entry.
+		matchPw: Match the pattern to the password string of an entry.
+		matchBulk: Match the pattern to the bulk data string of an entry.
+		matchAttrName: Match the pattern to all attribute name strings of an entry.
+		matchAttrData: Match the pattern to all attribute data strings of an entry.
+		Returns a list of PWManEntry() instances that match the pattern.
+		"""
 		if useRegexp:
 			self.setRegexpFlags(search=search,
 					    ignoreCase=True,
@@ -332,9 +392,16 @@ class PWManDatabase(CryptSQL):
 			 for data in dataSet ]
 
 	def entryExists(self, category, title):
+		"""Returns True, if an entry exists in the database.
+		category: The name string of the category.
+		title: The title string of the entry.
+		"""
 		return bool(self.getEntry(category, title))
 
 	def addEntry(self, entry):
+		"""Create a new entry in the database.
+		entry: A PWManEntry() instance.
+		"""
 		if self.entryExists(entry.category, entry.title):
 			raise PWManError("Entry does already exist")
 		c = self.sqlExec("INSERT INTO entries(category, title, user, pw) "
@@ -344,9 +411,12 @@ class PWManDatabase(CryptSQL):
 				  entry.user,
 				  entry.pw))
 		entry.entryId = c.lastRowID()
-		self.setDirty()
+		self.__setDirty()
 
 	def editEntry(self, entry):
+		"""Update the contents of an existing entry.
+		entry: A PWManEntry() containing the new data of the entry/
+		"""
 		oldEntry = self.getEntry(entry.category, entry.title)
 		if not oldEntry:
 			raise PWManError("Entry does not exist")
@@ -365,9 +435,14 @@ class PWManDatabase(CryptSQL):
 				  entry.user,
 				  entry.pw,
 				  entry.entryId))
-		self.setDirty()
+		self.__setDirty()
 
 	def moveEntry(self, entry, newCategory, newTitle):
+		"""Move an existing entry to a new category and/or set a new entry title.
+		entry: The PWManEntry() instance to move.
+		newCategory: The new category name string.
+		newTitle: The new title string.
+		"""
 		if self.entryExists(newCategory, newTitle):
 			raise PWManError("Entry does already exist.")
 		oldEntry = self.getEntry(entry.category, entry.title)
@@ -381,9 +456,12 @@ class PWManDatabase(CryptSQL):
 				 (entry.category,
 				  entry.title,
 				  oldEntry.entryId))
-		self.setDirty()
+		self.__setDirty()
 
 	def delEntry(self, entry):
+		"""Delete an existing entry from the database.
+		entry: The PWManEntry() instance to delete from the database.
+		"""
 		c = self.sqlExec("SELECT id FROM entries WHERE category=? AND title=?;",
 				 (entry.category,
 				  entry.title))
@@ -394,9 +472,13 @@ class PWManDatabase(CryptSQL):
 		c = self.sqlExec("DELETE FROM entries WHERE id=?;",
 				 (entryId,))
 		self.__garbageCollect()
-		self.setDirty()
+		self.__setDirty()
 
 	def getEntryBulk(self, entry):
+		"""Get the bulk data associated with an entry.
+		entry: The PWManEntry() to get the bulk data for.
+		Returns a PWManEntryBulk() instance or None, if there is no bulk data.
+		"""
 		c = self.sqlExec("SELECT bulk.id, bulk.data "
 				 "FROM bulk, entries "
 				 "WHERE entries.category=? AND entries.title=? AND "
@@ -411,6 +493,10 @@ class PWManDatabase(CryptSQL):
 				      bulkId=data[0])
 
 	def setEntryBulk(self, entryBulk):
+		"""Set the bulk data associated with an entry.
+		entryBulk: The new PWManEntryBulk() instance to write to the database.
+		           If entryBulk.data is None, then the bulk data is deleted.
+		"""
 		entry = entryBulk.entry
 		if not entry or entry.entryId is None:
 			raise PWManError("Bulk: Entry does not exist.")
@@ -434,9 +520,13 @@ class PWManDatabase(CryptSQL):
 		else:
 			c = self.sqlExec("DELETE FROM bulk WHERE id=?;",
 					 (entryBulk.bulkId,))
-		self.setDirty()
+		self.__setDirty()
 
 	def getEntryTotp(self, entry):
+		"""Get the TOTP parameters associated with an entry.
+		entry: The PWManEntry() to get the TOTP parameters for.
+		Returns a PWManEntryTOTP() instance, or None if there is no TOTP data.
+		"""
 		c = self.sqlExec("SELECT totp.id, totp.key, totp.digits, totp.hash "
 				 "FROM totp, entries "
 				 "WHERE entries.category=? AND entries.title=? AND "
@@ -453,6 +543,10 @@ class PWManDatabase(CryptSQL):
 				      totpId=data[0])
 
 	def setEntryTotp(self, entryTotp):
+		"""Set the TOTP data associated with an entry.
+		entryTotp: The new PWManEntryTOTP() instance to write to the database.
+		           If entryTotp.key is None, then the TOTP data is deleted.
+		"""
 		entry = entryTotp.entry
 		if not entry or entry.entryId is None:
 			raise PWManError("TOTP: Entry does not exist.")
@@ -480,9 +574,14 @@ class PWManDatabase(CryptSQL):
 		else:
 			c = self.sqlExec("DELETE FROM totp WHERE id=?;",
 					 (entryTotp.totpId,))
-		self.setDirty()
+		self.__setDirty()
 
 	def getEntryAttr(self, entry, attrName):
+		"""Get an attribute associated with an entry.
+		entry: The PWManEntry() to get the attribute for.
+		attrName: The name string of the attribute to get.
+		Returns a PWManEntryAttr() instance, or None if there is such attribute.
+		"""
 		c = self.sqlExec("SELECT entryattr.id, entryattr.name, entryattr.data "
 				 "FROM entryattr, entries "
 				 "WHERE entries.category=? AND entries.title=? AND "
@@ -499,6 +598,11 @@ class PWManDatabase(CryptSQL):
 				      attrId=data[0])
 
 	def getEntryAttrs(self, entry):
+		"""Get all attributes associated with an entry.
+		entry: The PWManEntry() to get the attributes for.
+		Returns a list of PWManEntryAttr() instances,
+		or an empty list if there are no attributes.
+		"""
 		c = self.sqlExec("SELECT entryattr.id, entryattr.name, entryattr.data "
 				 "FROM entryattr, entries "
 				 "WHERE entries.category=? AND entries.title=? AND "
@@ -515,6 +619,10 @@ class PWManDatabase(CryptSQL):
 			 for data in dataSet ]
 
 	def setEntryAttr(self, entryAttr):
+		"""Set an attribute associated with an entry.
+		entryAttr: The new PWManEntryAttr() instance to write to the database.
+		           If entryAttr.data is None, then the attribute is deleted.
+		"""
 		entry = entryAttr.entry
 		if not entry or entry.entryId is None:
 			raise PWManError("Attr: Entry does not exist.")
@@ -542,9 +650,13 @@ class PWManDatabase(CryptSQL):
 		else:
 			c = self.sqlExec("DELETE FROM entryattr WHERE id=?;",
 					 (entryAttr.attrId,))
-		self.setDirty()
+		self.__setDirty()
 
 	def getGlobalAttr(self, name):
+		"""Get a global attribute.
+		A global attribute is not associated with an entry.
+		Returns None, if the attribute does not exist.
+		"""
 		try:
 			c = self.sqlExec("SELECT id, data FROM globalattr WHERE name=?;",
 					 (name,))
@@ -554,6 +666,10 @@ class PWManDatabase(CryptSQL):
 			return None
 
 	def setGlobalAttr(self, name, data, setDirty=True):
+		"""Set a global attribute.
+		A global attribute is not associated with an entry.
+		If data is None or empty, the attribute is deleted from the database.
+		"""
 		if data:
 			c = self.sqlExec("SELECT id FROM globalattr "
 					 "WHERE name=?;",
@@ -573,31 +689,38 @@ class PWManDatabase(CryptSQL):
 			c = self.sqlExec("DELETE FROM globalattr WHERE name=?;",
 					 (name,))
 		if setDirty:
-			self.setDirty()
+			self.__setDirty()
 
-	def setDirty(self, d=True):
+	def __setDirty(self, d=True):
+		"""Set the flag for uncommitted data.
+		"""
 		self.__dirty = d
 
 	def isDirty(self):
+		"""Returns True, if the database contains uncommitted data.
+		"""
 		return self.__dirty
 
 	def flunkDirty(self):
+		"""Print a warning, if the database contains uncommitted data.
+		Then set the flag for uncommitted data to False.
+		"""
 		if self.isDirty():
 			print("WARNING: Dropping uncommitted data",
 			      file=sys.stderr)
-			self.setDirty(False)
+			self.__setDirty(False)
 
 	def dropUncommitted(self):
 		super().dropUncommitted()
-		self.setDirty(False)
+		self.__setDirty(False)
 
 	def commit(self):
 		self.__garbageCollect()
 		super().commit()
-		self.setDirty(False)
+		self.__setDirty(False)
 
 	def importSqlScript(self, *args, **kwargs):
-		self.setDirty()
+		self.__setDirty()
 		super().importSqlScript(*args, **kwargs)
 
 	def getOnDiskDb(self):
@@ -614,6 +737,7 @@ class PWManDatabase(CryptSQL):
 
 	def dumpEntry(self, entry, showTotpKey=False):
 		"""Returns a human readable dump string of an entry.
+		If showTotpKey=True: Also dump the TOTP key and parameters.
 		"""
 		res = []
 		res.append("===  %s  ===" % entry.category)
@@ -643,6 +767,7 @@ class PWManDatabase(CryptSQL):
 
 	def dumpEntries(self, showTotpKey=False):
 		"""Returns a human readable dump string of all entries.
+		If showTotpKey=True: Also dump the TOTP key and parameters.
 		"""
 		ret = []
 		for category in self.getCategoryNames():
@@ -654,6 +779,7 @@ class PWManDatabase(CryptSQL):
 
 	def dumpEntriesCsv(self, showTotpKey=False):
 		"""Returns a CSV format dump string of all entries.
+		If showTotpKey=True: Also dump the TOTP key and parameters.
 		"""
 		csvHeads = [
 			"Category",

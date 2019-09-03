@@ -39,7 +39,9 @@ __all__ = [
 CSQL_HEADER = b"CryptSQL v1"
 
 
-class CSQLError(Exception): pass
+class CSQLError(Exception):
+	"""CryptSQL exception.
+	"""
 
 class CompressDummy(object):
 	def compress(self, payload, *args):
@@ -47,11 +49,16 @@ class CompressDummy(object):
 	decompress = compress
 
 class CryptSQLCursor(object):
+	"""Encrypted SQL database cursor.
+	"""
+
 	def __init__(self, db):
 		self.__db = db
 		self.__c = db.cursor()
 
 	def sqlExec(self, code, params=[]):
+		"""Execute one SQL statement.
+		"""
 		try:
 			self.__c.execute(code, params)
 			return self
@@ -59,6 +66,8 @@ class CryptSQLCursor(object):
 			raise CSQLError("Database error: " + str(e))
 
 	def sqlExecScript(self, code):
+		"""Execute multiple SQL statements.
+		"""
 		try:
 			self.__c.executescript(code)
 			return self
@@ -66,25 +75,42 @@ class CryptSQLCursor(object):
 			raise CSQLError("Database error: " + str(e))
 
 	def fetchOne(self):
+		"""Fetches the next row of a query result set.
+		Returns a list of query results or None.
+		See sqlite3.Cursor.fetchone for more details.
+		"""
 		try:
 			return self.__c.fetchone()
 		except (sql.Error, sql.DatabaseError) as e:
 			raise CSQLError("Database error: " + str(e))
 
 	def fetchAll(self):
+		"""Fetches all rows of a query result.
+		Returns a list of lists of query results or an empty list.
+		See sqlite3.Cursor.fetchall for more details.
+		"""
 		try:
 			return self.__c.fetchall()
 		except (sql.Error, sql.DatabaseError) as e:
 			raise CSQLError("Database error: " + str(e))
 
 	def lastRowID(self):
+		"""Get the rowid of the last modified row.
+		Returns an int or None.
+		See sqlite3.Cursor.lastrowid for more details.
+		"""
 		try:
 			return self.__c.lastrowid
 		except (sql.Error, sql.DatabaseError) as e:
 			raise CSQLError("Database error: " + str(e))
 
 class CryptSQL(object):
+	"""Encrypted SQL database.
+	"""
+
 	def __init__(self, readOnly=True):
+		"""readOnly: If True, no commit is possible.
+		"""
 		self.__readOnly = readOnly
 		self.__db = None
 		self.__filename = None
@@ -92,12 +118,16 @@ class CryptSQL(object):
 		self.__key = None
 
 	def getPassphrase(self):
+		"""Get the current passphrase string for encryption and decryption.
+		"""
 		try:
 			return self.__passphrase.decode("UTF-8")
 		except UnicodeError as e:
 			raise CSQLError("Cannot UTF-8-decode passphrase.")
 
 	def setPassphrase(self, passphrase):
+		"""Set a new passphrase string for encryption and decryption.
+		"""
 		assert isinstance(passphrase, str),\
 		       "CryptSQL: Passphrase is not 'str'."
 		try:
@@ -107,15 +137,26 @@ class CryptSQL(object):
 			raise CSQLError("Cannot UTF-8-encode passphrase.")
 
 	def getKey(self):
+		"""Get the raw key. May be None, if there is none, yet.
+		Do not use this. getPassphrase probably is what you want.
+		"""
 		return self.__key
 
 	def setKey(self, key):
+		"""Set the raw key.
+		Do not use this. setPassphrase probably is what you want.
+		"""
 		self.__key = key
 
 	def getFilename(self):
+		"""Get the file path of the currently open database.
+		May return None, if no database file is opened.
+		"""
 		return self.__filename
 
 	def __parseFile(self, filename):
+		"""Read all data from 'filename' and decrypt it into memory.
+		"""
 		try:
 			fc = FileObjCollection.parseFile(filename)
 			if fc is None:
@@ -213,15 +254,20 @@ class CryptSQL(object):
 			raise CSQLError("File error: %s" % str(e))
 
 	def isOpen(self):
+		"""Returns True, if a database file is opened.
+		"""
 		return bool(self.__db)
 
 	def open(self, filename):
+		"""Open a database file and decrypt its contents into memory.
+		filename: The database file path.
+		"""
 		if self.isOpen():
 			raise CSQLError("A database is already open")
 		self.__db = sql.connect(":memory:")
 		self.__db.text_factory = str
 		self.setRegexpFlags()
-		self.__db.create_function("regexp", 2, self._sqlRegexpMatch)
+		self.sqlCreateFunction("regexp", 2, self._sqlRegexpMatch)
 		try:
 			self.__parseFile(filename)
 		except (CSQLError) as e:
@@ -231,6 +277,9 @@ class CryptSQL(object):
 		self.__filename = filename
 
 	def close(self):
+		"""Close the currently opened database.
+		This does not commit. All uncommitted changes are lost.
+		"""
 		self.__db = None
 		self.__filename = None
 		self.__passphrase = None
@@ -245,6 +294,9 @@ class CryptSQL(object):
 		return data[:index]
 
 	def __random(self, nrBytes):
+		"""Return cryptographically secure random bytes.
+		nrBytes: The number of bytes to return.
+		"""
 		if nrBytes <= 0:
 			raise CSQLError("__random(): Invalid number of random bytes.")
 		data = secrets.token_bytes(nrBytes)
@@ -257,6 +309,9 @@ class CryptSQL(object):
 		return data
 
 	def __randomInt(self, belowVal):
+		"""Return a cryptographically secure random integer.
+		belowVal: The returned integer (ret) shall be 0 <= ret < belowVal.
+		"""
 		if belowVal <= 0:
 			raise CSQLError("__randomInt(): Invalid range.")
 		val = secrets.randbelow(belowVal)
@@ -265,16 +320,20 @@ class CryptSQL(object):
 		return val
 
 	def dropUncommitted(self):
+		"""Drop all changes that are not committed, yet.
+		"""
 		self.__db.rollback()
 
 	def commit(self):
+		"""Write all changes to the encrypted database file.
+		"""
 		if self.__readOnly:
 			raise CSQLError("The database is read-only. "
 					"Cannot commit changes.")
 		if not self.__db or not self.__filename:
 			raise CSQLError("Database is not open")
 
-		self.vacuum()
+		self.sqlVacuum()
 
 		# Dump the database
 		payload = self.sqlPlainDump()
@@ -348,34 +407,56 @@ class CryptSQL(object):
 					      string,
 					      self._regexpFlags) is None else 1
 
-	def vacuum(self):
+	def sqlVacuum(self):
+		"""Run the SQL VACUUM statement.
+		This also commits all changes to the SQL database,
+		but not to the database file.
+		"""
 		self.__db.commit()
 		self.sqlExec("VACUUM;")
 		self.__db.commit()
 
 	def sqlExec(self, code, params=[]):
+		"""Execute one SQL statement.
+		"""
 		return CryptSQLCursor(self.__db).sqlExec(code, params)
 
 	def sqlExecScript(self, code):
+		"""Execute multiple SQL statements.
+		"""
 		return CryptSQLCursor(self.__db).sqlExecScript(code)
 
 	def sqlCreateFunction(self, name, nrParams, func):
+		"""Create an SQL function.
+		See sqlite3.Connection.create_function for more details.
+		"""
 		self.__db.create_function(name, nrParams, func)
 
 	def sqlIsEmpty(self):
+		"""Returns True, if the database does not contain any tables.
+		"""
 		c = self.sqlExec("ANALYZE;")
 		tbl = c.sqlExec("SELECT tbl FROM sqlite_stat1;").fetchOne()
 		return not bool(tbl)
 
 	def sqlPlainDump(self):
+		"""Get a plain text dump of the database.
+		Returns a string.
+		"""
 		return ("\n".join(self.__db.iterdump())).encode("UTF-8")
 
 	def importSqlScript(self, script, clear=True):
+		"""Imports a plain text dump into the database.
+		script: The script string to import.
+		clear: If True, drop all tables from the database before importing.
+		"""
 		if clear:
 			self.dropAllTables()
 		self.sqlExecScript(script)
 
 	def dropAllTables(self):
+		"""Drop all tables from the database.
+		"""
 		c = self.sqlExec("SELECT name FROM sqlite_master "
 				 "WHERE type='table';")
 		for table in c.fetchAll():
