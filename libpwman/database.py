@@ -681,9 +681,12 @@ class PWManDatabase(CryptSQL):
 					row["Bulk data"] = entryBulk.data
 				entryTotp = self.getEntryTotp(entry)
 				if entryTotp:
-					row["TOTP key"] = entryTotp.key
-					row["TOTP digits"] = entryTotp.digits
-					row["TOTP hash"] = entryTotp.hmacHash
+					if showTotpKey:
+						row["TOTP key"] = entryTotp.key
+						row["TOTP digits"] = entryTotp.digits
+						row["TOTP hash"] = entryTotp.hmacHash
+					else:
+						row["TOTP key"] = "available"
 				entryAttrs = self.getEntryAttrs(entry)
 				if entryAttrs:
 					for entryAttr in entryAttrs:
