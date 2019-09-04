@@ -18,7 +18,8 @@ __all__ = [
 ]
 
 class OtpError(Exception):
-	pass
+	"""HOTP/TOTP exception.
+	"""
 
 def hotp(key, counter, nrDigits=6, hmacHash="SHA1"):
 	"""HOTP - An HMAC-Based One-Time Password Algorithm.
