@@ -32,6 +32,11 @@ hook_regression_tests()
 	sh "$1/tests/run.sh"
 }
 
+hook_post_documentation()
+{
+	"$1"/maintenance/gen-doc.sh -r
+}
+
 project=pwman-python
 default_archives=py-sdist-xz
 makerelease "$@"
