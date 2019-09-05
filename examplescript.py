@@ -2,9 +2,14 @@
 # This is an example script that can be used as
 # pwman -p examplescript.py
 # pwman --call-pymod examplescript.py
-# See pwman --help for more information.
+#
+# See pwman --help for more information about the command line options.
+# See doc/api/ for a description of the Python API.
 #
 
+# Entry point.
+# The 'db' parameter is a PWManDatabase instance.
+# See doc/api/libpwman/database.html
 def run(db):
 	# Print all category names.
 	categories = db.getCategoryNames()

@@ -9,6 +9,7 @@ pwman has support for the following things:
 
 * Store arbitrary attributes and text data along with the passwords and login credentials.
 * Generate two factor authentication tokens (`TOTP <https://en.wikipedia.org/wiki/Time-based_One-time_Password_algorithm>`_).
+* Database search with Regular Expressions or SQL LIKE syntax.
 * Database compare (diff). In pwman prompt, at pwman command line and as `git diff` extension.
 * Shell-style Tab-completion for all commands.
 * Custom Python scripts for arbitrary database processing.
@@ -61,6 +62,18 @@ To get help about a specific command, enter the command into the prompt and appe
 .. code::
 
 	pwman$ find?
+
+Using a custom script to process the database content
+=====================================================
+
+A custom Python script can be passed to `pwman` as command line option. Such a script can do anything to the content of the database.
+
+Please see the example script `examplescript.py` for more information.
+
+API documentation
+=================
+
+The API documentation can be found in the `API documentation directory <doc/api/>`_.
 
 License / Copyright
 ===================

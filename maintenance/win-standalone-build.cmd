@@ -97,6 +97,8 @@ exit /B 0
 	if ERRORLEVEL 1 goto error_copy
 	copy *.html %distdir%\
 	if ERRORLEVEL 1 goto error_copy
+	copy examplescript.py %distdir%\
+	if ERRORLEVEL 1 goto error_copy
 	xcopy /E /I doc %distdir%\doc
 	if ERRORLEVEL 1 goto error_copy
 	rmdir /S /Q %distdir%\doc\foreign-licenses
