@@ -181,7 +181,9 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	class Quit(Exception): pass
 
 	def __init__(self, filename, passphrase,
-		     commitClearsUndo=False, timeout=None):
+		     commitClearsUndo=False,
+		     timeout=None,
+		     verifyPayloadMac=True):
 		super().__init__()
 
 		if sys.flags.optimize >= 2:
@@ -193,7 +195,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		# argument delimiter shall be space.
 		readline.set_completer_delims(" ")
 
-		self.__db = PWManDatabase(filename, passphrase, readOnly=False)
+		self.__db = PWManDatabase(filename,
+					  passphrase,
+					  readOnly=False,
+					  verifyPayloadMac=verifyPayloadMac)
 		self.__updatePrompt()
 
 		self._timeout = PWManTimeout(timeout)

@@ -32,7 +32,7 @@ def getPassphrase(dbPath, interactiveMode, infoFile=sys.stdout):
 						  verify=not dbExists)
 	return passphrase
 
-def run_diff(dbPath, oldDbPath, diffFormat):
+def run_diff(dbPath, oldDbPath, diffFormat, verifyPayloadMac):
 	for p in (dbPath, oldDbPath):
 		if not p.exists():
 			print("Database '%s' does not exist." % p,
@@ -46,14 +46,16 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 		return 1
 	db = libpwman.database.PWManDatabase(filename=dbPath,
 					     passphrase=dbPassphrase,
-					     readOnly=True)
+					     readOnly=True,
+					     verifyPayloadMac=verifyPayloadMac)
 
 	try:
 		# Try to open the old database with the passphrase
 		# of the new database.
 		oldDb = libpwman.database.PWManDatabase(filename=oldDbPath,
 							passphrase=dbPassphrase,
-							readOnly=True)
+							readOnly=True,
+							verifyPayloadMac=verifyPayloadMac)
 	except PWManError:
 		# The attempt failed. Ask the user for the proper passphrase.
 		dbPassphrase = getPassphrase(oldDbPath, interactiveMode=True,
@@ -62,7 +64,8 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 			return 1
 		oldDb = libpwman.database.PWManDatabase(filename=oldDbPath,
 							passphrase=dbPassphrase,
-							readOnly=True)
+							readOnly=True,
+							verifyPayloadMac=verifyPayloadMac)
 
 	diff = libpwman.dbdiff.PWManDatabaseDiff(db=db, oldDb=oldDb)
 	if diffFormat == "unified":
@@ -78,7 +81,7 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 		return 1
 	return 0
 
-def run_script(dbPath, pyModName):
+def run_script(dbPath, pyModName, verifyPayloadMac):
 	try:
 		if pyModName.lower().endswith(".py"):
 			pyModName = pyModName[:-3]
@@ -101,7 +104,8 @@ def run_script(dbPath, pyModName):
 		return 1
 	db = libpwman.database.PWManDatabase(filename=dbPath,
 					     passphrase=passphrase,
-					     readOnly=False)
+					     readOnly=False,
+					     verifyPayloadMac=verifyPayloadMac)
 	try:
 		run(db)
 	except Exception as e:
@@ -112,7 +116,7 @@ def run_script(dbPath, pyModName):
 	db.flunkDirty()
 	return 0
 
-def run_ui(dbPath, commitClearsUndo, timeout, commands):
+def run_ui(dbPath, commitClearsUndo, timeout, verifyPayloadMac, commands):
 	passphrase = getPassphrase(dbPath, interactiveMode=not commands)
 	if passphrase is None:
 		return 1
@@ -120,7 +124,8 @@ def run_ui(dbPath, commitClearsUndo, timeout, commands):
 		p = libpwman.PWMan(filename=dbPath,
 				   passphrase=passphrase,
 				   commitClearsUndo=commitClearsUndo,
-				   timeout=timeout)
+				   timeout=timeout,
+				   verifyPayloadMac=verifyPayloadMac)
 		if commands:
 			for command in commands:
 				p.runOneCommand(command)
@@ -165,6 +170,8 @@ def main():
 		       help="The commit command clears undo queue.")
 	p.add_argument("--no-mlock", action="store_true",
 		       help="Do not lock memory and allow swapping to disk.")
+	p.add_argument("--no-mac-verify", action="store_true",
+		       help="Do not use this option. The MAC protects against malicious database modifications.")
 	if libpwman.util.osIsPosix:
 		p.add_argument("-t", "--timeout", type=int, default=600, metavar="SECONDS",
 			       help="Sets the session timeout in seconds. Default is 10 minutes.")
@@ -193,14 +200,17 @@ def main():
 		if args.diff:
 			exitcode = run_diff(dbPath=args.database,
 					    oldDbPath=args.diff,
-					    diffFormat=args.diff_format)
+					    diffFormat=args.diff_format,
+					    verifyPayloadMac=not args.no_mac_verify)
 		elif args.call_pymod:
 			exitcode = run_script(dbPath=args.database,
-					      pyModName=args.call_pymod)
+					      pyModName=args.call_pymod,
+					      verifyPayloadMac=not args.no_mac_verify)
 		else:
 			exitcode = run_ui(dbPath=args.database,
 					  commitClearsUndo=args.commit_clear_undo,
 					  timeout=args.timeout if libpwman.util.osIsPosix else None,
+					  verifyPayloadMac=not args.no_mac_verify,
 					  commands=args.command)
 	except libpwman.database.CSQLError as e:
 		print("SQL error: " + str(e), file=sys.stderr)

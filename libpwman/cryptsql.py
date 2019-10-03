@@ -7,6 +7,7 @@
 
 import functools
 import hashlib
+import hmac
 import os
 import re
 import secrets
@@ -108,10 +109,11 @@ class CryptSQL(object):
 	"""Encrypted SQL database.
 	"""
 
-	def __init__(self, readOnly=True):
+	def __init__(self, readOnly=True, verifyPayloadMac=True):
 		"""readOnly: If True, no commit is possible.
 		"""
 		self.__readOnly = readOnly
+		self.__verifyPayloadMac = verifyPayloadMac
 		self.__db = None
 		self.__filename = None
 		self.__passphrase = None
@@ -177,6 +179,8 @@ class CryptSQL(object):
 			kdfMac = fc.getOne(b"KDF_MAC", "Invalid KDF_MAC object")
 			compress = fc.getOne(b"COMPRESS", "Invalid COMPRESS object")
 			paddingMethod = fc.getOne(b"PADDING", default=b"PWMAN")
+			payloadMac = fc.getOne(b"PAYLOAD_MAC", default=b"")
+			payloadMacDigest = fc.getOne(b"PAYLOAD_MAC_DIGEST", default=b"")
 			payload = fc.getOne(b"PAYLOAD", "Invalid PAYLOAD object")
 
 			# Check the padding method.
@@ -245,11 +249,30 @@ class CryptSQL(object):
 			else:
 				raise CSQLError("Unknown compression: %s" % compress)
 
+			# Check the payload MAC method.
+			if payloadMac == b"HMAC-SHA3-512" and payloadMacDigest:
+				payloadMacCheck = lambda k, p: hmac.compare_digest(
+								hmac.digest(k, p, "SHA3-512"),
+								payloadMacDigest)
+			else:
+				# Unknown method. Always fail.
+				payloadMacCheck = lambda k, p: False
+
 			# Generate the key.
 			if self.__key is None:
 				key = kdfMethod()
 			else:
 				key = self.__key
+
+			# Verify the payload MAC.
+			if self.__verifyPayloadMac:
+				if not payloadMacCheck(key, payload):
+					raise CSQLError("Database authenticity could not be verified. "
+							"Corrupt database or wrong passphrase?")
+			else:
+				print("WARNING: Skipping payload MAC verification! "
+				      "The database might be manipulated by a malicious eavesdropper!",
+				      file=sys.stderr)
 
 			try:
 				# Decrypt payload.
@@ -379,6 +402,10 @@ class CryptSQL(object):
 					      padding=pyaes.PADDING_DEFAULT)
 			payload = enc.feed(payload)
 			payload += enc.feed()
+
+			# Generate the payload MAC.
+			#FIXME: Use a different (derived) key!
+			payloadMacDigest = hmac.digest(key, payload, "SHA3-512")
 		except Exception as e:
 			raise CSQLError("Failed to encrypt: %s" % str(e))
 
@@ -397,6 +424,8 @@ class CryptSQL(object):
 				FileObj(b"KDF_MAC", b"HMAC"),
 				FileObj(b"COMPRESS", b"NONE"),
 				FileObj(b"PADDING", b"PKCS7"),
+				FileObj(b"PAYLOAD_MAC", b"HMAC-SHA3-512"),
+				FileObj(b"PAYLOAD_MAC_DIGEST", payloadMacDigest),
 				FileObj(b"PAYLOAD", payload),
 			)
 

@@ -9,7 +9,8 @@ class Test_Database_v0(TestCase):
 	"""
 	def test_v0(self):
 		db = PWManDatabase(filename=pathlib.Path("tests", "test_database_v0.db"),
-				   passphrase="test")
+				   passphrase="test",
+				   verifyPayloadMac=False)
 
 		self.assertEqual(db.getCategoryNames(),
 				 sorted([ "testcategory", "testcategory2", "testcategory3" ]))
