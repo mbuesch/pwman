@@ -66,7 +66,7 @@ def run_infodump(dbPath):
 		raise libpwman.PWManError(str(e))
 	return 0
 
-def run_diff(dbPath, oldDbPath, diffFormat):
+def run_diff(dbPath, oldDbPath, diffFormat, verifyPayloadMac):
 	for p in (dbPath, oldDbPath):
 		if not p.exists():
 			print("Database '%s' does not exist." % p,
@@ -80,14 +80,16 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 		return 1
 	db = libpwman.database.PWManDatabase(filename=dbPath,
 					     passphrase=dbPassphrase,
-					     readOnly=True)
+					     readOnly=True,
+					     verifyPayloadMac=verifyPayloadMac)
 
 	try:
 		# Try to open the old database with the passphrase
 		# of the new database.
 		oldDb = libpwman.database.PWManDatabase(filename=oldDbPath,
 							passphrase=dbPassphrase,
-							readOnly=True)
+							readOnly=True,
+							verifyPayloadMac=verifyPayloadMac)
 	except libpwman.PWManError:
 		# The attempt failed. Ask the user for the proper passphrase.
 		dbPassphrase = getPassphrase(oldDbPath, verbose=True,
@@ -96,7 +98,8 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 			return 1
 		oldDb = libpwman.database.PWManDatabase(filename=oldDbPath,
 							passphrase=dbPassphrase,
-							readOnly=True)
+							readOnly=True,
+							verifyPayloadMac=verifyPayloadMac)
 
 	diff = libpwman.dbdiff.PWManDatabaseDiff(db=db, oldDb=oldDb)
 	if diffFormat == "unified":
@@ -112,7 +115,7 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 		return 1
 	return 0
 
-def run_script(dbPath, pyModName):
+def run_script(dbPath, pyModName, verifyPayloadMac):
 	try:
 		if pyModName.lower().endswith(".py"):
 			pyModName = pyModName[:-3]
@@ -135,7 +138,8 @@ def run_script(dbPath, pyModName):
 		return 1
 	db = libpwman.database.PWManDatabase(filename=dbPath,
 					     passphrase=passphrase,
-					     readOnly=False)
+					     readOnly=False,
+					     verifyPayloadMac=verifyPayloadMac)
 	try:
 		run(db)
 	except Exception as e:
@@ -146,14 +150,15 @@ def run_script(dbPath, pyModName):
 	db.flunkDirty()
 	return 0
 
-def run_ui(dbPath, timeout, commands):
+def run_ui(dbPath, timeout, verifyPayloadMac, commands):
 	passphrase = getPassphrase(dbPath, verbose=not commands)
 	if passphrase is None:
 		return 1
 	try:
 		p = libpwman.PWMan(filename=dbPath,
 				   passphrase=passphrase,
-				   timeout=timeout)
+				   timeout=timeout,
+				   verifyPayloadMac=verifyPayloadMac)
 		if commands:
 			for command in commands:
 				p.runOneCommand(command)
@@ -207,6 +212,13 @@ def main():
 		       help="Do not lock memory and allow swapping to disk. "
 			    "Do not use this option, if you don't know what this means, "
 			    "because this option has security implications.")
+	p.add_argument("--no-auth-check", action="store_true",
+		       help="Do not check the database authenticity. "
+			    "Authentication protects against malicious database modifications. "
+			    "This option may be used to read and convert older databases "
+			    "that were encrypted without authentication support. "
+			    "Do not use this option, if you don't know what this means, "
+			    "because this option has security implications.")
 	if libpwman.util.osIsPosix:
 		p.add_argument("-t", "--timeout", type=int, default=600, metavar="SECONDS",
 			       help="Sets the session timeout in seconds. Default is 10 minutes.")
@@ -255,15 +267,18 @@ def main():
 			assert not interactiveMode
 			exitcode = run_diff(dbPath=args.database,
 					    oldDbPath=args.diff,
-					    diffFormat=args.diff_format)
+					    diffFormat=args.diff_format,
+					    verifyPayloadMac=not args.no_auth_check)
 		elif args.call_pymod:
 			assert not interactiveMode
 			exitcode = run_script(dbPath=args.database,
-					      pyModName=args.call_pymod)
+					      pyModName=args.call_pymod,
+					      verifyPayloadMac=not args.no_auth_check)
 		else:
 			assert interactiveMode != bool(args.command)
 			exitcode = run_ui(dbPath=args.database,
 					  timeout=args.timeout if libpwman.util.osIsPosix else None,
+					  verifyPayloadMac=not args.no_auth_check,
 					  commands=args.command)
 	except libpwman.database.CSQLError as e:
 		print("SQL error: " + str(e), file=sys.stderr)

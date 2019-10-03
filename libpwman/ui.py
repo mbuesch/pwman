@@ -341,10 +341,15 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	class CommandError(Exception): pass
 	class Quit(Exception): pass
 
-	def __init__(self, filename, passphrase, timeout=None):
+	def __init__(self,
+		     filename,
+		     passphrase,
+		     timeout=None,
+		     verifyPayloadMac=True):
 		super().__init__()
 
 		self.__isInteractive = False
+		self.__verifyPayloadMac = verifyPayloadMac
 
 		if sys.flags.optimize >= 2:
 			# We need docstrings.
@@ -356,7 +361,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		readline.set_completer_delims(" ")
 
 		self.__dbs = {
-			"main" : PWManDatabase(filename, passphrase, readOnly=False),
+			"main" : PWManDatabase(filename,
+					       passphrase,
+					       readOnly=False,
+					       verifyPayloadMac=self.__verifyPayloadMac),
 		}
 		self.__selDbName = "main"
 
@@ -1117,7 +1125,8 @@ class PWMan(Cmd, metaclass=PWManMeta):
 					self._err("database", "Could not get passphrase.")
 				db = PWManDatabase(filename=path,
 						   passphrase=passphrase,
-						   readOnly=False)
+						   readOnly=False,
+						   verifyPayloadMac=self.__verifyPayloadMac)
 			except PWManError as e:
 				self._err("database", str(e))
 			self.__dbs[name] = db
@@ -1567,7 +1576,8 @@ class PWMan(Cmd, metaclass=PWManMeta):
 					self._err("diff", "Could not get passphrase.")
 				oldDb = PWManDatabase(filename=path,
 						      passphrase=passphrase,
-						      readOnly=True)
+						      readOnly=True,
+						      verifyPayloadMac=self.__verifyPayloadMac)
 			else:
 				oldDb = self.__db.getOnDiskDb()
 			diff = PWManDatabaseDiff(db=self.__db, oldDb=oldDb)

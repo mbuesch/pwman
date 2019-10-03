@@ -34,7 +34,8 @@ class Test_UI(TestCase):
 		shutil.copy(pathlib.Path("tests", "test_database_v1.db"),
 			    self.dbFile.name)
 		self.ui = libpwman.PWMan(filename=self.dbFile.name,
-					 passphrase="test")
+					 passphrase="test",
+					 verifyPayloadMac=False)
 
 	def tearDown(self):
 		try:

@@ -93,7 +93,7 @@ class PWManDatabase(CryptSQL):
 	DB_TYPE	= "PWMan database"
 	DB_VER	= ("0", "1")
 
-	def __init__(self, filename, passphrase, key=None, readOnly=True, silent=False):
+	def __init__(self, filename, passphrase, key=None, readOnly=True, silent=False, verifyPayloadMac=True):
 		"""filename: Path to the database file.
 		             If it does not exist, a new file is created.
 		passphrase: The passphrase string for the database file.
@@ -102,7 +102,8 @@ class PWManDatabase(CryptSQL):
 		silent: Do not print information messages to the console.
 		"""
 		try:
-			super().__init__(readOnly=readOnly)
+			super().__init__(readOnly=readOnly,
+					 verifyPayloadMac=verifyPayloadMac)
 			self.__silent = silent
 			self.__dirty = False
 			self.__openFile(filename, passphrase, key)
@@ -826,7 +827,8 @@ class PWManDatabase(CryptSQL):
 				    passphrase=self.getPassphrase(),
 				    key=self.getKey(),
 				    readOnly=True,
-				    silent=True)
+				    silent=True,
+				    verifyPayloadMac=self.verifyPayloadMac)
 		return db
 
 	def dumpEntry(self, entry, totp="hide"):

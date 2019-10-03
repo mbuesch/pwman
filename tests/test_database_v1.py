@@ -9,7 +9,8 @@ class Test_Database_v1(TestCase):
 	"""
 	def test_read_contents(self):
 		db = PWManDatabase(filename=pathlib.Path("tests", "test_database_v1.db"),
-				   passphrase="test")
+				   passphrase="test",
+				   verifyPayloadMac=False)
 
 		self.assertEqual(db.getCategoryNames(),
 				 sorted([ "123",
@@ -110,6 +111,7 @@ class Test_Database_v1(TestCase):
 		# Test legacy PBKDF2 read support.
 		# Just check if we can open and decrypt it successfully.
 		db = PWManDatabase(filename=pathlib.Path("tests", "test_database_v1_pbkdf2.db"),
-				   passphrase="test")
+				   passphrase="test",
+				   verifyPayloadMac=False)
 		self.assertEqual(db.getCategoryNames(),
 				 sorted([ "123", "test2", "testcat1" ]))

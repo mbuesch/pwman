@@ -7,11 +7,13 @@
 
 import functools
 import hashlib
+import hmac
 import math
 import os
 import re
 import secrets
 import sqlite3 as sql
+import sys
 import zlib
 
 from libpwman.aes import AES
@@ -132,15 +134,22 @@ class CryptSQL:
 	KDF_ITERLIMIT_A		= lambda kdfMem: int(math.ceil(2500000 / kdfMem))
 	KDF_ITERLIMIT_B		= 2
 
-	def __init__(self, readOnly=True):
+	def __init__(self, readOnly=True, verifyPayloadMac=True):
 		"""readOnly: If True, no commit is possible.
+		verifyPayloadMac: If True, do not allow database read with
+				  invalid payload authentification.
 		"""
 		self.__readOnly = readOnly
+		self.__verifyPayloadMac = verifyPayloadMac
 		self.__db = None
 		self.__filename = None
 		self.__passphrase = None
 		self.__kdfMemFile = 0
 		self.__key = None
+
+	@property
+	def verifyPayloadMac(self):
+		return self.__verifyPayloadMac
 
 	def getPassphrase(self):
 		"""Get the current passphrase string for encryption and decryption.
@@ -252,6 +261,22 @@ class CryptSQL:
 			compress = fc.get(
 				name=b"COMPRESS",
 				default=b"NONE",
+			)
+			payloadMac = fc.get(
+				name=b"MAC",
+				default=b"",
+			)
+			payloadMacHash = fc.get(
+				name=b"MAC_HASH",
+				default=b"",
+			)
+			payloadMacSalt = fc.get(
+				name=b"MAC_SALT",
+				default=b"",
+			)
+			payloadMacDigest = fc.get(
+				name=b"MAC_DIGEST",
+				default=b"",
 			)
 			paddingMethod = fc.get(
 				name=b"PADDING",
@@ -379,12 +404,56 @@ class CryptSQL:
 				error="Unknown COMPRESS header value",
 			)
 
+			# Check the payload MAC method.
+			payloadMac = decodeChoices(
+				buf=payloadMac,
+				choices=("", "HMAC"),
+				error="Unknown PAYLOAD_MAC header value",
+			)
+			payloadMacHash = decodeChoices(
+				buf=payloadMacHash,
+				choices=("", "SHA3-512"),
+				error="Unknown PAYLOAD_MAC_HASH header value",
+			)
+			if payloadMac == "HMAC" and \
+			   payloadMacHash == "SHA3-512" and \
+			   payloadMacDigest:
+				payloadMacCheck = lambda key, payload: hmac.compare_digest(
+					hmac.digest(
+						key=Argon2.get().argon2id_v1p3(
+							passphrase=key,
+							salt=payloadMacSalt,
+							timeCost=32,
+							memCost=4096,
+							parallel=1,
+							keyLen=keyLen,
+						),
+						msg=payload,
+						digest=payloadMacHash,
+					),
+					payloadMacDigest,
+				)
+			else:
+				# Unknown method. Always fail.
+				payloadMacCheck = lambda key, payload: False
+
 			try:
 				# Generate the key.
 				key = kdf() if self.__key is None else self.__key
 			except Exception as e:
 				raise CSQLError("Failed to generate decryption key: %s: %s" % (
 						type(e), str(e)))
+
+			# Verify the payload MAC.
+			if self.__verifyPayloadMac:
+				if not payloadMacCheck(key, payload):
+					raise CSQLError("Database authenticity could not be verified. "
+							"Corrupt database or wrong passphrase?")
+			else:
+				print("WARNING: Skipping payload authentication check! "
+				      "A database manipulation by a malicious attacker "
+				      "can compromise your security.",
+				      file=sys.stderr)
 
 			try:
 				# Decrypt the payload.
@@ -526,6 +595,23 @@ class CryptSQL:
 				iv=cipherIV,
 				data=payload,
 			)
+
+			# Generate the payload MAC.
+			payloadMacHash = "SHA3-512"
+			payloadMacSalt = self.__random(16)
+			payloadMacKey = Argon2.get().argon2id_v1p3(
+				passphrase=key,
+				salt=payloadMacSalt,
+				timeCost=32,
+				memCost=4096,
+				parallel=1,
+				keyLen=keyLen,
+			)
+			payloadMacDigest = hmac.digest(
+				key=payloadMacKey,
+				msg=payload,
+				digest=payloadMacHash,
+			)
 		except Exception as e:
 			raise CSQLError("Failed to encrypt: %s" % str(e))
 
@@ -544,6 +630,10 @@ class CryptSQL:
 				FileObj(b"KDF_ITER", str(kdfIter).encode("UTF-8")),
 				FileObj(b"KDF_MEM", str(kdfMem).encode("UTF-8")),
 				FileObj(b"KDF_PAR", str(kdfPar).encode("UTF-8")),
+				FileObj(b"MAC", b"HMAC"),
+				FileObj(b"MAC_HASH", payloadMacHash.encode("UTF-8")),
+				FileObj(b"MAC_SALT", payloadMacSalt),
+				FileObj(b"MAC_DIGEST", payloadMacDigest),
 				FileObj(b"PADDING", b"PKCS7"),
 				FileObj(b"PAYLOAD", payload),
 			))
