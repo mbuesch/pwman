@@ -760,9 +760,13 @@ class PWManDatabase(CryptSQL):
 		entryAttrs = self.getEntryAttrs(entry)
 		if entryAttrs:
 			res.append("\tAttributes:")
+			maxLen = max(len(a.name) for a in entryAttrs)
 			for entryAttr in entryAttrs:
-				res.append("\t    %s:\t%s" % (entryAttr.name,
-							      entryAttr.data))
+				align = maxLen - len(entryAttr.name)
+				res.append("\t    %s:%s %s" % (
+					entryAttr.name,
+					align * " ",
+					entryAttr.data))
 		return "\n".join(res) + "\n"
 
 	def dumpEntries(self, showTotpKey=False):
