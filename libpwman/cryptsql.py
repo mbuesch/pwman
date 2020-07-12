@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 # Crypto SQL
-# Copyright (c) 2011-2019 Michael Buesch <m@bues.ch>
+# Copyright (c) 2011-2020 Michael Buesch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
@@ -162,6 +162,7 @@ class CryptSQL(object):
 			if fc is None:
 				return
 
+			# Get the file fields.
 			head = fc.getOne(b"HEAD", "Invalid file header object")
 			if head != CSQL_HEADER:
 				raise CSQLError("Invalid file header")
@@ -177,9 +178,13 @@ class CryptSQL(object):
 			compress = fc.getOne(b"COMPRESS", "Invalid COMPRESS object")
 			paddingMethod = fc.getOne(b"PADDING", default=b"PWMAN")
 			payload = fc.getOne(b"PAYLOAD", "Invalid PAYLOAD object")
+
+			# Check the padding method.
 			if paddingMethod not in (b"PWMAN", b"PKCS7"):
 				raise CSQLError("Unknown padding: %s" % (
 						paddingMethod.decode("UTF-8", "ignore")))
+
+			# Check the cipher.
 			if cipher == b"AES" and cipherMode == b"CBC":
 				if paddingMethod == b"PKCS7":
 					decrypter = lambda c: pyaes.Decrypter(c,\
@@ -193,24 +198,34 @@ class CryptSQL(object):
 				raise CSQLError("Unknown cipher/mode: %s/%s" % (
 					cipher.decode("UTF-8", "ignore"),
 					cipherMode.decode("UTF-8", "ignore")))
+
+			# Check the cipher IV.
 			if not cipherIV:
 				cipherIV = b'\x00' * cipherBlockSize
 			if len(cipherIV) != cipherBlockSize:
 				raise CSQLError("Invalid IV len: %d" % len(cipherIV))
+
+			# Check the cipher key length.
 			if keyLen == b"256":
 				keyLen = 256 // 8
 			else:
 				raise CSQLError("Unknown key len: %s" % keyLen.decode("UTF-8", "ignore"))
-			if kdfHash in (b"SHA256", b"SHA512"):
+
+			# Check the key derivation function hash.
+			if kdfHash in (b"SHA256", b"SHA512", b"SHA3-512"):
 				kdfHash = kdfHash.decode("UTF-8")
 			else:
 				raise CSQLError("Unknown kdf-hash: %s" % kdfHash.decode("UTF-8", "ignore"))
 			if len(kdfSalt) < 32:
 				raise CSQLError("Invalid salt len: %d" % len(kdfSalt))
+
+			# Check the key derivation function iterations.
 			try:
 				kdfIter = int(kdfIter.decode("UTF-8"), 10)
 			except (ValueError, UnicodeError) as e:
 				raise CSQLError("Unknown kdf-iter: %s" % kdfIter.decode("UTF-8", "ignore"))
+
+			# Check the key derivation function.
 			if kdfMethod == b"PBKDF2":
 				if kdfMac != b"HMAC":
 					raise CSQLError("Unknown kdf-mac: %s" % kdfMac)
@@ -221,33 +236,39 @@ class CryptSQL(object):
 									dklen=keyLen)
 			else:
 				raise CSQLError("Unknown kdf method: %s" % kdfMethod)
+
+			# Check the compression method.
 			if compress == b"ZLIB":
 				compress = zlib
 			elif compress == b"NONE":
 				compress = CompressDummy()
 			else:
 				raise CSQLError("Unknown compression: %s" % compress)
+
+			# Generate the key.
+			if self.__key is None:
+				key = kdfMethod()
+			else:
+				key = self.__key
+
 			try:
-				# Decrypt payload
-				if self.__key is None:
-					key = kdfMethod()
-				else:
-					key = self.__key
+				# Decrypt payload.
 				dec = decrypter(cipher(key=key, iv=cipherIV))
 				payload = dec.feed(payload)
 				payload += dec.feed()
 				if paddingMethod == b"PWMAN":
 					payload = self.__unpad_PWMAN(payload)
 
-				# Decompress payload
+				# Decompress payload.
 				payload = compress.decompress(payload)
 
-				# Import the SQL database
+				# Import the SQL database.
 				self.__db.cursor().executescript(payload.decode("UTF-8"))
+
+				# Store the raw key.
 				self.__key = key
 
-			except (CSQLError, zlib.error, sql.Error,
-				sql.DatabaseError, UnicodeError, Exception) as e:
+			except (CSQLError, zlib.error, sql.Error, sql.DatabaseError, UnicodeError, ValueError) as e:
 				raise CSQLError("Failed to decrypt database. "
 						"Wrong passphrase?")
 		except FileObjError as e:
@@ -339,8 +360,8 @@ class CryptSQL(object):
 		payload = self.sqlPlainDump()
 
 		try:
-			# Encrypt payload
-			kdfHash = "SHA512"
+			# Generate the key.
+			kdfHash = "SHA3-512"
 			kdfSalt = self.__random(34)
 			kdfIter = self.__randomInt(10000) + 1000000
 			keyLen = 256 // 8
@@ -349,6 +370,8 @@ class CryptSQL(object):
 						  salt=kdfSalt,
 						  iterations=kdfIter,
 						  dklen=keyLen)
+
+			# Encrypt payload
 			cipherBlockSize = 128 // 8
 			cipherIV = self.__random(cipherBlockSize)
 			enc = pyaes.Encrypter(pyaes.AESModeOfOperationCBC(key=key,
