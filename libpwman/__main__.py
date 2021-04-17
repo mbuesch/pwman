@@ -148,7 +148,7 @@ def main():
 			      "Python module PYTHONSCRIPT. An open PWManDatabase "
 			      "object is passed to run().")
 	grp.add_argument("-D", "--diff", type=pathlib.Path, default=None, metavar="OLD_DB_PATH",
-			 help="Diff the database (see -d|--database) to the "
+			 help="Diff the database (see DB_PATH) to the "
 			      "older version specified as OLD_DB_PATH.")
 	grp.add_argument("-c", "--command", action="append",
 			 help="Run this command instead of starting in interactive mode. "
