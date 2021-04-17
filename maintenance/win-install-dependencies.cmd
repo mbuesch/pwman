@@ -7,6 +7,8 @@ for /D %%f in ( "C:\PYTHON*" ) do set PATH=!PATH!;%%f
 for /D %%f in ( "%USERPROFILE%\AppData\Local\Programs\Python\Python*" ) do set PATH=!PATH!;%%f;%%f\Scripts
 
 
+call :install wheel
+if ERRORLEVEL 1 exit /B 1
 call :install pywin32
 if ERRORLEVEL 1 exit /B 1
 call :install windows-curses
@@ -14,6 +16,8 @@ if ERRORLEVEL 1 exit /B 1
 call :install pyreadline
 if ERRORLEVEL 1 exit /B 1
 call :install pyaes
+if ERRORLEVEL 1 exit /B 1
+call :install cx_Freeze
 if ERRORLEVEL 1 exit /B 1
 
 
