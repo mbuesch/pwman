@@ -19,6 +19,8 @@ call :install pyaes
 if ERRORLEVEL 1 exit /B 1
 call :install cx_Freeze
 if ERRORLEVEL 1 exit /B 1
+call :install readme_renderer
+if ERRORLEVEL 1 exit /B 1
 
 
 echo ---
