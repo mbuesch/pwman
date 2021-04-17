@@ -24,4 +24,4 @@ find . \( \
 rm -rf doc/api
 rm -rf build dist .pybuild
 rm -f MANIFEST
-rm -r *.html
+rm -f *.html
