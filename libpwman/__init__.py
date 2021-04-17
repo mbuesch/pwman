@@ -8,6 +8,7 @@ del sys
 import libpwman.database
 import libpwman.dbdiff
 import libpwman.exception
+import libpwman.mlock
 import libpwman.ui
 import libpwman.util
 import libpwman.version

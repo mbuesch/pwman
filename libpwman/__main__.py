@@ -163,6 +163,8 @@ def main():
 			    libpwman.database.getDefaultDatabase()))
 	p.add_argument("-U", "--commit-clear-undo", action="store_true",
 		       help="The commit command clears undo queue.")
+	p.add_argument("--no-mlock", action="store_true",
+		       help="Do not lock memory and allow swapping to disk.")
 	if libpwman.util.osIsPosix:
 		p.add_argument("-t", "--timeout", type=int, default=600, metavar="SECONDS",
 			       help="Sets the session timeout in seconds. Default is 10 minutes.")
@@ -174,6 +176,20 @@ def main():
 
 	exitcode = 1
 	try:
+		if not args.no_mlock:
+			MLockWrapper = libpwman.mlock.MLockWrapper
+			err = MLockWrapper.mlockall(MLockWrapper.MCL_CURRENT |
+						    MLockWrapper.MCL_FUTURE)
+			if err:
+				print("\nWARNING: %s\n"
+				      "The contents of the decrypted password database "
+				      "or the master password could possibly be written "
+				      "to an unencrypted swap-file or swap-partition on disk.\n"
+				      "If that is a problem, please abort NOW.\n" % err,
+				      file=sys.stderr)
+			else:
+				print("Memory locked.", file=sys.stderr)
+
 		if args.diff:
 			exitcode = run_diff(dbPath=args.database,
 					    oldDbPath=args.diff,
