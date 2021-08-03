@@ -4,7 +4,7 @@
 # Simple password manager
 # Encrypted database
 #
-# Copyright (c) 2011-2019 Michael Buesch <m@bues.ch>
+# Copyright (c) 2011-2021 Michael Buesch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 #
 """
@@ -180,31 +180,36 @@ class PWManDatabase(CryptSQL):
 	def __initTables(self):
 		"""Create the SQL tables, if they don't exist.
 		"""
-		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
-				 "globalattr(id INTEGER PRIMARY KEY AUTOINCREMENT, "
-					    "name TEXT, data TEXT);")
-		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
-				 "entries(id INTEGER PRIMARY KEY AUTOINCREMENT, "
-					 "category TEXT, title TEXT, user TEXT, pw TEXT);")
-		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
-				 "bulk(id INTEGER PRIMARY KEY AUTOINCREMENT, "
-				      "entry INTEGER, data TEXT);")
-		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
-				 "entryattr(id INTEGER PRIMARY KEY AUTOINCREMENT, "
-					   "entry INTEGER, name TEXT, data TEXT);")
-		c = self.sqlExec("CREATE TABLE IF NOT EXISTS "
-				 "totp(id INTEGER PRIMARY KEY AUTOINCREMENT, "
-				      "entry INTEGER, key TEXT, digits INTEGER, hash TEXT);")
+		c = self.sqlExecScript("""
+			CREATE TABLE IF NOT EXISTS
+			globalattr(id INTEGER PRIMARY KEY AUTOINCREMENT,
+				   name TEXT, data TEXT);
+
+			CREATE TABLE IF NOT EXISTS
+			entries(id INTEGER PRIMARY KEY AUTOINCREMENT,
+				category TEXT, title TEXT, user TEXT, pw TEXT);
+
+			CREATE TABLE IF NOT EXISTS
+			bulk(id INTEGER PRIMARY KEY AUTOINCREMENT,
+			     entry INTEGER, data TEXT);
+
+			CREATE TABLE IF NOT EXISTS
+			entryattr(id INTEGER PRIMARY KEY AUTOINCREMENT,
+				  entry INTEGER, name TEXT, data TEXT);
+
+			CREATE TABLE IF NOT EXISTS
+			totp(id INTEGER PRIMARY KEY AUTOINCREMENT,
+			     entry INTEGER, key TEXT, digits INTEGER, hash TEXT);
+		""")
 
 	def __garbageCollect(self):
 		"""Remove rows from the SQL database that are not needed anymore.
 		"""
-		c = self.sqlExec("DELETE FROM bulk "
-				 "WHERE entry NOT IN (SELECT id FROM entries);")
-		c = self.sqlExec("DELETE FROM entryattr "
-				 "WHERE entry NOT IN (SELECT id FROM entries);")
-		c = self.sqlExec("DELETE FROM totp "
-				 "WHERE entry NOT IN (SELECT id FROM entries);")
+		c = self.sqlExecScript("""
+			DELETE FROM bulk WHERE entry NOT IN (SELECT id FROM entries);
+			DELETE FROM entryattr WHERE entry NOT IN (SELECT id FROM entries);
+			DELETE FROM totp WHERE entry NOT IN (SELECT id FROM entries);
+		""")
 
 	def setPassphrase(self, passphrase):
 		super().setPassphrase(passphrase)
