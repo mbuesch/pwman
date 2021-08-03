@@ -1365,7 +1365,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			try:
 				self.cmdloop()
 				break
-			except (self.Quit) as e:
+			except self.Quit as e:
 				if self.__mayQuit():
 					self.do_cls("")
 					break
@@ -1375,15 +1375,17 @@ class PWMan(Cmd, metaclass=PWManMeta):
 				print(str(e), file=sys.stderr)
 			except (KeyboardInterrupt, EOFError) as e:
 				print("")
-			except (CSQLError) as e:
+			except CSQLError as e:
 				self.__warn(None, "SQL error: %s" % str(e))
 
 	def runOneCommand(self, command):
 		try:
 			self.onecmd(command)
+		except self.Quit as e:
+			raise PWManError("Quit command executed in non-interactive mode.")
 		except (EscapeError, self.CommandError) as e:
 			raise PWManError(str(e))
 		except (KeyboardInterrupt, EOFError) as e:
-			raise PWManError("Interrupted")
-		except (CSQLError) as e:
+			raise PWManError("Interrupted.")
+		except CSQLError as e:
 			raise PWManError("SQL error: %s" % str(e))
