@@ -56,9 +56,9 @@ class Test_UI(TestCase):
 		self.ui.do_drop("")
 
 		self.ui.do_list("")
+		self.ui.do_list("testcat1 testtitle1 totpkey")
 		self.ui.do_find("test")
 		self.ui.do_totp("testcat1 testtitle1")
-		self.ui.do_totp_key("testcat1 testtitle1")
 		self.ui.do_diff("")
 
 		self.ui.do_new("a b c")

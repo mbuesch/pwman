@@ -260,7 +260,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		cmpl = []
 		if paramIdx == 2:
 			cmpl.extend(escapeCmd(n) + " "
-				    for n in ("user", "password", "bulk")
+				    for n in ("user", "password", "bulk", "totpkey")
 				    if n.startswith(item.lower()))
 		cmpl.extend(self.__getEntryAttrCompletions(category, title, item,
 							   doName=(paramIdx == 2),
@@ -326,7 +326,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		("list", ("ls", "cat"), "List/print entry contents"),
 		("find", ("f",), "Search the database for patterns"),
 		("totp", ("t",), "Generate TOTP token"),
-		("totp_key", ("tk",), "Show TOTP key and parameters"),
 		("diff", (), "Show the database differences"),
 	)
 
@@ -441,7 +440,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		contents of the category. If category and entry
 		are given, list the contents of the entry.
 		If item is given, then only list one specific content item.
-		Item may be one of: user, password, bulk or any attribute name.\n
+		Item may be one of: user, password, bulk, totpkey or any attribute name.\n
 		Aliases: ls cat"""
 		category, title, item = self._getParams(params, 0, 3)
 		if not category and not title and not item:
@@ -476,6 +475,14 @@ class PWMan(Cmd, metaclass=PWManMeta):
 						self.__err("list", "'%s/%s' has no 'bulk' field." % (
 							   category, title))
 					self.__info(None, bulk.data)
+				elif item == "totpkey":
+					entryTotp = self.__db.getEntryTotp(entry)
+					if not entryTotp:
+						self.__err("list", "'%s/%s' has no 'TOTP key'." % (
+							   category, title))
+					self.__info(None, "TOTP key:     %s (base32 encoding)" % entryTotp.key)
+					self.__info(None, "TOTP digits:  %d" % entryTotp.digits)
+					self.__info(None, "TOTP hash:    %s" % entryTotp.hmacHash)
 				else: # attribute
 					attr = self.__db.getEntryAttr(entry, item)
 					if not attr:
@@ -967,34 +974,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	complete_totp = __complete_category_title
 	complete_t = complete_totp
-
-	def do_totp_key(self, params):
-		"""--- Show TOTP key and parameters ---
-		Command: totp_key category title\n
-		Show Time-Based One-Time Password Algorithm key and parameters.\n
-		Aliases: tk"""
-		category, title = self._getParams(params, 0, 2)
-		if not category:
-			self.__err("totp_key", "Category parameter is required.")
-		if not title:
-			self.__err("totp_key", "Title parameter is required.")
-		entry = self.__db.getEntry(category, title)
-		if not entry:
-			self.__err("totp_key", "'%s/%s' not found" % (category, title))
-		entryTotp = self.__db.getEntryTotp(entry)
-		enc = "  (base32 encoding)"
-		if not entryTotp:
-			entryTotp = PWManEntryTOTP(key="--- none ---",
-						   digits=6,
-						   hmacHash="SHA1")
-			enc = ""
-		self.__info(None, "TOTP key:     %s%s" % (entryTotp.key, enc))
-		self.__info(None, "TOTP digits:  %d" % entryTotp.digits)
-		self.__info(None, "TOTP hash:    %s" % entryTotp.hmacHash)
-	do_tk = do_totp_key
-
-	complete_totp_key = __complete_category_title
-	complete_tk = complete_totp_key
 
 	def do_edit_totp(self, params):
 		"""--- Edit TOTP key and parameters ---
