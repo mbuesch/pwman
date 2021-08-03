@@ -184,6 +184,8 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		     commitClearsUndo=False, timeout=None):
 		super().__init__()
 
+		self.__isInteractive = False
+
 		if sys.flags.optimize >= 2:
 			# We need docstrings.
 			raise PWManError("pwman does not support "
@@ -230,9 +232,8 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		self._timeout.poke()
 
 	def default(self, line):
-		self.__err(None,
-			   "Unknown command: %s\n"
-			   "Type 'help' for more help." % line)
+		extra = "\nType 'help' for more help." if self.__isInteractive else ""
+		self.__err(None, "Unknown command: %s%s" % (line, extra))
 
 	def emptyline(self):
 		self._timeout.poke()
@@ -1361,24 +1362,29 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		self.__db.flunkDirty()
 
 	def interactive(self):
-		while True:
-			try:
-				self.cmdloop()
-				break
-			except self.Quit as e:
-				if self.__mayQuit():
-					self.do_cls("")
+		self.__isInteractive = True
+		try:
+			while True:
+				try:
+					self.cmdloop()
 					break
-			except EscapeError as e:
-				self.__warn(None, str(e))
-			except self.CommandError as e:
-				print(str(e), file=sys.stderr)
-			except (KeyboardInterrupt, EOFError) as e:
-				print("")
-			except CSQLError as e:
-				self.__warn(None, "SQL error: %s" % str(e))
+				except self.Quit as e:
+					if self.__mayQuit():
+						self.do_cls("")
+						break
+				except EscapeError as e:
+					self.__warn(None, str(e))
+				except self.CommandError as e:
+					print(str(e), file=sys.stderr)
+				except (KeyboardInterrupt, EOFError) as e:
+					print("")
+				except CSQLError as e:
+					self.__warn(None, "SQL error: %s" % str(e))
+		finally:
+			self.__isInteractive = False
 
 	def runOneCommand(self, command):
+		self.__isInteractive = False
 		try:
 			self.onecmd(command)
 		except self.Quit as e:
