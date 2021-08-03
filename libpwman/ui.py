@@ -251,6 +251,23 @@ class PWMan(Cmd, metaclass=PWManMeta):
 							       text)
 		return []
 
+	@completion
+	def __complete_category_title_item(self, text, line, begidx, endidx):
+		paramIdx = self._calcParamIndex(line, endidx)
+		if paramIdx in (0, 1):
+			return self.__complete_category_title(text, line, begidx, endidx)
+		category, title, item = self._getComplParams(line, 0, 3)
+		cmpl = []
+		if paramIdx == 2:
+			cmpl.extend(escapeCmd(n) + " "
+				    for n in ("user", "password", "bulk")
+				    if n.startswith(item.lower()))
+		cmpl.extend(self.__getEntryAttrCompletions(category, title, item,
+							   doName=(paramIdx == 2),
+							   doData=False,
+							   text=text))
+		return cmpl
+
 	def __getCategoryCompletions(self, text):
 		return [ escapeCmd(n) + " "
 			 for n in self.__db.getCategoryNames()
@@ -260,6 +277,22 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		return [ escapeCmd(t) + " "
 			 for t in self.__db.getEntryTitles(category)
 			 if t.lower().startswith(text.lower()) ]
+
+	def __getEntryAttrCompletions(self, category, title, name, doName, doData, text):
+		if category and title:
+			entry = self.__db.getEntry(category, title)
+			if entry:
+				if doName: # complete name
+					entryAttrs = self.__db.getEntryAttrs(entry)
+					if entryAttrs:
+						return [ escapeCmd(entryAttr.name) + " "
+							 for entryAttr in entryAttrs
+							 if entryAttr.name.lower().startswith(name.lower()) ]
+				elif doData: # complete data
+					entryAttr = self.__db.getEntryAttr(entry, name)
+					if entryAttr:
+						return [ escapeCmd(entryAttr.data) + " " ]
+		return []
 
 	def __getPathCompletions(self, text):
 		"""Return an escaped file system path completion.
@@ -456,7 +489,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	do_ls = do_list
 	do_cat = do_list
 
-	complete_list = __complete_category_title
+	complete_list = __complete_category_title_item
 	complete_ls = complete_list
 	complete_cat = complete_list
 
@@ -1054,20 +1087,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
 		category, title, name = self._getComplParams(line, 0, 3)
-		if category and title:
-			entry = self.__db.getEntry(category, title)
-			if entry:
-				if paramIdx == 2: # name
-					entryAttrs = self.__db.getEntryAttrs(entry)
-					if entryAttrs:
-						return [ escapeCmd(entryAttr.name) + " "
-							 for entryAttr in entryAttrs
-							 if entryAttr.name.lower().startswith(name.lower()) ]
-				elif paramIdx == 3: # data
-					entryAttr = self.__db.getEntryAttr(entry, name)
-					if entryAttr:
-						return [ escapeCmd(entryAttr.data) + " " ]
-		return []
+		return self.__getEntryAttrCompletions(category, title, name,
+						      doName=(paramIdx == 2),
+						      doData=(paramIdx == 3),
+						      text=text)
 	complete_ea = complete_edit_attr
 
 	__diff_opts = ("-u", "-c", "-n")
