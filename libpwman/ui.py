@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 # Simple password manager
-# Copyright (c) 2011-2019 Michael Buesch <m@bues.ch>
+# Copyright (c) 2011-2021 Michael Buesch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
@@ -403,22 +403,52 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_list(self, params):
 		"""--- Print a listing ---
-		Command: list [category] [title]\n
+		Command: list [category] [title] [item]\n
 		If a category is given as parameter, list the 
 		contents of the category. If category and entry
-		are given, list the contents of the entry.\n
+		are given, list the contents of the entry.
+		If item is given, then only list one specific content item.
+		Item may be one of: user, password, bulk or any attribute name.\n
 		Aliases: ls cat"""
-		category, title = self._getParams(params, 0, 2)
-		if not category and not title:
+		category, title, item = self._getParams(params, 0, 3)
+		if not category and not title and not item:
 			self.__info(None, "Categories:")
 			self.__info(None, "\t" + "\n\t".join(self.__db.getCategoryNames()))
-		elif category and not title:
+		elif category and not title and not item:
 			self.__info(None, "Entries in category '%s':" % category)
 			self.__info(None, "\t" + "\n\t".join(self.__db.getEntryTitles(category)))
-		elif category and title:
+		elif category and title and not item:
 			entry = self.__db.getEntry(category, title)
 			if entry:
 				self.__info(None, self.__db.dumpEntry(entry))
+			else:
+				self.__err("list", "'%s/%s' not found" % (category, title))
+		elif category and title and item:
+			item = item.lower().strip()
+			entry = self.__db.getEntry(category, title)
+			if entry:
+				if item == "user":
+					if not entry.user:
+						self.__err("list", "'%s/%s' has no 'user' field." % (
+							   category, title))
+					self.__info(None, entry.user)
+				elif item == "password":
+					if not entry.pw:
+						self.__err("list", "'%s/%s' has no 'password' field." % (
+							   category, title))
+					self.__info(None, entry.pw)
+				elif item == "bulk":
+					bulk = self.__db.getEntryBulk(entry)
+					if not bulk:
+						self.__err("list", "'%s/%s' has no 'bulk' field." % (
+							   category, title))
+					self.__info(None, bulk.data)
+				else: # attribute
+					attr = self.__db.getEntryAttr(entry, item)
+					if not attr:
+						self.__err("list", "'%s/%s' has no attribute '%s'." % (
+							   category, title, item))
+					self.__info(None, attr.data)
 			else:
 				self.__err("list", "'%s/%s' not found" % (category, title))
 		else:
