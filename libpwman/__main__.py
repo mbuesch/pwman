@@ -16,9 +16,9 @@ __all__ = [
 	"main",
 ]
 
-def getPassphrase(dbPath, interactiveMode, infoFile=sys.stdout):
+def getPassphrase(dbPath, verbose=True, infoFile=sys.stdout):
 	dbExists = dbPath.exists()
-	if interactiveMode:
+	if verbose:
 		if dbExists:
 			print("Opening database '%s'..." % dbPath,
 			      file=infoFile)
@@ -40,7 +40,7 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 			return 1
 
 	# Open the new database
-	dbPassphrase = getPassphrase(dbPath, interactiveMode=True,
+	dbPassphrase = getPassphrase(dbPath, verbose=True,
 				     infoFile=sys.stderr)
 	if dbPassphrase is None:
 		return 1
@@ -56,7 +56,7 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 							readOnly=True)
 	except PWManError:
 		# The attempt failed. Ask the user for the proper passphrase.
-		dbPassphrase = getPassphrase(oldDbPath, interactiveMode=True,
+		dbPassphrase = getPassphrase(oldDbPath, verbose=True,
 					     infoFile=sys.stderr)
 		if dbPassphrase is None:
 			return 1
@@ -96,7 +96,7 @@ def run_script(dbPath, pyModName):
 		      file=sys.stderr)
 		return 1
 
-	passphrase = getPassphrase(dbPath, interactiveMode=False)
+	passphrase = getPassphrase(dbPath, verbose=False)
 	if passphrase is None:
 		return 1
 	db = libpwman.database.PWManDatabase(filename=dbPath,
@@ -113,7 +113,7 @@ def run_script(dbPath, pyModName):
 	return 0
 
 def run_ui(dbPath, commitClearsUndo, timeout, commands):
-	passphrase = getPassphrase(dbPath, interactiveMode=not commands)
+	passphrase = getPassphrase(dbPath, verbose=not commands)
 	if passphrase is None:
 		return 1
 	try:
@@ -176,28 +176,39 @@ def main():
 
 	exitcode = 1
 	try:
+		interactiveMode = (not args.command and
+				   not args.diff and
+				   not args.call_pymod)
 		if not args.no_mlock:
 			MLockWrapper = libpwman.mlock.MLockWrapper
 			err = MLockWrapper.mlockall(MLockWrapper.MCL_CURRENT |
 						    MLockWrapper.MCL_FUTURE)
-			if err:
-				print("\nWARNING: %s\n"
-				      "The contents of the decrypted password database "
-				      "or the master password could possibly be written "
-				      "to an unencrypted swap-file or swap-partition on disk.\n"
-				      "If that is a problem, please abort NOW.\n" % err,
+			baseMsg = "The contents of the decrypted password database "\
+				  "or the master password could possibly be written "\
+				  "to an unencrypted swap-file or swap-partition on disk."
+			if err and interactiveMode:
+				print("\nWARNING: %s\n%s\n"
+				      "If that is a problem, please abort NOW.\n" % (
+				      err, baseMsg),
 				      file=sys.stderr)
-			else:
+			if err and not interactiveMode:
+				raise libpwman.PWManError("Failed to lock memory: %s\n"
+							  "%s" % (
+							  err, baseMsg))
+			if not err and interactiveMode:
 				print("Memory locked.", file=sys.stderr)
 
 		if args.diff:
+			assert not interactiveMode
 			exitcode = run_diff(dbPath=args.database,
 					    oldDbPath=args.diff,
 					    diffFormat=args.diff_format)
 		elif args.call_pymod:
+			assert not interactiveMode
 			exitcode = run_script(dbPath=args.database,
 					      pyModName=args.call_pymod)
 		else:
+			assert interactiveMode != bool(args.command)
 			exitcode = run_ui(dbPath=args.database,
 					  commitClearsUndo=args.commit_clear_undo,
 					  timeout=args.timeout if libpwman.util.osIsPosix else None,
