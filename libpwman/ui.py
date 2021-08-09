@@ -457,7 +457,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			else:
 				self.__err("list", "'%s/%s' not found" % (category, title))
 		elif category and title and item:
-			item = item.lower().strip()
 			entry = self.__db.getEntry(category, title)
 			if entry:
 				if item == "user":
