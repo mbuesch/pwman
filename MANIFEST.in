@@ -4,6 +4,7 @@ include README.rst
 include examplescript.py
 include gitconfig.sh
 include pwman.cmd
+include requirements.txt
 
 graft doc
 graft maintenance
