@@ -1,7 +1,11 @@
 pwman - Commandline password manager
 ====================================
 
-https://bues.ch/h/pwman
+`Homepage <https://bues.ch/h/pwman>`_
+
+`Git repository <https://bues.ch/cgit/pwman.git>`_
+
+`Github repository <https://github.com/mbuesch/pwman>`_
 
 pwman is a commandline based password manager. It encrypts the password database file using strong AES-256 encryption.
 
