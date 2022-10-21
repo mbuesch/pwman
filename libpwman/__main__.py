@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 # Simple password manager
-# Copyright (c) 2011-2019 Michael Buesch <m@bues.ch>
+# Copyright (c) 2011-2022 Michael Buesch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
@@ -183,13 +183,19 @@ def main():
 			MLockWrapper = libpwman.mlock.MLockWrapper
 			err = MLockWrapper.mlockall(MLockWrapper.MCL_CURRENT |
 						    MLockWrapper.MCL_FUTURE)
-			baseMsg = "The contents of the decrypted password database "\
-				  "or the master password could possibly be written "\
-				  "to an unencrypted swap-file or swap-partition on disk."
+			baseMsg1 = "Failed to lock the pwman program memory to RAM to avoid "\
+				   "swapping secrets to disk.\nThe system call returned:"
+			baseMsg2 = "The contents of the decrypted password database "\
+				   "or the master password could possibly be written "\
+				   "to an unencrypted swap-file or swap-partition on disk."
+			baseMsg3 = "If you have an unencrypted swap space and if this is a problem, "\
+				   "please abort NOW."
 			if err and interactiveMode:
-				print("\nWARNING: %s\n%s\n"
-				      "If that is a problem, please abort NOW.\n" % (
-				      err, baseMsg),
+				print("\nWARNING: %s '%s'\n%s\n%s\n" % (
+				      baseMsg1,
+				      err,
+				      baseMsg2,
+				      baseMsg3),
 				      file=sys.stderr)
 			if err and not interactiveMode:
 				raise libpwman.PWManError("Failed to lock memory: %s\n"
