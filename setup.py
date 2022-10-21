@@ -42,7 +42,7 @@ if cx_Freeze:
 	extraKeywords["options"] = {
 			"build_exe" : {
 				"packages" : [ "readline",
-					       "pyreadline",
+					       "pyreadline3",
 					       "curses",
 					       "_curses",
 					       "sqlite3",

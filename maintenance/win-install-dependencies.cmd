@@ -13,7 +13,7 @@ call :install pywin32
 if ERRORLEVEL 1 exit /B 1
 call :install windows-curses
 if ERRORLEVEL 1 exit /B 1
-call :install pyreadline
+call :install pyreadline3
 if ERRORLEVEL 1 exit /B 1
 call :install pyaes
 if ERRORLEVEL 1 exit /B 1
