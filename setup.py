@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from distutils.core import setup
+from setuptools import setup
 try:
 	from cx_Freeze import setup, Executable
 	cx_Freeze = True
