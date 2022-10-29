@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 # Simple object file format.
-# Copyright (c) 2011-2019 Michael Buesch <m@bues.ch>
+# Copyright (c) 2011-2022 Michael Buesch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
@@ -32,10 +32,10 @@ class FileObj(object):
 		       "FileObj: Invalid 'name' type."
 		assert isinstance(data, (bytes, bytearray)),\
 		       "FileObj: Invalid 'data' type."
-		if len(name) > 0xFF:
+		if len(name) > 0x7F:
 			raise FileObjError("FileObj: Name too long")
 		self.__name = name
-		if len(data) > 0xFFFFFFFF:
+		if len(data) > 0x7FFFFFFF:
 			raise FileObjError("FileObj: Data too long")
 		self.__data = data
 
@@ -48,9 +48,11 @@ class FileObj(object):
 	def getRaw(self):
 		r = bytearray()
 		nameLen = len(self.__name)
+		assert nameLen <= 0x7F
 		r += b"%c" % (nameLen & 0xFF)
 		r += self.__name
 		dataLen = len(self.__data)
+		assert dataLen <= 0x7FFFFFFF
 		r += b"%c" % (dataLen & 0xFF)
 		r += b"%c" % ((dataLen >> 8) & 0xFF)
 		r += b"%c" % ((dataLen >> 16) & 0xFF)
@@ -65,6 +67,9 @@ class FileObj(object):
 		try:
 			off = 0
 			nameLen = raw[off]
+			if nameLen & 0x80:
+				raise FileObjError("FileObj: Name length extension bit is set, "
+						   "but not supported by this pwman version.")
 			off += 1
 			name = raw[off : off + nameLen]
 			off += nameLen
@@ -72,6 +77,9 @@ class FileObj(object):
 				   (raw[off + 1] << 8) |
 				   (raw[off + 2] << 16) |
 				   (raw[off + 3] << 24))
+			if dataLen & 0x80000000:
+				raise FileObjError("FileObj: Data length extension bit is set, "
+						   "but not supported by this pwman version.")
 			off += 4
 			data = raw[off : off + dataLen]
 			off += dataLen
