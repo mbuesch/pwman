@@ -58,7 +58,9 @@ class MLockWrapper(object):
 			from cffi import FFI
 		except ImportError as e:
 			print("Failed to import CFFI: %s\n"
-			      "Cannot use mlock() via CFFI." % (
+			      "Cannot use mlock() via CFFI.\n"
+			      "You might want to install CFFI by running: "
+			      "pip3 install cffi" % (
 			      str(e)), file=sys.stderr)
 			return
 
