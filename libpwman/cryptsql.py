@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 # Crypto SQL
-# Copyright (c) 2011-2020 Michael Buesch <m@bues.ch>
+# Copyright (c) 2011-2022 Michael Buesch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
@@ -26,7 +26,7 @@ def missingMod(name, debpack=None, pip=None):
 
 try:
 	import pyaes
-except (ImportError) as e:
+except ImportError as e:
 	missingMod("pyaes", "python3-pyaes", "pyaes")
 
 
@@ -291,10 +291,10 @@ class CryptSQL(object):
 		self.sqlCreateFunction("regexp", 2, self._sqlRegexpMatch)
 		try:
 			self.__parseFile(filename)
-		except (CSQLError) as e:
+		except CSQLError as e:
 			self.__db = None
 			self.__filename = None
-			raise
+			raise e
 		self.__filename = filename
 
 	def close(self):
