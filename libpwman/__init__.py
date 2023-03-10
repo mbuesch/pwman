@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import sys
-if sys.version_info.major <= 2:
-	raise Exception("Python 2 is not supported.")
-del sys
-
 import libpwman.database
 import libpwman.dbdiff
 import libpwman.exception
