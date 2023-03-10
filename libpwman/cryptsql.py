@@ -1,43 +1,26 @@
 # -*- coding: utf-8 -*-
 """
 # Crypto SQL
-# Copyright (c) 2011-2022 Michael Buesch <m@bues.ch>
+# Copyright (c) 2011-2023 Michael Büsch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
 import functools
 import hashlib
-import os
 import re
 import secrets
 import sqlite3 as sql
-import sys
 import zlib
 
 from libpwman.fileobj import *
-
-def missingMod(name, debpack=None, pip=None):
-	print("ERROR: The Python '%s' module is not installed." % name, file=sys.stderr)
-	if debpack:
-		print("Debian:  apt install %s" % debpack, file=sys.stderr)
-	if pip:
-		print("PyPi:  pip3 install %s" % pip, file=sys.stderr)
-	sys.exit(1)
-
-try:
-	import pyaes
-except ImportError as e:
-	missingMod("pyaes", "python3-pyaes", "pyaes")
-
+from libpwman.aes import AES
 
 __all__ = [
 	"CSQLError",
 	"CryptSQL",
 ]
 
-
 CSQL_HEADER = b"CryptSQL v1"
-
 
 class CSQLError(Exception):
 	"""CryptSQL exception.
@@ -186,14 +169,7 @@ class CryptSQL(object):
 
 			# Check the cipher.
 			if cipher == b"AES" and cipherMode == b"CBC":
-				if paddingMethod == b"PKCS7":
-					decrypter = lambda c: pyaes.Decrypter(c,\
-							padding=pyaes.PADDING_DEFAULT)
-				else:
-					decrypter = lambda c: pyaes.Decrypter(c,\
-							padding=pyaes.PADDING_NONE)
-				cipher = pyaes.AESModeOfOperationCBC
-				cipherBlockSize = 128 // 8
+				cipherBlockSize = AES.BLOCK_SIZE
 			else:
 				raise CSQLError("Unknown cipher/mode: %s/%s" % (
 					cipher.decode("UTF-8", "ignore"),
@@ -253,11 +229,11 @@ class CryptSQL(object):
 
 			try:
 				# Decrypt payload.
-				dec = decrypter(cipher(key=key, iv=cipherIV))
-				payload = dec.feed(payload)
-				payload += dec.feed()
-				if paddingMethod == b"PWMAN":
-					payload = self.__unpad_PWMAN(payload)
+				payload = AES.decrypt(
+					key=key,
+					iv=cipherIV,
+					data=payload,
+					legacyPadding=(paddingMethod == b"PWMAN"))
 
 				# Decompress payload.
 				payload = compress.decompress(payload)
@@ -304,15 +280,6 @@ class CryptSQL(object):
 		self.__db = None
 		self.__filename = None
 		self.__passphrase = None
-
-	@staticmethod
-	def __unpad_PWMAN(data):
-		"""Strip legacy padding.
-		"""
-		index = data.rfind(b"\xFF")
-		if index < 0 or index >= len(data):
-			raise CSQLError("unpad_PWMAN: error")
-		return data[:index]
 
 	def __random(self, nrBytes):
 		"""Return cryptographically secure random bytes.
@@ -372,13 +339,8 @@ class CryptSQL(object):
 						  dklen=keyLen)
 
 			# Encrypt payload
-			cipherBlockSize = 128 // 8
-			cipherIV = self.__random(cipherBlockSize)
-			enc = pyaes.Encrypter(pyaes.AESModeOfOperationCBC(key=key,
-									  iv=cipherIV),
-					      padding=pyaes.PADDING_DEFAULT)
-			payload = enc.feed(payload)
-			payload += enc.feed()
+			cipherIV = self.__random(AES.BLOCK_SIZE)
+			payload = AES.encrypt(key=key, iv=cipherIV, data=payload)
 		except Exception as e:
 			raise CSQLError("Failed to encrypt: %s" % str(e))
 

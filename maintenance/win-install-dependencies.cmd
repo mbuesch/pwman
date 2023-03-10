@@ -15,7 +15,7 @@ call :install windows-curses
 if ERRORLEVEL 1 exit /B 1
 call :install pyreadline3
 if ERRORLEVEL 1 exit /B 1
-call :install pyaes
+call :install pycryptodomex
 if ERRORLEVEL 1 exit /B 1
 call :install cx_Freeze
 if ERRORLEVEL 1 exit /B 1

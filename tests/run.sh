@@ -24,7 +24,7 @@ run_pyunit()
 	(
 		echo
 		echo "==="
-		echo "= Running $interpreter..."
+		echo "= Running $interpreter, PWMAN_CRYPTOLIB=\"$PWMAN_CRYPTOLIB\""
 		echo "==="
 		export PYTHONPATH="$rootdir/tests:$PYTHONPATH"
 		cd "$rootdir" || die "Failed to cd to rootdir."
@@ -52,6 +52,14 @@ run_testdir()
 	export PYTHONWARNINGS=once
 	export PYTHONHASHSEED=random
 
+	unset PWMAN_DATABASE
+	unset PWMAN_RAWGETPASS
+	unset PWMAN_CRYPTOLIB
+
+	run_pyunit python3 "$test_dir"
+	export PWMAN_CRYPTOLIB=cryptodome
+	run_pyunit python3 "$test_dir"
+	export PWMAN_CRYPTOLIB=pyaes
 	run_pyunit python3 "$test_dir"
 }
 

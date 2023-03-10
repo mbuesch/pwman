@@ -36,7 +36,7 @@ Or it can be installed vi `PyPi <https://pypi.org/>`_ by running the following c
 
 .. code:: sh
 
-	pip3 install -U pyaes
+	pip3 install -U pycryptodomex
 	pip3 install -U pwman-python
 
 Run pwman
@@ -82,7 +82,7 @@ The API documentation can be found in the `API documentation directory <doc/api/
 License / Copyright
 ===================
 
-Copyright (c) 2011-2022 Michael Buesch <m@bues.ch>
+Copyright (c) 2011-2023 Michael Büsch <m@bues.ch>
 
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
