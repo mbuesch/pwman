@@ -26,12 +26,7 @@ class CSQLError(Exception):
 	"""CryptSQL exception.
 	"""
 
-class CompressDummy(object):
-	def compress(self, payload, *args):
-		return payload
-	decompress = compress
-
-class CryptSQLCursor(object):
+class CryptSQLCursor:
 	"""Encrypted SQL database cursor.
 	"""
 
@@ -87,7 +82,7 @@ class CryptSQLCursor(object):
 		except (sql.Error, sql.DatabaseError) as e:
 			raise CSQLError("Database error: " + str(e))
 
-class CryptSQL(object):
+class CryptSQL:
 	"""Encrypted SQL database.
 	"""
 
@@ -217,7 +212,10 @@ class CryptSQL(object):
 			if compress == b"ZLIB":
 				compress = zlib
 			elif compress == b"NONE":
-				compress = CompressDummy()
+				class DecompressDummy:
+					def decompress(self, payload):
+						return payload
+				compress = DecompressDummy()
 			else:
 				raise CSQLError("Unknown compression: %s" % compress)
 
