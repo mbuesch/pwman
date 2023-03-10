@@ -43,7 +43,7 @@ def getDefaultDatabase():
 	return pathlib.Path(".pwman.db")
 
 @dataclass
-class PWManEntry(object):
+class PWManEntry:
 	"""Database entry data structure.
 	"""
 	category	: str
@@ -53,7 +53,7 @@ class PWManEntry(object):
 	entryId		: int = None
 
 @dataclass
-class PWManEntryAttr(object):
+class PWManEntryAttr:
 	"""Entry attribute data structure.
 	"""
 	name		: str
@@ -62,7 +62,7 @@ class PWManEntryAttr(object):
 	attrId		: int = None
 
 @dataclass
-class PWManEntryBulk(object):
+class PWManEntryBulk:
 	"""Entry bulk-data data structure.
 	"""
 	data		: str = None
@@ -70,7 +70,7 @@ class PWManEntryBulk(object):
 	bulkId		: int = None
 
 @dataclass
-class PWManEntryTOTP(object):
+class PWManEntryTOTP:
 	"""Entry TOTP-data data structure.
 	"""
 	key		: str

@@ -16,7 +16,7 @@ __all__ = [
 class FileObjError(Exception):
 	pass
 
-class FileObj(object):
+class FileObj:
 	# Raw object layout:
 	#   [ 1 byte  ] => Name length
 	#   [ x bytes ] => Name
@@ -88,7 +88,7 @@ class FileObj(object):
 		return (cls(name, data),
 			off)
 
-class FileObjCollection(object):
+class FileObjCollection:
 	def __init__(self, *objects):
 		self.objects = objects
 

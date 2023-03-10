@@ -29,7 +29,7 @@ __all__ = [
 	"MLockWrapper",
 ]
 
-class MLockWrapper(object):
+class MLockWrapper:
 	"""OS mlock wrapper.
 	"""
 

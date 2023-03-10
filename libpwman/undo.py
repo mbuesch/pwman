@@ -9,7 +9,7 @@ __all__ = [
 	"UndoStack",
 ]
 
-class UndoCommand(object):
+class UndoCommand:
 	def __init__(self, doCommands, undoCommands):
 		if isinstance(doCommands, (tuple, list)):
 			self.doCommands = tuple(doCommands)
@@ -20,7 +20,7 @@ class UndoCommand(object):
 		else:
 			self.undoCommands = (undoCommands, )
 
-class UndoStack(object):
+class UndoStack:
 	def __init__(self, limit=2**15):
 		self.limit = limit
 		self.frozen = 0

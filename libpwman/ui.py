@@ -1261,7 +1261,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 				       ignoreFirst=True, unescape=unescape)
 
 	@dataclass
-	class Opts(object):
+	class Opts:
 		__opts : list = field(default_factory=list)
 		__params : list = field(default_factory=list)
 		__atCmdIndex : dict = field(default_factory=dict)

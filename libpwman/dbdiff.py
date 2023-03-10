@@ -13,7 +13,7 @@ __all__ = [
 	"PWManDatabaseDiff",
 ]
 
-class PWManDatabaseDiff(object):
+class PWManDatabaseDiff:
 	def __init__(self, db, oldDb):
 		self.__db = db
 		self.__oldDb = oldDb
