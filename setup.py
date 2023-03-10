@@ -23,33 +23,18 @@ isPosix = os.name.lower() == "posix"
 # Create freeze executable list.
 extraKeywords = {}
 if cx_Freeze:
-	guiBase = "Win32GUI" if isWindows else None
-	freezeExecutables = [
-		("pwman", None, None),
-	]
-	executables = []
-	for script, exe, base in freezeExecutables:
-		if exe:
-			if isWindows:
-				exe += ".exe"
-			executables.append(Executable(script=script,
-						      targetName=exe,
-						      base=base))
-		else:
-			executables.append(Executable(script=script,
-						      base=base))
-	extraKeywords["executables"] = executables
+	extraKeywords["executables"] = [ Executable(script="pwman") ]
 	extraKeywords["options"] = {
-			"build_exe" : {
-				"packages" : [ "readline",
-					       "pyreadline3",
-					       "curses",
-					       "_curses",
-					       "sqlite3",
-					       "sqlite3.dump", ],
-				"excludes" : [ "tkinter", ],
-			}
+		"build_exe" : {
+			"packages" : [ "readline",
+				       "pyreadline3",
+				       "curses",
+				       "_curses",
+				       "sqlite3",
+				       "sqlite3.dump", ],
+			"excludes" : [ "tkinter", ],
 		}
+	}
 
 warnings.filterwarnings("ignore", r".*'python_requires'.*")
 warnings.filterwarnings("ignore", r".*'install_requires'.*")
