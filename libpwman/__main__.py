@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 # Simple password manager
-# Copyright (c) 2011-2022 Michael Buesch <m@bues.ch>
+# Copyright (c) 2011-2023 Michael Büsch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 

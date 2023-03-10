@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 # HOTP/TOTP support
-# Copyright (c) 2019 Michael Buesch <m@bues.ch>
+# Copyright (c) 2019-2023 Michael Büsch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
