@@ -153,7 +153,7 @@ class CryptSQL:
 			kdfIter = fc.getOne(b"KDF_ITER", "Invalid KDF_ITER object")
 			kdfHash = fc.getOne(b"KDF_HASH", "Invalid KDF_HASH object")
 			kdfMac = fc.getOne(b"KDF_MAC", "Invalid KDF_MAC object")
-			compress = fc.getOne(b"COMPRESS", "Invalid COMPRESS object")
+			compress = fc.getOne(b"COMPRESS", default=b"NONE")
 			paddingMethod = fc.getOne(b"PADDING", default=b"PWMAN")
 			payload = fc.getOne(b"PAYLOAD", "Invalid PAYLOAD object")
 
@@ -171,7 +171,7 @@ class CryptSQL:
 					cipherMode.decode("UTF-8", "ignore")))
 
 			# Check the cipher IV.
-			if not cipherIV:
+			if not cipherIV: # legacy
 				cipherIV = b'\x00' * cipherBlockSize
 			if len(cipherIV) != cipherBlockSize:
 				raise CSQLError("Invalid IV len: %d" % len(cipherIV))
@@ -209,13 +209,13 @@ class CryptSQL:
 				raise CSQLError("Unknown kdf method: %s" % kdfMethod)
 
 			# Check the compression method.
-			if compress == b"ZLIB":
-				compress = zlib
-			elif compress == b"NONE":
+			if compress == b"NONE":
 				class DecompressDummy:
 					def decompress(self, payload):
 						return payload
 				compress = DecompressDummy()
+			elif compress == b"ZLIB": # legacy
+				compress = zlib
 			else:
 				raise CSQLError("Unknown compression: %s" % compress)
 
@@ -233,7 +233,7 @@ class CryptSQL:
 					data=payload,
 					legacyPadding=(paddingMethod == b"PWMAN"))
 
-				# Decompress payload.
+				# Decompress payload (legacy).
 				payload = compress.decompress(payload)
 
 				# Import the SQL database.
@@ -355,7 +355,7 @@ class CryptSQL:
 				FileObj(b"KDF_ITER", str(kdfIter).encode("UTF-8")),
 				FileObj(b"KDF_HASH", kdfHash.encode("UTF-8")),
 				FileObj(b"KDF_MAC", b"HMAC"),
-				FileObj(b"COMPRESS", b"NONE"),
+				FileObj(b"COMPRESS", b"NONE"), # compat for older versions.
 				FileObj(b"PADDING", b"PKCS7"),
 				FileObj(b"PAYLOAD", payload),
 			)
