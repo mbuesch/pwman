@@ -79,6 +79,13 @@ API documentation
 
 The API documentation can be found in the `API documentation directory <doc/api/>`_.
 
+Crypto backend
+==============
+
+Pwman uses either `Cryptodome <https://pypi.org/project/pycryptodomex/>`_ or `pyaes <https://pypi.org/project/pyaes/>`_ for AES encryption.
+Therefore, either one of these Python modules has to be installed.
+Pwman first tries to use Cryptodome and then falls back to pyaes, if Cryptodome is not installed.
+
 License / Copyright
 ===================
 
