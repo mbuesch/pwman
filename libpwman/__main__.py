@@ -203,8 +203,6 @@ def main():
 				raise libpwman.PWManError("Failed to lock memory: %s\n"
 							  "%s" % (
 							  err, baseMsg))
-			if not err and interactiveMode:
-				print("Memory locked.", file=sys.stderr)
 
 		# Probe the AES singleton instance to bail out early
 		# in case of a crypto lib import error.
