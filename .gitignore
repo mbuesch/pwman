@@ -1,4 +1,5 @@
 /build/
+/pwman-venv/
 __pycache__/
 /*.html
 *.swp

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-srcdir="$(realpath -e "$0" | xargs dirname)"
+srcdir="$(realpath "$0" | xargs dirname)"
 
 srcdir="$srcdir/.."
 
