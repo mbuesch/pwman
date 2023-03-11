@@ -23,19 +23,16 @@ Install pwman
 =============
 
 pwman does not have to be installed. The `pwman` script can be run directly from the source tree.
+It is not recommended to install pwman into the operating system.
 
-However if you want to install pwman, it can be done either directly from the source tree by running the following commands:
+Installing pwman into a virtualenv
+----------------------------------
 
-.. code:: sh
-
-	./setup.py build
-	sudo -i  # Or any other command to become root
-	./setup.py install
-
-Or it can be installed vi `PyPi <https://pypi.org/>`_ by running the following commands:
+If you want to install pwman into a Python virtualenv, run the following commands to create a new venv and install pwman from `PyPi <https://pypi.org/>`_:
 
 .. code:: sh
 
+	virtualenv --system-site-packages pwman-venv
 	pip3 install -U pycryptodomex
 	pip3 install -U pwman-python
 
@@ -45,7 +42,6 @@ Run pwman
 Just run the `pwman` executable to start pwman.
 
 Type `pwman -h` for help about the command line options.
-
 
 pwman prompt
 ============
