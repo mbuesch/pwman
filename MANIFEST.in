@@ -3,6 +3,7 @@ include README.html
 include README.rst
 include examplescript.py
 include gitconfig.sh
+include install_to_venv.sh
 include pwman.cmd
 include requirements.txt
 
