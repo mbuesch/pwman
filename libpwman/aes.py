@@ -5,15 +5,28 @@
 # Licensed under the GNU/GPL version 2 or later.
 """
 
+from libpwman.exception import PWManError
+
 import os
-import sys
 
 __all__ = [
 	"AES",
 ]
 
-class _AES:
+class AES:
+	"""Abstraction layer for the AES implementation.
+	"""
+
 	BLOCK_SIZE = 128 // 8
+	__singleton = None
+
+	@classmethod
+	def get(cls):
+		"""Get the AES singleton.
+		"""
+		if cls.__singleton is None:
+			cls.__singleton = cls()
+		return cls.__singleton
 
 	def __init__(self):
 		self.__pyaes = None
@@ -41,14 +54,12 @@ class _AES:
 			except ImportError as e:
 				pass
 
-		print("ERROR: Python module import error.", file=sys.stderr)
+		msg = "Python module import error."
 		if cryptolib == "":
-			print("ERROR: Neither 'Cryptodome' nor 'pyaes' is installed.",
-			      file=sys.stderr)
+			msg += "\nNeither 'Cryptodome' nor 'pyaes' is installed."
 		else:
-			print("ERROR: 'PWMAN_CRYPTOLIB=%s' is not supported or not installed." % cryptolib,
-			      file=sys.stderr)
-		sys.exit(1)
+			msg += "\n'PWMAN_CRYPTOLIB=%s' is not supported or not installed." % cryptolib
+		raise PWManError(msg)
 
 	def encrypt(self, key, iv, data):
 		"""Encrypt data.
@@ -123,5 +134,3 @@ class _AES:
 		if index < 0 or index >= len(data):
 			raise CSQLError("unpad_PWMAN: error")
 		return data[:index]
-
-AES = _AES() # Singleton

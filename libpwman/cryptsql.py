@@ -227,7 +227,7 @@ class CryptSQL:
 
 			try:
 				# Decrypt payload.
-				payload = AES.decrypt(
+				payload = AES.get().decrypt(
 					key=key,
 					iv=cipherIV,
 					data=payload,
@@ -338,7 +338,7 @@ class CryptSQL:
 
 			# Encrypt payload
 			cipherIV = self.__random(AES.BLOCK_SIZE)
-			payload = AES.encrypt(key=key, iv=cipherIV, data=payload)
+			payload = AES.get().encrypt(key=key, iv=cipherIV, data=payload)
 		except Exception as e:
 			raise CSQLError("Failed to encrypt: %s" % str(e))
 

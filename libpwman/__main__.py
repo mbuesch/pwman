@@ -179,6 +179,8 @@ def main():
 		interactiveMode = (not args.command and
 				   not args.diff and
 				   not args.call_pymod)
+
+		# Lock memory to RAM.
 		if not args.no_mlock:
 			MLockWrapper = libpwman.mlock.MLockWrapper
 			err = MLockWrapper.mlockall(MLockWrapper.MCL_CURRENT |
@@ -203,6 +205,11 @@ def main():
 							  err, baseMsg))
 			if not err and interactiveMode:
 				print("Memory locked.", file=sys.stderr)
+
+		# Probe the AES singleton instance to bail out early
+		# in case of a crypto lib import error.
+		from libpwman.aes import AES
+		AES.get()
 
 		if args.diff:
 			assert not interactiveMode
