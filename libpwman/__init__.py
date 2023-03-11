@@ -4,6 +4,7 @@ import libpwman.database
 import libpwman.dbdiff
 import libpwman.exception
 import libpwman.mlock
+import libpwman.otp
 import libpwman.ui
 import libpwman.util
 import libpwman.version
