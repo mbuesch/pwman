@@ -32,7 +32,8 @@ If you want to install pwman into a Python virtualenv, run the following command
 
 .. code:: sh
 
-	virtualenv --system-site-packages pwman-venv
+	virtualenv --system-site-packages ./pwman-venv
+	. ./pwman-venv/bin/activate
 	pip3 install -U pycryptodomex
 	pip3 install -U pwman-python
 
