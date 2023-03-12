@@ -401,7 +401,7 @@ class PWManDatabase(CryptSQL):
 		category: The name string of the category.
 		title: The title string of the entry.
 		"""
-		return bool(self.getEntry(category, title))
+		return self.getEntry(category, title) is not None
 
 	def addEntry(self, entry):
 		"""Create a new entry in the database.

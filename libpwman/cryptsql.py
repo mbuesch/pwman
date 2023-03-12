@@ -251,7 +251,7 @@ class CryptSQL:
 	def isOpen(self):
 		"""Returns True, if a database file is opened.
 		"""
-		return bool(self.__db)
+		return self.__db is not None
 
 	def open(self, filename):
 		"""Open a database file and decrypt its contents into memory.
@@ -266,8 +266,7 @@ class CryptSQL:
 		try:
 			self.__parseFile(filename)
 		except CSQLError as e:
-			self.__db = None
-			self.__filename = None
+			self.close()
 			raise e
 		self.__filename = filename
 

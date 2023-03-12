@@ -85,8 +85,7 @@ class FileObj:
 			off += dataLen
 		except (IndexError, KeyError) as e:
 			raise FileObjError("Failed to parse file object")
-		return (cls(name, data),
-			off)
+		return (cls(name, data), off)
 
 class FileObjCollection:
 	def __init__(self, *objects):
@@ -98,8 +97,7 @@ class FileObjCollection:
 				f.write(self.getRaw())
 				f.flush()
 		except IOError as e:
-			raise FileObjError("Failed to write file: %s" %
-					   e.strerror)
+			raise FileObjError("Failed to write file: %s" % e.strerror)
 
 	def getRaw(self):
 		raw = bytearray()
@@ -127,7 +125,7 @@ class FileObjCollection:
 		offset = 0
 		objects = []
 		while offset < len(raw):
-			(obj, objLen) = FileObj.parseRaw(raw[offset:])
+			obj, objLen = FileObj.parseRaw(raw[offset:])
 			objects.append(obj)
 			offset += objLen
 		return cls(*objects)
@@ -137,9 +135,8 @@ class FileObjCollection:
 		try:
 			with open(filepath, "rb") as f:
 				rawData = f.read()
-		except (IOError) as e:
+		except IOError as e:
 			if e.errno != errno.ENOENT:
-				raise FileObjError("Failed to read file: %s" %\
-						   e.strerror)
+				raise FileObjError("Failed to read file: %s" % e.strerror)
 			return None
 		return cls.parseRaw(rawData)
