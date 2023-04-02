@@ -28,7 +28,7 @@ run_pyunit()
 		echo "==="
 		export PYTHONPATH="$rootdir/tests:$PYTHONPATH"
 		cd "$rootdir" || die "Failed to cd to rootdir."
-		"$interpreter" -m unittest --failfast --buffer --catch "$test_dir" ||\
+		"$interpreter" -m unittest --failfast --buffer --catch --verbose "$test_dir" ||\
 			die "Test failed"
 	) || die
 }
