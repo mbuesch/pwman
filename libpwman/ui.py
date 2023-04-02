@@ -21,7 +21,7 @@ import sys
 import time
 import traceback
 from cmd import Cmd
-from copy import copy
+from copy import copy, deepcopy
 from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
@@ -355,16 +355,33 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		# argument delimiter shall be space.
 		readline.set_completer_delims(" ")
 
-		self.__db = PWManDatabase(filename, passphrase, readOnly=False)
+		self.__dbs = {
+			"main" : PWManDatabase(filename, passphrase, readOnly=False),
+		}
+		self.__selDbName = "main"
+
 		self.__updatePrompt()
 
 		self._timeout = PWManTimeout(timeout)
 
+	@property
+	def __db(self):
+		return self.__dbs[self.__selDbName]
+
 	def __updatePrompt(self):
-		if self.__db.isDirty():
-			self.prompt = "*pwman$ "
+		if len(self.__dbs) > 1:
+			dbName = self.__selDbName
+			lim = 20
+			if len(dbName) > lim - 3:
+				dbName = dbName[:lim-3] + "..."
 		else:
-			self.prompt = "pwman$ "
+			dbName = ""
+		dirty = any(db.isDirty() for db in self.__dbs.values())
+		self.prompt = "%spwman%s%s$ " % (
+			"*" if dirty else "",
+			"/" if dbName else "",
+			dbName
+		)
 
 	@classmethod
 	def _err(cls, source, message):
@@ -430,31 +447,39 @@ class PWMan(Cmd, metaclass=PWManMeta):
 							   text=text))
 		return cmpl
 
-	def __getCategoryCompletions(self, text):
+	def __getCategoryCompletions(self, text, db=None):
+		db = db or self.__db
 		return [ escapeCmd(n) + " "
-			 for n in self.__db.getCategoryNames()
+			 for n in db.getCategoryNames()
 			 if n.startswith(text) ]
 
-	def __getEntryTitleCompletions(self, category, text):
+	def __getEntryTitleCompletions(self, category, text, db=None):
+		db = db or self.__db
 		return [ escapeCmd(t) + " "
-			 for t in self.__db.getEntryTitles(category)
+			 for t in db.getEntryTitles(category)
 			 if t.startswith(text) ]
 
-	def __getEntryAttrCompletions(self, category, title, name, doName, doData, text):
+	def __getEntryAttrCompletions(self, category, title, name, doName, doData, text, db=None):
+		db = db or self.__db
 		if category and title:
-			entry = self.__db.getEntry(category, title)
+			entry = db.getEntry(category, title)
 			if entry:
 				if doName: # complete name
-					entryAttrs = self.__db.getEntryAttrs(entry)
+					entryAttrs = db.getEntryAttrs(entry)
 					if entryAttrs:
 						return [ escapeCmd(entryAttr.name) + " "
 							 for entryAttr in entryAttrs
 							 if entryAttr.name.startswith(name) ]
 				elif doData: # complete data
-					entryAttr = self.__db.getEntryAttr(entry, name)
+					entryAttr = db.getEntryAttr(entry, name)
 					if entryAttr:
 						return [ escapeCmd(entryAttr.data) + " " ]
 		return []
+
+	def __getDatabaseCompletions(self, text):
+		return [ escapeCmd(n) + " "
+			 for n in self.__dbs.keys()
+			 if n.startswith(text) ]
 
 	def __getPathCompletions(self, text):
 		"""Return an escaped file system path completion.
@@ -499,15 +524,18 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		("edit_totp", ("et",), "Edit the TOTP key and parameters"),
 		("edit_attr", ("ea",), "Edit an entry attribute"),
 		("move", ("mv", "rename"), "Move/rename an existing entry"),
+#TODO		("copy", ("cp",), "Copy an existing entry or category"),
 		("remove", ("rm", "del"), "Remove an existing entry"),
 	)
 
 	cmdHelpDatabase = (
-		("commit", ("c", "w"), "Commit/write database file"),
-		("masterp", (), "Change the master passphrase"),
-		("dbdump", (), "Dump the database"),
+		("database", ("db",), "Open or select another database"),
+		("commit", ("c", "w"), "Commit/write selected db to disk"),
+		("drop", (), "Drop uncommitted changes in selected db"),
+		("close", (), "Close a database"),
+		("dbdump", (), "Dump the selected database"),
 		("dbimport", (), "Import a database dump file"),
-		("drop", (), "Drop all uncommitted changes"),
+		("masterp", (), "Change the master passphrase"),
 	)
 
 	cmdHelpMisc = (
@@ -533,7 +561,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 				spc = " " * (10 - len(cmd))
 				msg = "  %s%s%s" % (cmd, spc, desc)
 				if aliases:
-					msg += " " * (51 - len(msg))
+					msg += " " * (52 - len(msg))
 					msg += " Alias%s: %s" %\
 					("es" if len(aliases) > 1 else "",
 					", ".join(aliases))
@@ -558,7 +586,8 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		Aliases: q exit ^D
 		"""
 		if params == "!":
-			self.__db.flunkDirty()
+			for db in self.__dbs.values():
+				db.flunkDirty()
 		raise self.Quit()
 	do_q = do_quit
 	do_exit = do_quit
@@ -576,15 +605,33 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		"""
 		clearScreen()
 
+	__commit_opts = ("-a",)
 	def do_commit(self, params):
-		"""--- Write changes to the database file ---
+		"""--- Write changes to the database file(s) ---
 		Command: commit
+
+		Options:
+		  -a   Commit all open databases.
 
 		Aliases: c w
 		"""
-		self.__db.commit()
+		opts = PWManOpts.parse(params, self.__commit_opts)
+		dbs = self.__dbs.values() if "-a" in opts else [ self.__db ]
+		try:
+			for db in dbs:
+				db.commit()
+		except PWManError as e:
+			self._err("commit", str(e))
 	do_c = do_commit
 	do_w = do_commit
+
+	@completion
+	def complete_commit(self, text, line, begidx, endidx):
+		if text == "-":
+			return PWManOpts.rawOptTemplates(self.__commit_opts)
+		return []
+	complete_c = complete_commit
+	complete_w = complete_commit
 
 	def do_masterp(self, params):
 		"""--- Change the master passphrase ---
@@ -863,38 +910,93 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	complete_rm = complete_remove
 	complete_del = complete_remove
 
+	__move_opts = ("-s:", "-d:")
 	def do_move(self, params):
 		"""--- Move/rename an existing entry or a category ---
+		Options:
+		  -s SOURCE_DATABASE_NAME
+		  -d DESTINATION_DATABASE_NAME
+		  Databases default to the currently selected database.
 
 		Move/rename an existing entry:
-		Command: move category title newCategory [newTitle]
+		Command: move CATEGORY TITLE TO_CATEGORY [NEW_TITLE]
+		(NEW_TITLE defaults to TITLE)
 
 		Rename an existing category:
-		Command: move category newCategory
+		Command: move CATEGORY NEW_CATEGORY
+
+		Move an entry from one database to another:
+		Command: move -s main -d other CATEGORY TITLE TO_CATEGORY [NEW_TITLE]
+		(NEW_TITLE defaults to TITLE)
+
+		Move all entries from a category from one database to another database:
+		Command: move -s main -d other CATEGORY [NEW_CATEGORY]
+		(NEW_CATEGORY defaults to CATEGORY)
+
+		The named databases must be open. See 'database' command.
 
 		Aliases: mv rename
 		"""
-		p0, p1, p2, p3 = PWManOpts.parseParams(params, 0, 4)
-		if p0 and p1 and p2:
-			# Entry move
-			fromCategory, fromTitle, toCategory, toTitle = p0, p1, p2, p3
-			if not toTitle:
-				toTitle = fromTitle
-			if fromCategory == toCategory and fromTitle == toTitle:
+		opts = PWManOpts.parse(params, self.__move_opts)
+
+		sourceDbName = opts.getOpt("-s", default=self.__selDbName)
+		sourceDb = self.__dbs.get(sourceDbName, None)
+		if sourceDb is None:
+			self._err("move", "Source database '%s' does not exist" % sourceDbName)
+		destDbName = opts.getOpt("-d", default=self.__selDbName)
+		destDb = self.__dbs.get(destDbName, None)
+		if destDb is None:
+			self._err("move", "Destination database '%s' does not exist" % destDbName)
+
+		if opts.nrParams in (3, 4):
+			# Entry rename/move
+			fromCategory, fromTitle, toCategory, toTitle =\
+				(opts.getParam(0), opts.getParam(1),
+				 opts.getParam(2), opts.getParam(3))
+			toTitle = toTitle or fromTitle
+			if sourceDb is destDb and fromCategory == toCategory and fromTitle == toTitle:
 				self._info("move", "Nothing changed. Not moving anything.")
 				return
-			entry = self.__db.getEntry(fromCategory, fromTitle)
+			entry = sourceDb.getEntry(fromCategory, fromTitle)
+			oldEntry = deepcopy(entry)
 			if not entry:
 				self._err("move", "Source entry does not exist.")
 			try:
-				self.__db.moveEntry(entry, toCategory, toTitle)
+				if sourceDb is destDb:
+					# Move in one DB.
+					sourceDb.moveEntry(entry, toCategory, toTitle)
+				else:
+					# Move between different DBs.
+					entry.entryId = None
+					entry.category = toCategory
+					entry.title = toTitle
+					destDb.addEntry(entry)
+					sourceDb.delEntry(oldEntry)
 			except (PWManError) as e:
 				self._err("move", str(e))
-		elif p0 and p1:
-			# Category rename
-			fromCategory, toCategory = p0, p1
+		elif (sourceDb is destDb and opts.nrParams == 2) or\
+		     (sourceDb is not destDb and opts.nrParams in (1, 2)):
+			# Category rename or move between DBs.
+			fromCategory, toCategory = opts.getParam(0), opts.getParam(1)
+			toCategory = toCategory or fromCategory
 			try:
-				self.__db.renameCategory(fromCategory, toCategory)
+				if sourceDb is destDb:
+					# Category rename in one DB.
+					sourceDb.renameCategory(fromCategory, toCategory)
+				else:
+					# Category move between DBs.
+					for fromTitle in sourceDb.getEntryTitles(fromCategory):
+						self._info("move",
+							"running command: move -s %s -d %s %s %s %s %s" % (
+							escapeCmd(sourceDbName), escapeCmd(destDbName),
+							escapeCmd(fromCategory), escapeCmd(fromTitle),
+							escapeCmd(toCategory), escapeCmd(fromTitle)))
+						entry = sourceDb.getEntry(fromCategory, fromTitle)
+						oldEntry = deepcopy(entry)
+						entry.entryId = None
+						entry.category = toCategory
+						destDb.addEntry(entry)
+						sourceDb.delEntry(oldEntry)
 			except (PWManError) as e:
 				self._err("move", str(e))
 		else:
@@ -904,17 +1006,139 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	@completion
 	def complete_move(self, text, line, begidx, endidx):
-		paramIdx = PWManOpts.calcParamIndex(line, endidx)
-		if paramIdx in (0, 2):
+		if text == "-":
+			return PWManOpts.rawOptTemplates(self.__move_opts)
+		if len(text) == 2 and text.startswith("-"):
+			return [ text + " " ]
+		dbOpts = ("-s", "-d")
+		opts = PWManOpts.parse(line, self.__move_opts, ignoreFirst=True, softFail=True)
+		if opts.error:
+			opt, error = opts.error
+			if error == "no_arg" and opt in dbOpts:
+				return self.__getDatabaseCompletions(text)
+			return []
+		optName, value = opts.atCmdIndex(PWManOpts.calcParamIndex(line, endidx))
+		if optName in dbOpts:
+			return self.__getDatabaseCompletions(text)
+
+		sourceDbName = opts.getOpt("-s", default=self.__selDbName)
+		sourceDb = self.__dbs.get(sourceDbName, None)
+		if sourceDb is None:
+			return []
+		destDbName = opts.getOpt("-d", default=self.__selDbName)
+		destDb = self.__dbs.get(destDbName, None)
+		if destDb is None:
+			return []
+
+		paramIdx = opts.getComplParamIdx(text)
+		if paramIdx == 0:
 			# Category completion
-			return self.__getCategoryCompletions(text)
-		elif paramIdx in (1, 3):
+			return self.__getCategoryCompletions(text, db=sourceDb)
+		elif paramIdx == 1:
 			# Entry title completion
-			category = PWManOpts.parseComplParam(line, 0 if paramIdx == 1 else 2)
-			return self.__getEntryTitleCompletions(category, text)
+			category = opts.getParam(0)
+			if category:
+				return self.__getEntryTitleCompletions(category, text, db=sourceDb)
+		elif paramIdx == 2:
+			# Category completion
+			return self.__getCategoryCompletions(text, db=destDb)
+		elif paramIdx == 3:
+			# Entry title completion
+			category = opts.getParam(2)
+			if category:
+				return self.__getEntryTitleCompletions(category, text, db=destDb)
 		return []
 	complete_mv = complete_move
 	complete_rename = complete_move
+
+	__database_opts = ("-f:",)
+	def do_database(self, params):
+		"""--- Open a database or switch to an already opened database ---
+		Command: database [-f FILEPATH] [NAME]
+
+		If neither FILEPATH nor NAME are given, then
+		a list of all currently opened databases will be printed.
+		The currently selected database will be marked with [@].
+		All databases with uncommitted changes will be marked with [*].
+
+		If only NAME is given, then the selected database will
+		be switched to the named one. NAME must already be open.
+
+		A new database can be opened with -f FILEPATH.
+		NAME is optional in this case.
+		The selected database will be switched to the newly opened one.
+
+		Aliases: db
+		"""
+		opts = PWManOpts.parse(params, self.__database_opts)
+		path = opts.getOpt("-f")
+		name = opts.getParam(0)
+		if path:
+			if opts.nrParams not in (0, 1):
+				self._err("database", "Invalid parameters.")
+			# Open a new db.
+			path = pathlib.Path(path)
+			name = name or path.name
+			if name == "main":
+				self._err("database",
+					  "The database name 'main' is reserved. "
+					  "Please select another name.")
+			if name in self.__dbs:
+				self._err("database",
+					  ("The database name '%' is already used. "
+					   "Please select another name.") % name)
+			try:
+				passphrase = readPassphrase(
+					"Master passphrase of '%s'" % path,
+					verify=not path.exists())
+				if passphrase is None:
+					self._err("database", "Could not get passphrase.")
+				db = PWManDatabase(filename=path,
+						   passphrase=passphrase,
+						   readOnly=False)
+			except PWManError as e:
+				self._err("database", str(e))
+			self.__dbs[name] = db
+			self.__selDbName = name
+		elif opts.nrParams == 1:
+			# Switch selected db to NAME.
+			if name not in self.__dbs:
+				self._err("database", "The database '%s' does not exist." % name)
+			if name != self.__selDbName:
+				self.__selDbName = name
+		elif opts.nrParams == 0:
+			# Print db list.
+			for name, db in self.__dbs.items():
+				flags = "@" if db is self.__db else " "
+				flags += "*" if db.isDirty() else " "
+				path = db.getFilename()
+				self._info(None, "[%s] %s: %s" % (
+					   flags, name, path))
+		else:
+			self._err("database", "Invalid parameters.")
+	do_db = do_database
+
+	@completion
+	def complete_database(self, text, line, begidx, endidx):
+		if text == "-":
+			return PWManOpts.rawOptTemplates(self.__database_opts)
+		if len(text) == 2 and text.startswith("-"):
+			return [ text + " " ]
+		opts = PWManOpts.parse(line, self.__database_opts, ignoreFirst=True, softFail=True)
+		if opts.error:
+			opt, error = opts.error
+			if error == "no_arg" and opt == "-f":
+				return self.__getPathCompletions(text)
+			return []
+		optName, value = opts.atCmdIndex(PWManOpts.calcParamIndex(line, endidx))
+		if optName == "-f":
+			return self.__getPathCompletions(text)
+		paramIdx = opts.getComplParamIdx(text)
+		if paramIdx == 0:
+			# Database name
+			return self.__getDatabaseCompletions(text)
+		return []
+	complete_db = complete_database
 
 	__dbdump_opts = ("-s", "-h", "-c")
 	def do_dbdump(self, params):
@@ -1017,6 +1241,57 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		Aliases: None
 		"""
 		self.__db.dropUncommitted()
+
+	def do_close(self, params):
+		"""--- Close a database ---
+		Command: close [!] [NAME]
+
+		If NAME is not given, then this closes the currently selected database.
+		If NAME is given, then this closes the named database.
+
+		If ! is specified, then the uncommitted changes will be dropped.
+
+		If the currently used database is closed, the selected database
+		will be switched to 'main'.
+
+		The 'main' database can only be closed last,
+		which in turn closes the application.
+
+		Aliases: None
+		"""
+		flunk = params.startswith("!")
+		if flunk:
+			params = params[1:].strip()
+		name = params if params else self.__selDbName
+		if name == "main" and len(self.__dbs) > 1:
+			self._err("close", "The 'main' database can only be closed last")
+		db = self.__dbs.get(name, None)
+		if db is None:
+			self._err("close", "The database '%s' does not exist" % name)
+		if db.isDirty():
+			if not flunk:
+				self._err("close", "The database '%s' contains "
+					  "uncommitted changes" % name)
+			db.flunkDirty()
+		if len(self.__dbs) > 1:
+			self.__dbs.pop(name)
+			if self.__selDbName == name:
+				self.__selDbName = "main"
+		else:
+			raise self.Quit()
+
+	@completion
+	def complete_close(self, text, line, begidx, endidx):
+		if text == "!":
+			return [ text + " " ]
+		opts = PWManOpts.parse(line, (), ignoreFirst=True, softFail=True)
+		if opts.error:
+			return []
+		paramIdx = opts.getComplParamIdx(text)
+		if paramIdx == 0 or (paramIdx == 1 and opts.getParam(0) == "!"):
+			# Database name
+			return self.__getDatabaseCompletions(text)
+		return []
 
 	__find_opts = ("-c", "-t", "-u", "-p", "-b", "-a", "-A", "-r")
 	def do_find(self, params):
