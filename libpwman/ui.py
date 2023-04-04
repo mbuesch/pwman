@@ -109,6 +109,190 @@ class PWManTimeout(Exception):
 	def __timeout(self, signum, frame):
 		raise self
 
+@dataclass
+class PWManOpts:
+	"""UI command option parser.
+	"""
+	__opts : list = field(default_factory=list)
+	__params : list = field(default_factory=list)
+	__atCmdIndex : dict = field(default_factory=dict)
+
+	@classmethod
+	def parse(cls,
+		  line,
+		  possibleOpts,
+		  ignoreFirst=False,
+		  unescape=True):
+		"""Parses the command options in 'line' and returns an Opts instance.
+		possibleOpts is a tuple of the possible options.
+		"""
+		possibleOptsPlain = [ o.replace(":", "") for o in possibleOpts ]
+		opts = cls()
+		i = 0
+		while True:
+			p = cls.parseParam(line, i,
+					   ignoreFirst=ignoreFirst,
+					   unescape=unescape)
+			if not p:
+				break
+			if opts.nrParams:
+				opts._appendParam(i, p)
+			else:
+				try:
+					optIdx = possibleOptsPlain.index(p)
+				except ValueError:
+					opts._appendParam(i, p)
+					i += 1
+					continue
+				if possibleOpts[optIdx].endswith(":"):
+					i += 1
+					arg = cls.parseParam(line, i,
+							     ignoreFirst=ignoreFirst,
+							     unescape=unescape)
+					if not arg:
+						PWMan._err(None, "Option '%s' "
+							   "requires an argument." % p)
+					opts._appendOpt(i, p, arg)
+				else:
+					opts._appendOpt(i, p)
+			i += 1
+		return opts
+
+	def _appendOpt(self, cmdIndex, optName, optValue=None):
+		self.__opts.append( (optName, optValue) )
+		self.__atCmdIndex[cmdIndex] = (optName, optValue)
+
+	def _appendParam(self, cmdIndex, param):
+		self.__params.append(param)
+		self.__atCmdIndex[cmdIndex] = (None, param)
+
+	def __contains__(self, optName):
+		"""Check if we have a specific "-X" style option.
+		"""
+		return optName in (o[0] for o in self.__opts)
+
+	@property
+	def hasOpts(self):
+		"""Do we have -X style options?
+		"""
+		return bool(self.__opts)
+
+	def getOpt(self, optName):
+		"""Get an option value by "-X" style name.
+		"""
+		if optName in self:
+			return [ o[1] for o in self.__opts if o[0] == optName ][-1]
+		return None
+
+	@property
+	def nrParams(self):
+		"""The number of trailing parameters.
+		"""
+		return len(self.__params)
+
+	def getParam(self, index):
+		"""Get a trailing parameter at index.
+		"""
+		return self.__params[index]
+
+	def atCmdIndex(self, cmdIndex):
+		"""Get an item (option or parameter) at command line index cmdIndex.
+		Returns (optName, optValue) if it is an option.
+		Returns (None, parameter) if it is a parameter.
+		Returns (None, None) if it does not exist.
+		"""
+		return self.__atCmdIndex.get(cmdIndex, (None, None))
+
+	@classmethod
+	def skipParams(cls, line, count,
+		       lineIncludesCommand=False, unescape=True):
+		"""Return a parameter string with the first 'count'
+		parameters skipped.
+		"""
+		sline = cls.patchSpaceEscapes(line)
+		if lineIncludesCommand:
+			count += 1
+		i = 0
+		while i < len(sline) and count > 0:
+			while i < len(sline) and not sline[i].isspace():
+				i += 1
+			while i < len(sline) and sline[i].isspace():
+				i += 1
+			count -= 1
+		if i >= len(sline):
+			return ""
+		s = line[i:]
+		if unescape:
+			s = unescapeCmd(s)
+		return s
+
+	@classmethod
+	def calcParamIndex(cls, line, endidx):
+		"""Returns the parameter index into the commandline
+		given the character end-index. This honors space-escape.
+		"""
+		line = cls.patchSpaceEscapes(line)
+		startidx = endidx - 1
+		while startidx > 0 and not line[startidx].isspace():
+			startidx -= 1
+		return len([l for l in line[:startidx].split() if l]) - 1
+
+	@classmethod
+	def patchSpaceEscapes(cls, line):
+		# Patch a commandline for simple whitespace based splitting.
+		# We just replace the space escape sequence by a random
+		# non-whitespace string. The line remains the same size.
+		return line.replace('\\ ', '_S')
+
+	@classmethod
+	def parseParam(cls, line, paramIndex,
+		       ignoreFirst=False, unescape=True):
+		"""Returns the full parameter from the commandline.
+		"""
+		sline = cls.patchSpaceEscapes(line)
+		if ignoreFirst:
+			paramIndex += 1
+		inParam = False
+		idx = 0
+		for startIndex, c in enumerate(sline):
+			if c.isspace():
+				if inParam:
+					idx += 1
+				inParam = False
+			else:
+				inParam = True
+				if idx == paramIndex:
+					break
+		else:
+			return ""
+		endIndex = startIndex
+		while endIndex < len(sline) and not sline[endIndex].isspace():
+			endIndex += 1
+		p = line[startIndex : endIndex]
+		if unescape:
+			p = unescapeCmd(p)
+		return p
+
+	@classmethod
+	def parseComplParam(cls, line, paramIndex, unescape=True):
+		return cls.parseParam(line, paramIndex,
+				      ignoreFirst=True, unescape=unescape)
+
+	@classmethod
+	def parseParams(cls, line, paramIndex, count,
+			ignoreFirst=False, unescape=True):
+		"""Returns a generator of the specified parameters from the commandline.
+		paramIndex: start index.
+		count: Number of paramerts to fetch.
+		"""
+		return ( cls.parseParam(line, i, ignoreFirst, unescape)
+			 for i in range(paramIndex, paramIndex + count) )
+
+	@classmethod
+	def parseComplParams(cls, line, paramIndex, count, unescape=True):
+		return cls.parseParams(line, paramIndex, count,
+				       ignoreFirst=True, unescape=unescape)
+
 # PWMan completion decorator that does common things and workarounds.
 def completion(func):
 	@functools.wraps(func)
@@ -117,7 +301,7 @@ def completion(func):
 			self._timeout.poke()
 
 			# Find the real begidx that takes space escapes into account.
-			sline = self._patchSpaceEscapes(line)
+			sline = PWManOpts.patchSpaceEscapes(line)
 			realBegidx = endidx
 			while realBegidx > 0:
 				if sline[realBegidx - 1] == " ":
@@ -137,8 +321,8 @@ def completion(func):
 			# Fixup text.
 			# By fetching the parameter again it is ensured that
 			# it is properly unescaped.
-			paramIdx = self._calcParamIndex(line, endidx)
-			text = self._getComplParam(line, paramIdx)
+			paramIdx = PWManOpts.calcParamIndex(line, endidx)
+			text = PWManOpts.parseComplParam(line, paramIdx)
 
 			# Call the PWMan completion handler.
 			completions = func(self, text, line, begidx, endidx)
@@ -208,21 +392,24 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		else:
 			self.prompt = "pwman$ "
 
-	def __err(self, source, message):
+	@classmethod
+	def _err(cls, source, message):
 		source = (" " + source + ":") if source else ""
-		raise self.CommandError("***%s %s" % (source, message))
+		raise cls.CommandError("***%s %s" % (source, message))
 
-	def __warn(self, source, message):
+	@classmethod
+	def _warn(cls, source, message):
 		source = (" " + source + ":") if source else ""
 		print("***%s %s" % (source, message))
 
-	def __info(self, source, message):
+	@classmethod
+	def _info(cls, source, message):
 		source = ("+++ " + source + ": ") if source else ""
 		print("%s%s" % (source, message))
 
 	def precmd(self, line):
 		self._timeout.poke()
-		first = self._getParam(line, 0, unescape=False)
+		first = PWManOpts.parseParam(line, 0, unescape=False)
 		if first.endswith('?'):
 			return "help %s" % first[:-1]
 		return line
@@ -233,7 +420,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def default(self, line):
 		extra = "\nType 'help' for more help." if self.__isInteractive else ""
-		self.__err(None, "Unknown command: %s%s" % (line, extra))
+		self._err(None, "Unknown command: %s%s" % (line, extra))
 
 	def emptyline(self):
 		self._timeout.poke()
@@ -242,22 +429,22 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	@completion
 	def __complete_category_title(self, text, line, begidx, endidx):
 		# Generic [category] [title] completion
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self._getComplParam(line, 0),
+			return self.__getEntryTitleCompletions(PWManOpts.parseComplParam(line, 0),
 							       text)
 		return []
 
 	@completion
 	def __complete_category_title_item(self, text, line, begidx, endidx):
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
-		category, title, item = self._getComplParams(line, 0, 3)
+		category, title, item = PWManOpts.parseComplParams(line, 0, 3)
 		cmpl = []
 		if paramIdx == 2:
 			cmpl.extend(escapeCmd(n) + " "
@@ -373,16 +560,16 @@ class PWMan(Cmd, metaclass=PWManMeta):
 					msg += " Alias%s: %s" %\
 					("es" if len(aliases) > 1 else "",
 					", ".join(aliases))
-				self.__info(None, msg)
-		self.__info(None, "\nSearching/listing commands:")
+				self._info(None, msg)
+		self._info(None, "\nSearching/listing commands:")
 		printCmdHelp(self.cmdHelpShow)
-		self.__info(None, "\nEditing commands:")
+		self._info(None, "\nEditing commands:")
 		printCmdHelp(self.cmdHelpEdit)
-		self.__info(None, "\nDatabase commands:")
+		self._info(None, "\nDatabase commands:")
 		printCmdHelp(self.cmdHelpDatabase)
-		self.__info(None, "\nMisc commands:")
+		self._info(None, "\nMisc commands:")
 		printCmdHelp(self.cmdHelpMisc)
-		self.__info(None, "\nType 'command?' or 'help command' for more help on a command.")
+		self._info(None, "\nType 'command?' or 'help command' for more help on a command.")
 	do_h = do_help
 
 	def do_quit(self, params):
@@ -424,11 +611,11 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		p = readPassphrase("Current master passphrase")
 		if p != self.__db.getPassphrase():
 			time.sleep(1)
-			self.__warn(None, "Passphrase mismatch! ")
+			self._warn(None, "Passphrase mismatch! ")
 			return
 		p = readPassphrase("Master passphrase", verify=True)
 		if p is None:
-			self.__info(None, "Passphrase not changed.")
+			self._info(None, "Passphrase not changed.")
 			return
 		if p != self.__db.getPassphrase():
 			self.__db.setPassphrase(p)
@@ -443,56 +630,56 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		If item is given, then only list one specific content item.
 		Item may be one of: user, password, bulk, totpkey or any attribute name.\n
 		Aliases: ls cat"""
-		category, title, item = self._getParams(params, 0, 3)
+		category, title, item = PWManOpts.parseParams(params, 0, 3)
 		if not category and not title and not item:
-			self.__info(None, "Categories:")
-			self.__info(None, "\t" + "\n\t".join(self.__db.getCategoryNames()))
+			self._info(None, "Categories:")
+			self._info(None, "\t" + "\n\t".join(self.__db.getCategoryNames()))
 		elif category and not title and not item:
-			self.__info(None, "Entries in category '%s':" % category)
-			self.__info(None, "\t" + "\n\t".join(self.__db.getEntryTitles(category)))
+			self._info(None, "Entries in category '%s':" % category)
+			self._info(None, "\t" + "\n\t".join(self.__db.getEntryTitles(category)))
 		elif category and title and not item:
 			entry = self.__db.getEntry(category, title)
 			if entry:
-				self.__info(None, self.__db.dumpEntry(entry))
+				self._info(None, self.__db.dumpEntry(entry))
 			else:
-				self.__err("list", "'%s/%s' not found" % (category, title))
+				self._err("list", "'%s/%s' not found" % (category, title))
 		elif category and title and item:
 			entry = self.__db.getEntry(category, title)
 			if entry:
 				if item == "user":
 					if not entry.user:
-						self.__err("list", "'%s/%s' has no 'user' field." % (
-							   category, title))
-					self.__info(None, entry.user)
+						self._err("list", "'%s/%s' has no 'user' field." % (
+							  category, title))
+					self._info(None, entry.user)
 				elif item == "password":
 					if not entry.pw:
-						self.__err("list", "'%s/%s' has no 'password' field." % (
-							   category, title))
-					self.__info(None, entry.pw)
+						self._err("list", "'%s/%s' has no 'password' field." % (
+							  category, title))
+					self._info(None, entry.pw)
 				elif item == "bulk":
 					bulk = self.__db.getEntryBulk(entry)
 					if not bulk:
-						self.__err("list", "'%s/%s' has no 'bulk' field." % (
-							   category, title))
-					self.__info(None, bulk.data)
+						self._err("list", "'%s/%s' has no 'bulk' field." % (
+							  category, title))
+					self._info(None, bulk.data)
 				elif item == "totpkey":
 					entryTotp = self.__db.getEntryTotp(entry)
 					if not entryTotp:
-						self.__err("list", "'%s/%s' has no 'TOTP key'." % (
-							   category, title))
-					self.__info(None, "TOTP key:     %s (base32 encoding)" % entryTotp.key)
-					self.__info(None, "TOTP digits:  %d" % entryTotp.digits)
-					self.__info(None, "TOTP hash:    %s" % entryTotp.hmacHash)
+						self._err("list", "'%s/%s' has no 'TOTP key'." % (
+							  category, title))
+					self._info(None, "TOTP key:     %s (base32 encoding)" % entryTotp.key)
+					self._info(None, "TOTP digits:  %d" % entryTotp.digits)
+					self._info(None, "TOTP hash:    %s" % entryTotp.hmacHash)
 				else: # attribute
 					attr = self.__db.getEntryAttr(entry, item)
 					if not attr:
-						self.__err("list", "'%s/%s' has no attribute '%s'." % (
-							   category, title, item))
-					self.__info(None, attr.data)
+						self._err("list", "'%s/%s' has no attribute '%s'." % (
+							  category, title, item))
+					self._info(None, attr.data)
 			else:
-				self.__err("list", "'%s/%s' not found" % (category, title))
+				self._err("list", "'%s/%s' not found" % (category, title))
 		else:
-			self.__err("list", "Invalid parameter")
+			self._err("list", "Invalid parameter")
 	do_ls = do_list
 	do_cat = do_list
 
@@ -507,21 +694,21 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		they are asked for interactively.\n
 		Aliases: n add"""
 		if params:
-			category, title, user, pw = self._getParams(params, 0, 4)
+			category, title, user, pw = PWManOpts.parseParams(params, 0, 4)
 		else:
-			self.__info("new", "Create new entry:")
+			self._info("new", "Create new entry:")
 			category = input("\tCategory: ")
 			title = input("\tEntry title: ")
 			user = input("\tUsername: ")
 			pw = input("\tPassword: ")
 		if not category or not title:
-			self.__err("new", "Invalid parameters. "
-				"Need to supply category and title.")
+			self._err("new", "Invalid parameters. "
+				  "Need to supply category and title.")
 		entry = PWManEntry(category=category, title=title, user=user, pw=pw)
 		try:
 			self.__db.addEntry(entry)
 		except (PWManError) as e:
-			self.__err("new", str(e))
+			self._err("new", str(e))
 		self.__undo.do("new %s" % params,
 			       "remove %s %s" % (escapeCmd(category), escapeCmd(title)))
 	do_n = do_new
@@ -533,18 +720,18 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def __do_edit_entry(self, params, commandName,
 			    entry2data, data2entry):
-		category, title = self._getParams(params, 0, 2)
+		category, title = PWManOpts.parseParams(params, 0, 2)
 		if not category or not title:
-			self.__err(commandName, "Invalid parameters. "
-				"Need to supply category and title.")
+			self._err(commandName, "Invalid parameters. "
+				  "Need to supply category and title.")
 		oldEntry = self.__db.getEntry(category, title)
 		if not oldEntry:
-			self.__err(commandName, "Entry does not exist")
-		newData = self._skipParams(params, 2).strip()
+			self._err(commandName, "Entry does not exist")
+		newData = PWManOpts.skipParams(params, 2).strip()
 		try:
 			self.__db.editEntry(data2entry(category, title, newData))
 		except (PWManError) as e:
-			self.__err(commandName, str(e))
+			self._err(commandName, str(e))
 		self.__undo.do("%s %s" % (commandName, params),
 			       "%s %s %s %s" %\
 			       (commandName, escapeCmd(oldEntry.category),
@@ -566,18 +753,18 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	@completion
 	def complete_edit_user(self, text, line, begidx, endidx):
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self._getComplParam(line, 0),
+			return self.__getEntryTitleCompletions(PWManOpts.parseComplParam(line, 0),
 							       text)
 		elif paramIdx == 2:
 			# User data
-			entry = self.__db.getEntry(self._getComplParam(line, 0),
-						   self._getComplParam(line, 1))
+			entry = self.__db.getEntry(PWManOpts.parseComplParam(line, 0),
+						   PWManOpts.parseComplParam(line, 1))
 			return [ escapeCmd(entry.user) ]
 		return []
 	complete_eu = complete_edit_user
@@ -597,18 +784,18 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	@completion
 	def complete_edit_pw(self, text, line, begidx, endidx):
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self._getComplParam(line, 0),
+			return self.__getEntryTitleCompletions(PWManOpts.parseComplParam(line, 0),
 							       text)
 		elif paramIdx == 2:
 			# Password data
-			entry = self.__db.getEntry(self._getComplParam(line, 0),
-						   self._getComplParam(line, 1))
+			entry = self.__db.getEntry(PWManOpts.parseComplParam(line, 0),
+						   PWManOpts.parseComplParam(line, 1))
 			return [ escapeCmd(entry.pw) ]
 		return []
 	complete_ep = complete_edit_pw
@@ -621,15 +808,15 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		The NEWDATA must _not_ be escaped (however, category and
 		title must be escaped).\n
 		Aliases: eb"""
-		category, title = self._getParams(params, 0, 2)
-		data = self._skipParams(params, 2).strip()
+		category, title = PWManOpts.parseParams(params, 0, 2)
+		data = PWManOpts.skipParams(params, 2).strip()
 		if not category:
-			self.__err("edit_bulk", "Category parameter is required.")
+			self._err("edit_bulk", "Category parameter is required.")
 		if not title:
-			self.__err("edit_bulk", "Title parameter is required.")
+			self._err("edit_bulk", "Title parameter is required.")
 		entry = self.__db.getEntry(category, title)
 		if not entry:
-			self.__err("edit_bulk", "'%s/%s' not found" % (category, title))
+			self._err("edit_bulk", "'%s/%s' not found" % (category, title))
 		entryBulk = self.__db.getEntryBulk(entry)
 		if not entryBulk:
 			entryBulk = PWManEntryBulk(entry=entry)
@@ -645,18 +832,18 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	@completion
 	def complete_edit_bulk(self, text, line, begidx, endidx):
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if paramIdx == 0:
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx == 1:
 			# Entry title completion
-			return self.__getEntryTitleCompletions(self._getComplParam(line, 0),
+			return self.__getEntryTitleCompletions(PWManOpts.parseComplParam(line, 0),
 							       text)
 		elif paramIdx == 2:
 			# Bulk data
-			entry = self.__db.getEntry(self._getComplParam(line, 0),
-						   self._getComplParam(line, 1))
+			entry = self.__db.getEntry(PWManOpts.parseComplParam(line, 0),
+						   PWManOpts.parseComplParam(line, 1))
 			if entry:
 				entryBulk = self.__db.getEntryBulk(entry)
 				if entryBulk:
@@ -669,27 +856,27 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		Command: remove category [title]\n
 		Remove an existing database entry.\n
 		Aliases: rm del"""
-		category, title = self._getParams(params, 0, 2)
+		category, title = PWManOpts.parseParams(params, 0, 2)
 		if not category:
-			self.__err("remove", "Category parameter is required.")
+			self._err("remove", "Category parameter is required.")
 		if not title:
 			# Remove whole category
 			for title in self.__db.getEntryTitles(category):
 				p = "%s %s" % (escapeCmd(category),
 					       escapeCmd(title))
-				self.__info("remove", "running: remove %s" % p)
+				self._info("remove", "running: remove %s" % p)
 				self.do_remove(p)
 			return
 		oldEntry = self.__db.getEntry(category, title)
 		if not oldEntry:
-			self.__err("remove", "Entry does not exist")
+			self._err("remove", "Entry does not exist")
 		oldEntryBulk = self.__db.getEntryBulk(oldEntry)
 		oldEntryAttrs = self.__db.getEntryAttrs(oldEntry)
 		oldEntryTotp = self.__db.getEntryTotp(oldEntry)
 		try:
 			self.__db.delEntry(PWManEntry(category, title))
 		except (PWManError) as e:
-			self.__err("remove", str(e))
+			self._err("remove", str(e))
 		undoCmds = [ "new %s %s %s %s" % (
 			     escapeCmd(oldEntry.category),
 			     escapeCmd(oldEntry.title),
@@ -728,23 +915,23 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		Rename an existing category:
 		Command: move category newCategory\n
 		Aliases: mv rename"""
-		p0, p1, p2, p3 = self._getParams(params, 0, 4)
+		p0, p1, p2, p3 = PWManOpts.parseParams(params, 0, 4)
 		if p0 and p1 and p2:
 			# Entry move
 			fromCategory, fromTitle, toCategory, toTitle = p0, p1, p2, p3
 			if not toTitle:
 				toTitle = fromTitle
 			if fromCategory == toCategory and fromTitle == toTitle:
-				self.__info("move", "Nothing changed. Not moving anything.")
+				self._info("move", "Nothing changed. Not moving anything.")
 				return
 			entry = self.__db.getEntry(fromCategory, fromTitle)
 			if not entry:
-				self.__err("move", "Source entry does not exist.")
+				self._err("move", "Source entry does not exist.")
 			oldEntry = deepcopy(entry)
 			try:
 				self.__db.moveEntry(entry, toCategory, toTitle)
 			except (PWManError) as e:
-				self.__err("move", str(e))
+				self._err("move", str(e))
 			self.__undo.do("move %s" % params,
 				       "move %s %s %s %s" % (
 				       escapeCmd(entry.category), escapeCmd(entry.title),
@@ -755,24 +942,24 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			try:
 				self.__db.renameCategory(fromCategory, toCategory)
 			except (PWManError) as e:
-				self.__err("move", str(e))
+				self._err("move", str(e))
 			self.__undo.do("move %s" % params,
 				       "move %s %s" % (
 				       escapeCmd(toCategory), escapeCmd(fromCategory)))
 		else:
-			self.__err("move", "Invalid parameters.")
+			self._err("move", "Invalid parameters.")
 	do_mv = do_move
 	do_rename = do_move
 
 	@completion
 	def complete_move(self, text, line, begidx, endidx):
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if paramIdx in (0, 2):
 			# Category completion
 			return self.__getCategoryCompletions(text)
 		elif paramIdx in (1, 3):
 			# Entry title completion
-			category = self._getComplParam(line, 0 if paramIdx == 1 else 2)
+			category = PWManOpts.parseComplParam(line, 0 if paramIdx == 1 else 2)
 			return self.__getEntryTitleCompletions(category, text)
 		return []
 	complete_mv = complete_move
@@ -792,15 +979,15 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		  -c   Dump format CSV.\n
 		WARNING: The database dump is not encrypted.\n
 		Aliases: None"""
-		opts = self._getOpts(params, self.__dbdump_opts)
+		opts = PWManOpts.parse(params, self.__dbdump_opts)
 		if opts.nrParams > 1:
-			self.__err("dbdump", "Too many arguments.")
+			self._err("dbdump", "Too many arguments.")
 		optFmtSqlDump = "-s" in opts
 		optFmtHumanReadable = "-h" in opts
 		optFmtCsv = "-c" in opts
 		numFmtOpts = int(optFmtSqlDump) + int(optFmtHumanReadable) + int(optFmtCsv)
 		if not 0 <= numFmtOpts <= 1:
-			self.__err("dbdump", "Multiple format OPTions. "
+			self._err("dbdump", "Multiple format OPTions. "
 					     "Only one is allowed.")
 		if numFmtOpts == 0:
 			optFmtSqlDump = True
@@ -822,16 +1009,16 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			else:
 				stdout(dump)
 		except UnicodeError as e:
-			self.__err("dbdump", "Unicode error.")
+			self._err("dbdump", "Unicode error.")
 		except IOError as e:
-			self.__err("dbdump", "Failed to write dump: %s" % e.strerror)
+			self._err("dbdump", "Failed to write dump: %s" % e.strerror)
 
 	@completion
 	def complete_dbdump(self, text, line, begidx, endidx):
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if text == "-":
 			return self.__dbdump_opts
-		opts = self._getOpts(line, self.__dbdump_opts, ignoreFirst=True)
+		opts = PWManOpts.parse(line, self.__dbdump_opts, ignoreFirst=True)
 		optName, value = opts.atCmdIndex(paramIdx)
 		if optName: # -... option
 			return [ text + " " ]
@@ -851,13 +1038,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			with open(params, "rb") as f:
 				data = f.read().decode("UTF-8")
 			self.__db.importSqlScript(data)
-			self.__info("dbimport", "success.")
+			self._info("dbimport", "success.")
 		except (CSQLError, IOError, UnicodeError) as e:
-			self.__err("dbimport", "Failed to import dump: %s" % str(e))
+			self._err("dbimport", "Failed to import dump: %s" % str(e))
 
 	@completion
 	def complete_dbimport(self, text, line, begidx, endidx):
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if paramIdx == 0:
 			return self.__getPathCompletions(text)
 		return []
@@ -888,7 +1075,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		(*) = These OPTS are enabled by default, if and only if
 		      none of them are specified by the user.\n
 		Aliases: f"""
-		opts = self._getOpts(params, self.__find_opts)
+		opts = PWManOpts.parse(params, self.__find_opts)
 		mCategory = "-c" in opts
 		mTitle = "-t" in opts
 		mUser = "-u" in opts
@@ -900,11 +1087,11 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		if not any( (mTitle, mUser, mPw, mBulk, mAttrData) ):
 			mTitle, mUser, mPw, mBulk, mAttrData = (True,) * 5
 		if opts.nrParams < 1 or opts.nrParams > 2:
-			self.__err("find", "Invalid parameters.")
+			self._err("find", "Invalid parameters.")
 		inCategory = opts.getParam(0) if opts.nrParams > 1 else None
 		pattern = opts.getParam(1) if opts.nrParams > 1 else opts.getParam(0)
 		if inCategory and mCategory:
-			self.__err("find", "-c and [IN_CATEGORY] cannot be used at the same time.")
+			self._err("find", "-c and [IN_CATEGORY] cannot be used at the same time.")
 		entries = self.__db.findEntries(pattern=pattern,
 						useRegexp=regexp,
 						inCategory=inCategory,
@@ -916,17 +1103,17 @@ class PWMan(Cmd, metaclass=PWManMeta):
 						matchAttrName=mAttrName,
 						matchAttrData=mAttrData)
 		if not entries:
-			self.__err("find", "'%s' not found" % pattern)
+			self._err("find", "'%s' not found" % pattern)
 		for entry in entries:
-			self.__info(None, self.__db.dumpEntry(entry))
+			self._info(None, self.__db.dumpEntry(entry))
 	do_f = do_find
 
 	@completion
 	def complete_find(self, text, line, begidx, endidx):
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if text == "-":
 			return self.__find_opts
-		opts = self._getOpts(line, self.__find_opts, ignoreFirst=True)
+		opts = PWManOpts.parse(line, self.__find_opts, ignoreFirst=True)
 		optName, value = opts.atCmdIndex(paramIdx)
 		if optName: # -... option
 			return [ text + " " ]
@@ -940,36 +1127,36 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		Command: totp [CATEGORY TITLE] OR [TITLE]\n
 		Generates a token using the Time-Based One-Time Password Algorithm.\n
 		Aliases: t"""
-		first, second = self._getParams(params, 0, 2)
+		first, second = PWManOpts.parseParams(params, 0, 2)
 		if not first:
-			self.__err("totp", "First parameter is required.")
+			self._err("totp", "First parameter is required.")
 		if second:
 			category, title = first, second
 		else:
 			entries = self.__db.findEntries(first, matchTitle=True)
 			if not entries:
-				self.__err("totp", "Entry title not found.")
+				self._err("totp", "Entry title not found.")
 				return
 			elif len(entries) == 1:
 				category = entries[0].category
 				title = entries[0].title
 			else:
-				self.__err("totp", "Entry title ambiguous.")
+				self._err("totp", "Entry title ambiguous.")
 				return
 		entry = self.__db.getEntry(category, title)
 		if not entry:
-			self.__err("totp", "'%s/%s' not found" % (category, title))
+			self._err("totp", "'%s/%s' not found" % (category, title))
 		entryTotp = self.__db.getEntryTotp(entry)
 		if not entryTotp:
-			self.__err("totp", "'%s/%s' does not have "
+			self._err("totp", "'%s/%s' does not have "
 				   "TOTP key information" % (category, title))
 		try:
 			token = totp(key=entryTotp.key,
 				     nrDigits=entryTotp.digits,
 				     hmacHash=entryTotp.hmacHash)
 		except OtpError as e:
-			self.__err("totp", "Failed to generate TOTP: %s" % str(e))
-		self.__info(None, "%s" % token)
+			self._err("totp", "Failed to generate TOTP: %s" % str(e))
+		self._info(None, "%s" % token)
 	do_t = do_totp
 
 	complete_totp = __complete_category_title
@@ -983,14 +1170,14 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		DIGITS default to 6, if not provided.
 		HASH defaults to SHA1, if not provided.\n
 		Aliases: et"""
-		category, title, key, digits, _hash = self._getParams(params, 0, 5)
+		category, title, key, digits, _hash = PWManOpts.parseParams(params, 0, 5)
 		if not category:
-			self.__err("edit_totp", "Category parameter is required.")
+			self._err("edit_totp", "Category parameter is required.")
 		if not title:
-			self.__err("edit_totp", "Title parameter is required.")
+			self._err("edit_totp", "Title parameter is required.")
 		entry = self.__db.getEntry(category, title)
 		if not entry:
-			self.__err("edit_totp", "'%s/%s' not found" % (category, title))
+			self._err("edit_totp", "'%s/%s' not found" % (category, title))
 		entryTotp = self.__db.getEntryTotp(entry)
 		if not entryTotp:
 			entryTotp = PWManEntryTOTP(key=None, entry=entry)
@@ -1000,7 +1187,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			try:
 				entryTotp.digits = int(digits)
 			except ValueError:
-				self.__err("edit_totp", "Invalid digits parameter.")
+				self._err("edit_totp", "Invalid digits parameter.")
 		if _hash:
 			entryTotp.hmacHash = _hash
 		self.__db.setEntryTotp(entryTotp)
@@ -1015,10 +1202,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	@completion
 	def complete_edit_totp(self, text, line, begidx, endidx):
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
-		category, title = self._getComplParams(line, 0, 2)
+		category, title = PWManOpts.parseComplParams(line, 0, 2)
 		if category and title:
 			entry = self.__db.getEntry(category, title)
 			if entry:
@@ -1038,14 +1225,14 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		Command: edit_attr category title NAME [DATA]\n
 		Edit or delete an entry attribute.\n
 		Aliases: ea"""
-		category, title, name, data = self._getParams(params, 0, 4)
+		category, title, name, data = PWManOpts.parseParams(params, 0, 4)
 		if not category:
-			self.__err("edit_attr", "Category parameter is required.")
+			self._err("edit_attr", "Category parameter is required.")
 		if not title:
-			self.__err("edit_attr", "Title parameter is required.")
+			self._err("edit_attr", "Title parameter is required.")
 		entry = self.__db.getEntry(category, title)
 		if not entry:
-			self.__err("edit_attr", "'%s/%s' not found" % (category, title))
+			self._err("edit_attr", "'%s/%s' not found" % (category, title))
 		entryAttr = self.__db.getEntryAttr(entry, name)
 		if not entryAttr:
 			entryAttr = PWManEntryAttr(name=name, entry=entry)
@@ -1062,10 +1249,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	@completion
 	def complete_edit_attr(self, text, line, begidx, endidx):
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if paramIdx in (0, 1):
 			return self.__complete_category_title(text, line, begidx, endidx)
-		category, title, name = self._getComplParams(line, 0, 3)
+		category, title, name = PWManOpts.parseComplParams(line, 0, 3)
 		return self.__getEntryAttrCompletions(category, title, name,
 						      doName=(paramIdx == 2),
 						      doData=(paramIdx == 3),
@@ -1086,15 +1273,15 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		-c  Generate a context diff
 		-n  Generate an ndiff\n
 		Aliases: None"""
-		opts = self._getOpts(params, self.__diff_opts)
+		opts = PWManOpts.parse(params, self.__diff_opts)
 		if opts.nrParams > 1:
-			self.__err("diff", "Too many arguments.")
+			self._err("diff", "Too many arguments.")
 		optUnified = "-u" in opts
 		optContext = "-c" in opts
 		optNdiff = "-n" in opts
 		numFmtOpts = int(optUnified) + int(optContext) + int(optNdiff)
 		if not 0 <= numFmtOpts <= 1:
-			self.__err("diff", "Multiple format OPTions. "
+			self._err("diff", "Multiple format OPTions. "
 					   "Only one is allowed.")
 		if numFmtOpts == 0:
 			optUnified = True
@@ -1103,12 +1290,12 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			if dbFile:
 				path = pathlib.Path(dbFile)
 				if not path.exists():
-					self.__err("diff", "'%s' does not exist." % dbFile)
+					self._err("diff", "'%s' does not exist." % dbFile)
 				passphrase = readPassphrase(
 						"Master passphrase of '%s'" % dbFile,
 						verify=False)
 				if passphrase is None:
-					self.__err("diff", "Could not get passphrase.")
+					self._err("diff", "Could not get passphrase.")
 				oldDb = PWManDatabase(filename=path,
 						      passphrase=passphrase,
 						      readOnly=True)
@@ -1123,16 +1310,16 @@ class PWMan(Cmd, metaclass=PWManMeta):
 				diffText = diff.getNdiffDiff()
 			else:
 				assert(0)
-			self.__info(None, diffText)
+			self._info(None, diffText)
 		except PWManError as e:
-			self.__err("diff", "Failed: %s" % str(e))
+			self._err("diff", "Failed: %s" % str(e))
 
 	@completion
 	def complete_diff(self, text, line, begidx, endidx):
-		paramIdx = self._calcParamIndex(line, endidx)
+		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if text == "-":
 			return self.__diff_opts
-		opts = self._getOpts(line, self.__diff_opts, ignoreFirst=True)
+		opts = PWManOpts.parse(line, self.__diff_opts, ignoreFirst=True)
 		optName, value = opts.atCmdIndex(paramIdx)
 		if optName: # -... option
 			return [ text + " " ]
@@ -1147,17 +1334,17 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		Aliases: None"""
 		cmd = self.__undo.undo()
 		if not cmd:
-			self.__err("undo", "There is no command to be undone.")
+			self._err("undo", "There is no command to be undone.")
 		self.__undo.freeze()
 		try:
 			for undoCommand in cmd.undoCommands:
 				self.onecmd(undoCommand)
 		finally:
 			self.__undo.thaw()
-		self.__info("undo",
-			    "\n    " + "\n    ".join(cmd.doCommands) +
-			    "\nsuccessfully undone with:\n" +
-			    "    " + "\n    ".join(cmd.undoCommands))
+		self._info("undo",
+			   "\n    " + "\n    ".join(cmd.doCommands) +
+			   "\nsuccessfully undone with:\n" +
+			   "    " + "\n    ".join(cmd.undoCommands))
 
 	def do_redo(self, params):
 		"""--- Redo the last undone command ---
@@ -1167,193 +1354,24 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		Aliases: None"""
 		cmd = self.__undo.redo()
 		if not cmd:
-			self.__err("redo", "There is no undone command to be redone.")
+			self._err("redo", "There is no undone command to be redone.")
 		self.__undo.freeze()
 		try:
 			for doCommand in cmd.doCommands:
 				self.onecmd(doCommand)
 		finally:
 			self.__undo.thaw()
-		self.__info("redo",
-			    "\n    " + "\n    ".join(cmd.undoCommands) +
-			    "\nsuccessfully redone with:\n" +
-			    "    " + "\n    ".join(cmd.doCommands))
-
-	def _skipParams(self, line, count,
-			 lineIncludesCommand=False, unescape=True):
-		# Return a parameter string with the first 'count'
-		# parameters skipped.
-		sline = self._patchSpaceEscapes(line)
-		if lineIncludesCommand:
-			count += 1
-		i = 0
-		while i < len(sline) and count > 0:
-			while i < len(sline) and not sline[i].isspace():
-				i += 1
-			while i < len(sline) and sline[i].isspace():
-				i += 1
-			count -= 1
-		if i >= len(sline):
-			return ""
-		s = line[i:]
-		if unescape:
-			s = unescapeCmd(s)
-		return s
-
-	def _calcParamIndex(self, line, endidx):
-		# Returns the parameter index into the commandline
-		# given the character end-index. This honors space-escape.
-		line = self._patchSpaceEscapes(line)
-		startidx = endidx - 1
-		while startidx > 0 and not line[startidx].isspace():
-			startidx -= 1
-		return len([l for l in line[:startidx].split() if l]) - 1
-
-	def _patchSpaceEscapes(self, line):
-		# Patch a commandline for simple whitespace based splitting.
-		# We just replace the space escape sequence by a random
-		# non-whitespace string. The line remains the same size.
-		return line.replace('\\ ', '_S')
-
-	def _getParam(self, line, paramIndex,
-		       ignoreFirst=False, unescape=True):
-		"""Returns the full parameter from the commandline.
-		"""
-		sline = self._patchSpaceEscapes(line)
-		if ignoreFirst:
-			paramIndex += 1
-		inParam = False
-		idx = 0
-		for startIndex, c in enumerate(sline):
-			if c.isspace():
-				if inParam:
-					idx += 1
-				inParam = False
-			else:
-				inParam = True
-				if idx == paramIndex:
-					break
-		else:
-			return ""
-		endIndex = startIndex
-		while endIndex < len(sline) and not sline[endIndex].isspace():
-			endIndex += 1
-		p = line[startIndex : endIndex]
-		if unescape:
-			p = unescapeCmd(p)
-		return p
-
-	def _getComplParam(self, line, paramIndex, unescape=True):
-		return self._getParam(line, paramIndex,
-				      ignoreFirst=True, unescape=unescape)
-
-	def _getParams(self, line, paramIndex, count,
-		       ignoreFirst=False, unescape=True):
-		"""Returns a generator of the specified parameters from the commandline.
-		paramIndex: start index.
-		count: Number of paramerts to fetch.
-		"""
-		return ( self._getParam(line, i, ignoreFirst, unescape)
-			 for i in range(paramIndex, paramIndex + count) )
-
-	def _getComplParams(self, line, paramIndex, count, unescape=True):
-		return self._getParams(line, paramIndex, count,
-				       ignoreFirst=True, unescape=unescape)
-
-	@dataclass
-	class Opts:
-		__opts : list = field(default_factory=list)
-		__params : list = field(default_factory=list)
-		__atCmdIndex : dict = field(default_factory=dict)
-
-		def _appendOpt(self, cmdIndex, optName, optValue=None):
-			self.__opts.append( (optName, optValue) )
-			self.__atCmdIndex[cmdIndex] = (optName, optValue)
-
-		def _appendParam(self, cmdIndex, param):
-			self.__params.append(param)
-			self.__atCmdIndex[cmdIndex] = (None, param)
-
-		def __contains__(self, optName):
-			"""Check if we have a specific "-X" style option.
-			"""
-			return optName in (o[0] for o in self.__opts)
-
-		@property
-		def hasOpts(self):
-			"""Do we have -X style options?
-			"""
-			return bool(self.__opts)
-
-		def getOpt(self, optName):
-			"""Get an option value by "-X" style name.
-			"""
-			if optName in self:
-				return [ o[1] for o in self.__opts if o[0] == optName ][-1]
-			return None
-
-		@property
-		def nrParams(self):
-			"""The number of trailing parameters.
-			"""
-			return len(self.__params)
-
-		def getParam(self, index):
-			"""Get a trailing parameter at index.
-			"""
-			return self.__params[index]
-
-		def atCmdIndex(self, cmdIndex):
-			"""Get an item (option or parameter) at command line index cmdIndex.
-			Returns (optName, optValue) if it is an option.
-			Returns (None, parameter) if it is a parameter.
-			Returns (None, None) if it does not exist.
-			"""
-			return self.__atCmdIndex.get(cmdIndex, (None, None))
-
-	def _getOpts(self, line, possibleOpts,
-		     ignoreFirst=False, unescape=True):
-		"""Parses the command options in 'line' and returns an Opts instance.
-		possibleOpts is a tuple of the possible options.
-		"""
-		possibleOptsPlain = [ o.replace(":", "") for o in possibleOpts ]
-		opts = self.Opts()
-		i = 0
-		while True:
-			p = self._getParam(line, i,
-					   ignoreFirst=ignoreFirst,
-					   unescape=unescape)
-			if not p:
-				break
-			if opts.nrParams:
-				opts._appendParam(i, p)
-			else:
-				try:
-					optIdx = possibleOptsPlain.index(p)
-				except ValueError:
-					opts._appendParam(i, p)
-					i += 1
-					continue
-				if possibleOpts[optIdx].endswith(":"):
-					i += 1
-					arg = self._getParam(line, i,
-							     ignoreFirst=ignoreFirst,
-							     unescape=unescape)
-					if not arg:
-						self.__err(None, "Option '%s' "
-							   "requires an argument." % p)
-					opts._appendOpt(i, p, arg)
-				else:
-					opts._appendOpt(i, p)
-			i += 1
-		return opts
+		self._info("redo",
+			   "\n    " + "\n    ".join(cmd.undoCommands) +
+			   "\nsuccessfully redone with:\n" +
+			   "    " + "\n    ".join(cmd.doCommands))
 
 	def __mayQuit(self):
 		if self.__db.isDirty():
-			self.__warn(None,
-				    "Warning: Uncommitted changes. Operation not performed.\n"
-				    "Use command 'commit' to write the changes to the database.\n"
-				    "Use command 'quit!' to quit without saving.")
+			self._warn(None,
+				   "Warning: Uncommitted changes. Operation not performed.\n"
+				   "Use command 'commit' to write the changes to the database.\n"
+				   "Use command 'quit!' to quit without saving.")
 			return False
 		return True
 
@@ -1372,13 +1390,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 						self.do_cls("")
 						break
 				except EscapeError as e:
-					self.__warn(None, str(e))
+					self._warn(None, str(e))
 				except self.CommandError as e:
 					print(str(e), file=sys.stderr)
 				except (KeyboardInterrupt, EOFError) as e:
 					print("")
 				except CSQLError as e:
-					self.__warn(None, "SQL error: %s" % str(e))
+					self._warn(None, "SQL error: %s" % str(e))
 		finally:
 			self.__isInteractive = False
 
