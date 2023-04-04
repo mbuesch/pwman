@@ -197,6 +197,18 @@ class PWManOpts:
 			return default
 		return self.__params[index]
 
+	def getComplParamIdx(self, complText):
+		"""Get the parameter index in an active completion.
+		complText: The partial parameter text in the completion.
+		"""
+		if complText:
+			paramIdx = self.nrParams - 1
+		else:
+			paramIdx = self.nrParams
+		if paramIdx < 0:
+			return None
+		return paramIdx
+
 	def atCmdIndex(self, cmdIndex):
 		"""Get an item (option or parameter) at command line index cmdIndex.
 		Returns (optName, optValue) if it is an option.
@@ -1024,7 +1036,9 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		optName, value = opts.atCmdIndex(paramIdx)
 		if optName: # -... option
 			return [ text + " " ]
-		if (opts.nrParams == 0 and not text) or (opts.nrParams == 1 and text): # trailing param
+		paramIdx = opts.getComplParamIdx(text)
+		if paramIdx == 0:
+			# filepath
 			return self.__getPathCompletions(text)
 		return []
 
@@ -1119,7 +1133,9 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		optName, value = opts.atCmdIndex(paramIdx)
 		if optName: # -... option
 			return [ text + " " ]
-		if (opts.nrParams == 0 and not text) or (opts.nrParams == 1 and text): # category
+		paramIdx = opts.getComplParamIdx(text)
+		if paramIdx == 0:
+			# category
 			return self.__getCategoryCompletions(text)
 		return []
 	complete_f = complete_find
@@ -1325,7 +1341,9 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		optName, value = opts.atCmdIndex(paramIdx)
 		if optName: # -... option
 			return [ text + " " ]
-		if (opts.nrParams == 0 and not text) or (opts.nrParams == 1 and text): # trailing param
+		paramIdx = opts.getComplParamIdx(text)
+		if paramIdx == 0:
+			# database file path
 			return self.__getPathCompletions(text)
 		return []
 
