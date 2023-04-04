@@ -177,12 +177,12 @@ class PWManOpts:
 		"""
 		return bool(self.__opts)
 
-	def getOpt(self, optName):
+	def getOpt(self, optName, default=None):
 		"""Get an option value by "-X" style name.
 		"""
 		if optName in self:
 			return [ o[1] for o in self.__opts if o[0] == optName ][-1]
-		return None
+		return default
 
 	@property
 	def nrParams(self):
@@ -190,9 +190,11 @@ class PWManOpts:
 		"""
 		return len(self.__params)
 
-	def getParam(self, index):
+	def getParam(self, index, default=None):
 		"""Get a trailing parameter at index.
 		"""
+		if index < 0 or index >= self.nrParams:
+			return default
 		return self.__params[index]
 
 	def atCmdIndex(self, cmdIndex):
@@ -991,7 +993,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 					     "Only one is allowed.")
 		if numFmtOpts == 0:
 			optFmtSqlDump = True
-		dumpFile = opts.getParam(0) if opts.nrParams > 0 else None
+		dumpFile = opts.getParam(0)
 		try:
 			if optFmtSqlDump:
 				dump = self.__db.sqlPlainDump() + b"\n"
@@ -1285,7 +1287,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 					   "Only one is allowed.")
 		if numFmtOpts == 0:
 			optUnified = True
-		dbFile = opts.getParam(0) if opts.nrParams > 0 else None
+		dbFile = opts.getParam(0)
 		try:
 			if dbFile:
 				path = pathlib.Path(dbFile)
