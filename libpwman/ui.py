@@ -1035,11 +1035,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	@completion
 	def complete_dbdump(self, text, line, begidx, endidx):
-		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if text == "-":
 			return PWManOpts.rawOptTemplates(self.__dbdump_opts)
 		opts = PWManOpts.parse(line, self.__dbdump_opts, ignoreFirst=True)
-		optName, value = opts.atCmdIndex(paramIdx)
+		optName, value = opts.atCmdIndex(PWManOpts.calcParamIndex(line, endidx))
 		if optName: # -... option
 			return [ text + " " ]
 		paramIdx = opts.getComplParamIdx(text)
@@ -1132,11 +1131,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	@completion
 	def complete_find(self, text, line, begidx, endidx):
-		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if text == "-":
 			return PWManOpts.rawOptTemplates(self.__find_opts)
 		opts = PWManOpts.parse(line, self.__find_opts, ignoreFirst=True)
-		optName, value = opts.atCmdIndex(paramIdx)
+		optName, value = opts.atCmdIndex(PWManOpts.calcParamIndex(line, endidx))
 		if optName: # -... option
 			return [ text + " " ]
 		paramIdx = opts.getComplParamIdx(text)
@@ -1340,11 +1338,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	@completion
 	def complete_diff(self, text, line, begidx, endidx):
-		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if text == "-":
 			return PWManOpts.rawOptTemplates(self.__diff_opts)
 		opts = PWManOpts.parse(line, self.__diff_opts, ignoreFirst=True)
-		optName, value = opts.atCmdIndex(paramIdx)
+		optName, value = opts.atCmdIndex(PWManOpts.calcParamIndex(line, endidx))
 		if optName: # -... option
 			return [ text + " " ]
 		paramIdx = opts.getComplParamIdx(text)
