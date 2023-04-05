@@ -20,9 +20,10 @@ import readline
 import sys
 import time
 import traceback
-from copy import copy, deepcopy
 from cmd import Cmd
+from copy import copy, deepcopy
 from dataclasses import dataclass, field
+from typing import Optional, Tuple
 
 if osIsPosix:
 	import signal
@@ -116,17 +117,19 @@ class PWManOpts:
 	__opts : list = field(default_factory=list)
 	__params : list = field(default_factory=list)
 	__atCmdIndex : dict = field(default_factory=dict)
+	__error : Optional[Tuple[str, str]] = None
 
 	@classmethod
 	def parse(cls,
 		  line,
-		  possibleOpts,
+		  optTemplates,
 		  ignoreFirst=False,
-		  unescape=True):
+		  unescape=True,
+		  softFail=False):
 		"""Parses the command options in 'line' and returns an Opts instance.
-		possibleOpts is a tuple of the possible options.
+		optTemplates is a tuple of the possible options.
 		"""
-		possibleOptsPlain = [ o.replace(":", "") for o in possibleOpts ]
+		optTemplatesRaw = cls.rawOptTemplates(optTemplates)
 		opts = cls()
 		i = 0
 		while True:
@@ -139,16 +142,19 @@ class PWManOpts:
 				opts._appendParam(i, p)
 			else:
 				try:
-					optIdx = possibleOptsPlain.index(p)
+					optIdx = optTemplatesRaw.index(p)
 				except ValueError:
 					opts._appendParam(i, p)
 					i += 1
 					continue
-				if possibleOpts[optIdx].endswith(":"):
+				if optTemplates[optIdx].endswith(":"):
 					i += 1
 					arg = cls.parseParam(line, i,
 							     ignoreFirst=ignoreFirst,
 							     unescape=unescape)
+					if not arg and softFail:
+						opts._setError(p, "opt_arg_missing")
+						break
 					if not arg:
 						PWMan._err(None, "Option '%s' "
 							   "requires an argument." % p)
@@ -166,10 +172,17 @@ class PWManOpts:
 		self.__params.append(param)
 		self.__atCmdIndex[cmdIndex] = (None, param)
 
+	def _setError(self, optName, error):
+		self.__error = (optName, error)
+
 	def __contains__(self, optName):
 		"""Check if we have a specific "-X" style option.
 		"""
 		return optName in (o[0] for o in self.__opts)
+
+	@property
+	def error(self):
+		return self.__error
 
 	@property
 	def hasOpts(self):
