@@ -307,6 +307,12 @@ class PWManOpts:
 		return cls.parseParams(line, paramIndex, count,
 				       ignoreFirst=True, unescape=unescape)
 
+	@classmethod
+	def rawOptTemplates(cls, optTemplates):
+		"""Remove the modifiers from opt templates.
+		"""
+		return [ ot.replace(":", "") for ot in optTemplates ]
+
 # PWMan completion decorator that does common things and workarounds.
 def completion(func):
 	@functools.wraps(func)
@@ -1031,7 +1037,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	def complete_dbdump(self, text, line, begidx, endidx):
 		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if text == "-":
-			return self.__dbdump_opts
+			return PWManOpts.rawOptTemplates(self.__dbdump_opts)
 		opts = PWManOpts.parse(line, self.__dbdump_opts, ignoreFirst=True)
 		optName, value = opts.atCmdIndex(paramIdx)
 		if optName: # -... option
@@ -1128,7 +1134,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	def complete_find(self, text, line, begidx, endidx):
 		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if text == "-":
-			return self.__find_opts
+			return PWManOpts.rawOptTemplates(self.__find_opts)
 		opts = PWManOpts.parse(line, self.__find_opts, ignoreFirst=True)
 		optName, value = opts.atCmdIndex(paramIdx)
 		if optName: # -... option
@@ -1336,7 +1342,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	def complete_diff(self, text, line, begidx, endidx):
 		paramIdx = PWManOpts.calcParamIndex(line, endidx)
 		if text == "-":
-			return self.__diff_opts
+			return PWManOpts.rawOptTemplates(self.__diff_opts)
 		opts = PWManOpts.parse(line, self.__diff_opts, ignoreFirst=True)
 		optName, value = opts.atCmdIndex(paramIdx)
 		if optName: # -... option
