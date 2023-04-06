@@ -146,7 +146,7 @@ class CryptSQL:
 				raise CSQLError("Invalid file header")
 			cipher = fc.getOne(b"CIPHER", "Invalid CYPHER object")
 			cipherMode = fc.getOne(b"CIPHER_MODE", "Invalid CYPHER_MODE object")
-			cipherIV = fc.getOne(b"CIPHER_IV")
+			cipherIV = fc.getOne(b"CIPHER_IV", "Invalid CIPHER_IV object")
 			keyLen = fc.getOne(b"KEY_LEN", "Invalid KEY_LEN object")
 			kdfMethod = fc.getOne(b"KDF_METHOD", "Invalid KDF_METHOD object")
 			kdfSalt = fc.getOne(b"KDF_SALT", "Invalid KDF_SALT object")
@@ -171,8 +171,6 @@ class CryptSQL:
 					cipherMode.decode("UTF-8", "ignore")))
 
 			# Check the cipher IV.
-			if not cipherIV: # legacy
-				cipherIV = b'\x00' * cipherBlockSize
 			if len(cipherIV) != cipherBlockSize:
 				raise CSQLError("Invalid IV len: %d" % len(cipherIV))
 
