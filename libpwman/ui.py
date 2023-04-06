@@ -1392,10 +1392,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			if dbFile:
 				path = pathlib.Path(dbFile)
 				if not path.exists():
-					self._err("diff", "'%s' does not exist." % dbFile)
+					self._err("diff", "'%s' does not exist." % path)
 				passphrase = readPassphrase(
-						"Master passphrase of '%s'" % dbFile,
-						verify=False)
+					"Master passphrase of '%s'" % path,
+					verify=False)
 				if passphrase is None:
 					self._err("diff", "Could not get passphrase.")
 				oldDb = PWManDatabase(filename=path,
