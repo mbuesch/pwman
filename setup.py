@@ -16,9 +16,6 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 for base in (os.getcwd(), basedir):
 	sys.path.insert(0, base)
 
-isWindows = os.name.lower() in {"nt", "ce"}
-isPosix = os.name.lower() == "posix"
-
 # Create freeze executable list.
 extraKeywords = {}
 if cx_Freeze:
