@@ -484,7 +484,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		if paramIdx == 2:
 			cmpl.extend(escapeCmd(n) + " "
 				    for n in ("user", "password", "bulk", "totpkey")
-				    if n.startswith(item.lower()))
+				    if n.startswith(item))
 		cmpl.extend(self.__getEntryAttrCompletions(category, title, item,
 							   doName=(paramIdx == 2),
 							   doData=False,
@@ -494,12 +494,12 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	def __getCategoryCompletions(self, text):
 		return [ escapeCmd(n) + " "
 			 for n in self.__db.getCategoryNames()
-			 if n.lower().startswith(text.lower()) ]
+			 if n.startswith(text) ]
 
 	def __getEntryTitleCompletions(self, category, text):
 		return [ escapeCmd(t) + " "
 			 for t in self.__db.getEntryTitles(category)
-			 if t.lower().startswith(text.lower()) ]
+			 if t.startswith(text) ]
 
 	def __getEntryAttrCompletions(self, category, title, name, doName, doData, text):
 		if category and title:
@@ -510,7 +510,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 					if entryAttrs:
 						return [ escapeCmd(entryAttr.name) + " "
 							 for entryAttr in entryAttrs
-							 if entryAttr.name.lower().startswith(name.lower()) ]
+							 if entryAttr.name.startswith(name) ]
 				elif doData: # complete data
 					entryAttr = self.__db.getEntryAttr(entry, name)
 					if entryAttr:
