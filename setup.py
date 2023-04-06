@@ -7,7 +7,6 @@ try:
 	cx_Freeze = True
 except ImportError:
 	cx_Freeze = False
-import warnings
 import os
 import sys
 
@@ -35,10 +34,6 @@ if cx_Freeze:
 			"excludes" : [ "tkinter", ],
 		}
 	}
-
-warnings.filterwarnings("ignore", r".*'python_requires'.*")
-warnings.filterwarnings("ignore", r".*'install_requires'.*")
-warnings.filterwarnings("ignore", r".*'long_description_content_type'.*")
 
 with open(os.path.join(basedir, "README.rst"), "rb") as fd:
 	readmeText = fd.read().decode("UTF-8")
