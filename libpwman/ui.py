@@ -387,6 +387,8 @@ class PWManMeta(type):
 				# Remove leading double-tabs.
 				attr.__doc__, n = re.subn("^\t\t", "\t", attr.__doc__,
 							  0, re.MULTILINE)
+				# Remove trailing white space.
+				attr.__doc__ = attr.__doc__.rstrip()
 				# Tabs to spaces.
 				attr.__doc__, n = re.subn("\t", " " * 8, attr.__doc__,
 							  0, re.MULTILINE)
@@ -578,9 +580,11 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	)
 
 	def do_help(self, params):
-		"""--- Shows help text about a command ---\n
-		Command: help\n
-		Aliases: h"""
+		"""--- Shows help text about a command ---
+		Command: help
+
+		Aliases: h
+		"""
 		if params:
 			super().do_help(params)
 			return
@@ -607,9 +611,12 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_quit(self, params):
 		"""--- Exit pwman ---
-		Command: quit [!]\n
-		Use the exclamation mark to force quit and discard changes.\n
-		Aliases: q exit ^D"""
+		Command: quit [!]
+
+		Use the exclamation mark to force quit and discard changes.
+
+		Aliases: q exit ^D
+		"""
 		if params == "!":
 			self.__db.flunkDirty()
 		raise self.Quit()
@@ -619,18 +626,23 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_cls(self, params):
 		"""--- Clear console screen and undo/redo buffer ---
-		Command: cls\n
+		Command: cls
+
 		Clear the console screen and all undo/redo buffers.
 		Note that this does not clear a possibly existing
-		'screen' session buffer or other advanced console buffers.\n
-		Aliases: None"""
+		'screen' session buffer or other advanced console buffers.
+
+		Aliases: None
+		"""
 		clearScreen()
 		self.__undo.clear()
 
 	def do_commit(self, params):
-		"""--- Write changes to the database file ---\n
-		Command: commit\n
-		Aliases: c w"""
+		"""--- Write changes to the database file ---
+		Command: commit
+
+		Aliases: c w
+		"""
 		self.__db.commit()
 		if self.__commitClearsUndo:
 			self.__undo.clear()
@@ -638,9 +650,11 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	do_w = do_commit
 
 	def do_masterp(self, params):
-		"""--- Change the master passphrase ---\n
-		Command: masterp\n
-		Aliases: None"""
+		"""--- Change the master passphrase ---
+		Command: masterp
+
+		Aliases: None
+		"""
 		p = readPassphrase("Current master passphrase")
 		if p != self.__db.getPassphrase():
 			time.sleep(1)
@@ -656,13 +670,16 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_list(self, params):
 		"""--- Print a listing ---
-		Command: list [category] [title] [item]\n
+		Command: list [category] [title] [item]
+
 		If a category is given as parameter, list the 
 		contents of the category. If category and entry
 		are given, list the contents of the entry.
 		If item is given, then only list one specific content item.
-		Item may be one of: user, password, bulk, totpkey or any attribute name.\n
-		Aliases: ls cat"""
+		Item may be one of: user, password, bulk, totpkey or any attribute name.
+
+		Aliases: ls cat
+		"""
 		category, title, item = PWManOpts.parseParams(params, 0, 3)
 		if not category and not title and not item:
 			self._info(None, "Categories:")
@@ -722,10 +739,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_new(self, params):
 		"""--- Create a new entry ---
-		Command: new [category] [title] [user] [password]\n
+		Command: new [category] [title] [user] [password]
+
 		Create a new database entry. If no parameters are given,
-		they are asked for interactively.\n
-		Aliases: n add"""
+		they are asked for interactively.
+
+		Aliases: n add
+		"""
 		if params:
 			category, title, user, pw = PWManOpts.parseParams(params, 0, 4)
 		else:
@@ -773,12 +793,15 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_edit_user(self, params):
 		"""--- Edit the 'user' field of an existing entry ---
-		Command: edit_user category title NEWDATA...\n
+		Command: edit_user category title NEWDATA...
+
 		Change the 'user' field of an existing database entry.
 		NEWDATA is the new data to write into the 'user' field.
 		The NEWDATA must _not_ be escaped (however, category and
-		title must be escaped).\n
-		Aliases: eu"""
+		title must be escaped).
+
+		Aliases: eu
+		"""
 		self.__do_edit_entry(params, "edit_user",
 			lambda entry: entry.user,
 			lambda cat, tit, data: PWManEntry(cat, tit, user=data))
@@ -804,12 +827,15 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_edit_pw(self, params):
 		"""--- Edit the 'password' field of an existing entry ---
-		Command: edit_pw category title NEWDATA...\n
+		Command: edit_pw category title NEWDATA...
+
 		Change the 'password' field of an existing database entry.
 		NEWDATA is the new data to write into the 'password' field.
 		The NEWDATA must _not_ be escaped (however, category and
-		title must be escaped).\n
-		Aliases: ep"""
+		title must be escaped).
+
+		Aliases: ep
+		"""
 		self.__do_edit_entry(params, "edit_pw",
 			lambda entry: entry.pw,
 			lambda cat, tit, data: PWManEntry(cat, tit, pw=data))
@@ -835,12 +861,15 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_edit_bulk(self, params):
 		"""--- Edit the 'bulk' field of an existing entry ---
-		Command: edit_bulk category title NEWDATA...\n
+		Command: edit_bulk category title NEWDATA...
+
 		Change the 'bulk' field of an existing database entry.
 		NEWDATA is the new data to write into the 'bulk' field.
 		The NEWDATA must _not_ be escaped (however, category and
-		title must be escaped).\n
-		Aliases: eb"""
+		title must be escaped).
+
+		Aliases: eb
+		"""
 		category, title = PWManOpts.parseParams(params, 0, 2)
 		data = PWManOpts.skipParams(params, 2).strip()
 		if not category:
@@ -886,9 +915,12 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_remove(self, params):
 		"""--- Remove an existing entry ---
-		Command: remove category [title]\n
-		Remove an existing database entry.\n
-		Aliases: rm del"""
+		Command: remove category [title]
+
+		Remove an existing database entry.
+
+		Aliases: rm del
+		"""
 		category, title = PWManOpts.parseParams(params, 0, 2)
 		if not category:
 			self._err("remove", "Category parameter is required.")
@@ -942,12 +974,16 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	complete_del = complete_remove
 
 	def do_move(self, params):
-		"""--- Move/rename an existing entry or a category ---\n
+		"""--- Move/rename an existing entry or a category ---
+
 		Move/rename an existing entry:
-		Command: move category title newCategory [newTitle]\n
+		Command: move category title newCategory [newTitle]
+
 		Rename an existing category:
-		Command: move category newCategory\n
-		Aliases: mv rename"""
+		Command: move category newCategory
+
+		Aliases: mv rename
+		"""
 		p0, p1, p2, p3 = PWManOpts.parseParams(params, 0, 4)
 		if p0 and p1 and p2:
 			# Entry move
@@ -1001,17 +1037,22 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	__dbdump_opts = ("-s", "-h", "-c")
 	def do_dbdump(self, params):
 		"""--- Dump the pwman SQL database ---
-		Command: dbdump [OPTS] [FILEPATH]\n
+		Command: dbdump [OPTS] [FILEPATH]
+
 		If FILEPATH is given, the database is dumped
 		unencrypted to the file.
 		If FILEPATH is omitted, the database is dumped
-		unencrypted to stdout.\n
+		unencrypted to stdout.
+
 		OPTS may be one of:
 		  -s   Dump format SQL. (default)
 		  -h   Dump format human readable text.
-		  -c   Dump format CSV.\n
-		WARNING: The database dump is not encrypted.\n
-		Aliases: None"""
+		  -c   Dump format CSV.
+
+		WARNING: The database dump is not encrypted.
+
+		Aliases: None
+		"""
 		opts = PWManOpts.parse(params, self.__dbdump_opts)
 		if opts.nrParams > 1:
 			self._err("dbdump", "Too many arguments.")
@@ -1063,10 +1104,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_dbimport(self, params):
 		"""--- Import an SQL database dump ---
-		Command: dbimport FILEPATH\n
+		Command: dbimport FILEPATH
+
 		Import the FILEPATH into the current database.
-		The database is cleared before importing the file!\n
-		Aliases: None"""
+		The database is cleared before importing the file!
+
+		Aliases: None
+		"""
 		try:
 			if not params.strip():
 				raise IOError("FILEPATH is empty.")
@@ -1086,18 +1130,22 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_drop(self, params):
 		"""--- Drop all uncommitted changes ---
-		Command: drop\n
-		Aliases: None"""
+		Command: drop
+
+		Aliases: None
+		"""
 		self.__db.dropUncommitted()
 
 	__find_opts = ("-c", "-t", "-u", "-p", "-b", "-a", "-A", "-r")
 	def do_find(self, params):
 		"""--- Search the database ---
-		Command: find [OPTS] [IN_CATEGORY] PATTERN\n
+		Command: find [OPTS] [IN_CATEGORY] PATTERN
+
 		Searches the database for patterns. If 'IN_CATEGORY' is given, only search
 		in the specified category.
 		PATTERN may either use SQL LIKE wildcards (without -r)
-		or Python Regular Expression special characters (with -r).\n
+		or Python Regular Expression special characters (with -r).
+
 		OPTS may be one or multiple of:
 		  -c   Match 'category'       (only if no IN_CATEGORY parameter)
 		  -t   Match 'title'          (*)
@@ -1106,10 +1154,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		  -b   Match 'bulk'           (*)
 		  -a   Match 'attribute data' (*)
 		  -A   Match 'attribute name'
-		  -r   Use Python Regular Expression matching\n
+		  -r   Use Python Regular Expression matching
+
 		(*) = These OPTS are enabled by default, if and only if
-		      none of them are specified by the user.\n
-		Aliases: f"""
+		      none of them are specified by the user.
+
+		Aliases: f
+		"""
 		opts = PWManOpts.parse(params, self.__find_opts)
 		mCategory = "-c" in opts
 		mTitle = "-t" in opts
@@ -1161,9 +1212,12 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_totp(self, params):
 		"""--- Generate a TOTP token ---
-		Command: totp [CATEGORY TITLE] OR [TITLE]\n
-		Generates a token using the Time-Based One-Time Password Algorithm.\n
-		Aliases: t"""
+		Command: totp [CATEGORY TITLE] OR [TITLE]
+
+		Generates a token using the Time-Based One-Time Password Algorithm.
+
+		Aliases: t
+		"""
 		first, second = PWManOpts.parseParams(params, 0, 2)
 		if not first:
 			self._err("totp", "First parameter is required.")
@@ -1201,12 +1255,15 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_edit_totp(self, params):
 		"""--- Edit TOTP key and parameters ---
-		Command: edit_totp category title [KEY] [DIGITS] [HASH]\n
+		Command: edit_totp category title [KEY] [DIGITS] [HASH]
+
 		Set Time-Based One-Time Password Algorithm key and parameters.
 		If KEY is not provided, the TOTP parameters for this entry are deleted.
 		DIGITS default to 6, if not provided.
-		HASH defaults to SHA1, if not provided.\n
-		Aliases: et"""
+		HASH defaults to SHA1, if not provided.
+
+		Aliases: et
+		"""
 		category, title, key, digits, _hash = PWManOpts.parseParams(params, 0, 5)
 		if not category:
 			self._err("edit_totp", "Category parameter is required.")
@@ -1259,9 +1316,12 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_edit_attr(self, params):
 		"""--- Edit an entry attribute ---
-		Command: edit_attr category title NAME [DATA]\n
-		Edit or delete an entry attribute.\n
-		Aliases: ea"""
+		Command: edit_attr category title NAME [DATA]
+
+		Edit or delete an entry attribute.
+
+		Aliases: ea
+		"""
 		category, title, name, data = PWManOpts.parseParams(params, 0, 4)
 		if not category:
 			self._err("edit_attr", "Category parameter is required.")
@@ -1299,17 +1359,22 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	__diff_opts = ("-u", "-c", "-n")
 	def do_diff(self, params):
 		"""--- Diff the current database to another database ---
-		Command: diff [OPTS] [DATABASE_FILE]\n
+		Command: diff [OPTS] [DATABASE_FILE]
+
 		If no DATABASE_FILE is provided: Diffs the latest changes in the
 		currently open database to the committed changes in the current database.
-		This can be used to review changes before commit.\n
+		This can be used to review changes before commit.
+
 		If DATABASE_FILE is provided: Diffs the latest changes in the
-		currently opened database to the contents of DATABASE_FILE.\n
+		currently opened database to the contents of DATABASE_FILE.
+
 		OPTS may be one of:
 		-u  Generate a unified diff (default if no OPT is given).
 		-c  Generate a context diff
-		-n  Generate an ndiff\n
-		Aliases: None"""
+		-n  Generate an ndiff
+
+		Aliases: None
+		"""
 		opts = PWManOpts.parse(params, self.__diff_opts)
 		if opts.nrParams > 1:
 			self._err("diff", "Too many arguments.")
@@ -1368,9 +1433,12 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_undo(self, params):
 		"""--- Undo the last command ---
-		Command: undo\n
-		Rewinds the last command that changed the database.\n
-		Aliases: None"""
+		Command: undo
+
+		Rewinds the last command that changed the database.
+
+		Aliases: None
+		"""
 		cmd = self.__undo.undo()
 		if not cmd:
 			self._err("undo", "There is no command to be undone.")
@@ -1387,10 +1455,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_redo(self, params):
 		"""--- Redo the last undone command ---
-		Command: redo\n
+		Command: redo
+
 		Redoes the last undone command.
-		Also see 'undo' help.\n
-		Aliases: None"""
+		Also see 'undo' help.
+
+		Aliases: None
+		"""
 		cmd = self.__undo.redo()
 		if not cmd:
 			self._err("redo", "There is no undone command to be redone.")
