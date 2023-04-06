@@ -106,7 +106,8 @@ class AES:
 			else:
 				unpadData = self.__cryptodome.Util.Padding.unpad(
 					padded_data=decData,
-					block_size=self.BLOCK_SIZE)
+					block_size=self.BLOCK_SIZE,
+					style="pkcs7")
 			return unpadData
 
 		if self.__pyaes is not None:
