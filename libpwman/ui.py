@@ -153,7 +153,7 @@ class PWManOpts:
 							     ignoreFirst=ignoreFirst,
 							     unescape=unescape)
 					if not arg and softFail:
-						opts._setError(p, "opt_arg_missing")
+						opts._setError(p, "no_arg")
 						break
 					if not arg:
 						PWMan._err(None, "Option '%s' "
@@ -1050,10 +1050,9 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	def complete_dbdump(self, text, line, begidx, endidx):
 		if text == "-":
 			return PWManOpts.rawOptTemplates(self.__dbdump_opts)
-		opts = PWManOpts.parse(line, self.__dbdump_opts, ignoreFirst=True)
-		optName, value = opts.atCmdIndex(PWManOpts.calcParamIndex(line, endidx))
-		if optName: # -... option
+		if len(text) == 2 and text.startswith("-"):
 			return [ text + " " ]
+		opts = PWManOpts.parse(line, self.__dbdump_opts, ignoreFirst=True)
 		paramIdx = opts.getComplParamIdx(text)
 		if paramIdx == 0:
 			# filepath
@@ -1146,10 +1145,9 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	def complete_find(self, text, line, begidx, endidx):
 		if text == "-":
 			return PWManOpts.rawOptTemplates(self.__find_opts)
-		opts = PWManOpts.parse(line, self.__find_opts, ignoreFirst=True)
-		optName, value = opts.atCmdIndex(PWManOpts.calcParamIndex(line, endidx))
-		if optName: # -... option
+		if len(text) == 2 and text.startswith("-"):
 			return [ text + " " ]
+		opts = PWManOpts.parse(line, self.__find_opts, ignoreFirst=True)
 		paramIdx = opts.getComplParamIdx(text)
 		if paramIdx == 0:
 			# category
@@ -1353,10 +1351,9 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	def complete_diff(self, text, line, begidx, endidx):
 		if text == "-":
 			return PWManOpts.rawOptTemplates(self.__diff_opts)
-		opts = PWManOpts.parse(line, self.__diff_opts, ignoreFirst=True)
-		optName, value = opts.atCmdIndex(PWManOpts.calcParamIndex(line, endidx))
-		if optName: # -... option
+		if len(text) == 2 and text.startswith("-"):
 			return [ text + " " ]
+		opts = PWManOpts.parse(line, self.__diff_opts, ignoreFirst=True)
 		paramIdx = opts.getComplParamIdx(text)
 		if paramIdx == 0:
 			# database file path
