@@ -1052,7 +1052,9 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			return PWManOpts.rawOptTemplates(self.__dbdump_opts)
 		if len(text) == 2 and text.startswith("-"):
 			return [ text + " " ]
-		opts = PWManOpts.parse(line, self.__dbdump_opts, ignoreFirst=True)
+		opts = PWManOpts.parse(line, self.__dbdump_opts, ignoreFirst=True, softFail=True)
+		if opts.error:
+			return []
 		paramIdx = opts.getComplParamIdx(text)
 		if paramIdx == 0:
 			# filepath
@@ -1147,7 +1149,9 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			return PWManOpts.rawOptTemplates(self.__find_opts)
 		if len(text) == 2 and text.startswith("-"):
 			return [ text + " " ]
-		opts = PWManOpts.parse(line, self.__find_opts, ignoreFirst=True)
+		opts = PWManOpts.parse(line, self.__find_opts, ignoreFirst=True, softFail=True)
+		if opts.error:
+			return []
 		paramIdx = opts.getComplParamIdx(text)
 		if paramIdx == 0:
 			# category
@@ -1353,7 +1357,9 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			return PWManOpts.rawOptTemplates(self.__diff_opts)
 		if len(text) == 2 and text.startswith("-"):
 			return [ text + " " ]
-		opts = PWManOpts.parse(line, self.__diff_opts, ignoreFirst=True)
+		opts = PWManOpts.parse(line, self.__diff_opts, ignoreFirst=True, softFail=True)
+		if opts.error:
+			return []
 		paramIdx = opts.getComplParamIdx(text)
 		if paramIdx == 0:
 			# database file path
