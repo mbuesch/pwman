@@ -524,7 +524,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		("edit_totp", ("et",), "Edit the TOTP key and parameters"),
 		("edit_attr", ("ea",), "Edit an entry attribute"),
 		("move", ("mv", "rename"), "Move/rename an existing entry"),
-#TODO		("copy", ("cp",), "Copy an existing entry or category"),
+		("copy", ("cp",), "Copy an existing entry or category"),
 		("remove", ("rm", "del"), "Remove an existing entry"),
 	)
 
@@ -1050,6 +1050,88 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		return []
 	complete_mv = complete_move
 	complete_rename = complete_move
+
+	__copy_opts = ("-s:", "-d:")
+	def do_copy(self, params):
+		"""--- Copy an entry or a category ---
+		Options:
+		  -s SOURCE_DATABASE_NAME
+		  -d DESTINATION_DATABASE_NAME
+		  Databases default to the currently selected database.
+
+		Copy an existing entry:
+		Command: copy CATEGORY TITLE TO_CATEGORY [NEW_TITLE]
+		(NEW_TITLE defaults to TITLE)
+
+		Copy all entries from a category to a new category:
+		Command: copy CATEGORY NEW_CATEGORY
+
+		Copy an entry from one database to another:
+		Command: copy -s main -d other CATEGORY TITLE TO_CATEGORY [NEW_TITLE]
+		(NEW_TITLE defaults to TITLE)
+
+		Copy all entries from a category from one database to another database:
+		Command: copy -s main -d other CATEGORY [NEW_CATEGORY]
+		(NEW_CATEGORY defaults to CATEGORY)
+
+		The named databases must be open. See 'database' command.
+
+		Aliases: cp
+		"""
+		opts = PWManOpts.parse(params, self.__copy_opts)
+
+		sourceDbName = opts.getOpt("-s", default=self.__selDbName)
+		sourceDb = self.__dbs.get(sourceDbName, None)
+		if sourceDb is None:
+			self._err("copy", "Source database '%s' does not exist" % sourceDbName)
+		destDbName = opts.getOpt("-d", default=self.__selDbName)
+		destDb = self.__dbs.get(destDbName, None)
+		if destDb is None:
+			self._err("copy", "Destination database '%s' does not exist" % destDbName)
+
+		if opts.nrParams in (3, 4):
+			# Entry copy
+			fromCategory, fromTitle, toCategory, toTitle =\
+				(opts.getParam(0), opts.getParam(1),
+				 opts.getParam(2), opts.getParam(3))
+			toTitle = toTitle or fromTitle
+			if sourceDb is destDb and fromCategory == toCategory and fromTitle == toTitle:
+				self._info("copy", "Copy source and target are identical.")
+				return
+			entry = sourceDb.getEntry(fromCategory, fromTitle)
+			if not entry:
+				self._err("copy", "Source entry does not exist.")
+			try:
+				entry.entryId = None
+				entry.category = toCategory
+				entry.title = toTitle
+				destDb.addEntry(entry)
+			except (PWManError) as e:
+				self._err("copy", str(e))
+		elif (sourceDb is destDb and opts.nrParams == 2) or\
+		     (sourceDb is not destDb and opts.nrParams in (1, 2)):
+			# Category copy
+			fromCategory, toCategory = opts.getParam(0), opts.getParam(1)
+			toCategory = toCategory or fromCategory
+			try:
+				for fromTitle in sourceDb.getEntryTitles(fromCategory):
+					self._info("copy",
+						"running command: copy -s %s -d %s %s %s %s %s" % (
+						escapeCmd(sourceDbName), escapeCmd(destDbName),
+						escapeCmd(fromCategory), escapeCmd(fromTitle),
+						escapeCmd(toCategory), escapeCmd(fromTitle)))
+					entry = sourceDb.getEntry(fromCategory, fromTitle)
+					entry.entryId = None
+					entry.category = toCategory
+					destDb.addEntry(entry)
+			except (PWManError) as e:
+				self._err("copy", str(e))
+		else:
+			self._err("copy", "Invalid parameters.")
+	do_cp = do_copy
+
+	complete_copy = complete_move # copy and move are equal w.r.t. completion
+	complete_cp = complete_copy
 
 	__database_opts = ("-f:",)
 	def do_database(self, params):
