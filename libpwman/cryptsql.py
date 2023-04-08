@@ -45,6 +45,7 @@ class CryptSQLCursor:
 
 	def sqlExecScript(self, code):
 		"""Execute multiple SQL statements.
+		Warning: This implicitly commits pending transactions before executing.
 		"""
 		try:
 			self.__c.executescript(code)
@@ -235,7 +236,7 @@ class CryptSQL:
 				payload = compress.decompress(payload)
 
 				# Import the SQL database.
-				self.__db.cursor().executescript(payload.decode("UTF-8"))
+				self.importSqlScript(payload.decode("UTF-8"))
 
 				# Store the raw key.
 				self.__key = key
@@ -403,7 +404,7 @@ class CryptSQL:
 
 	def sqlExecScript(self, code):
 		"""Execute multiple SQL statements.
-		Warning: This implicitly commits open transactions before executing.
+		Warning: This implicitly commits pending transactions before executing.
 		"""
 		return CryptSQLCursor(self.__db).sqlExecScript(code)
 

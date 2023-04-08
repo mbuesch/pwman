@@ -846,7 +846,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			for title in self.__db.getEntryTitles(category):
 				p = "%s %s" % (escapeCmd(category),
 					       escapeCmd(title))
-				self._info("remove", "running: remove %s" % p)
+				self._info("remove", "running command: remove %s" % p)
 				self.do_remove(p)
 			return
 		try:
