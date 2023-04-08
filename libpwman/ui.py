@@ -518,12 +518,15 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	def do_help(self, params):
 		"""--- Shows help text about a command ---
-		Command: help
+		Command: help [COMMAND]
+
+		If COMMAND is not given: Show a command summary.
+		If COMMAND is given: Show detailed help about that command.
 
 		Aliases: h
 		"""
 		if params:
-			super().do_help(params)
+			Cmd.do_help(self, params)
 			return
 		def printCmdHelp(cmdHelp):
 			for cmd, aliases, desc in cmdHelp:
