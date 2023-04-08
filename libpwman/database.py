@@ -205,11 +205,10 @@ class PWManDatabase(CryptSQL):
 	def __garbageCollect(self):
 		"""Remove rows from the SQL database that are not needed anymore.
 		"""
-		c = self.sqlExecScript("""
-			DELETE FROM bulk WHERE entry NOT IN (SELECT id FROM entries);
-			DELETE FROM entryattr WHERE entry NOT IN (SELECT id FROM entries);
-			DELETE FROM totp WHERE entry NOT IN (SELECT id FROM entries);
-		""")
+		# Do not use sqlExecScript here, as that would commit transactions.
+		c = self.sqlExec("DELETE FROM bulk WHERE entry NOT IN (SELECT id FROM entries);")
+		c = self.sqlExec("DELETE FROM entryattr WHERE entry NOT IN (SELECT id FROM entries);")
+		c = self.sqlExec("DELETE FROM totp WHERE entry NOT IN (SELECT id FROM entries);")
 
 	def setPassphrase(self, passphrase):
 		super().setPassphrase(passphrase)
