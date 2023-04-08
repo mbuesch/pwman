@@ -403,6 +403,7 @@ class CryptSQL:
 
 	def sqlExecScript(self, code):
 		"""Execute multiple SQL statements.
+		Warning: This implicitly commits open transactions before executing.
 		"""
 		return CryptSQLCursor(self.__db).sqlExecScript(code)
 
