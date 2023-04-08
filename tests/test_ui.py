@@ -69,6 +69,3 @@ class Test_UI(TestCase):
 		self.ui.do_edit_attr("a b c d")
 		self.ui.do_move("a b c d")
 		self.ui.do_remove("c d")
-
-		self.ui.do_undo("")
-		self.ui.do_redo("")

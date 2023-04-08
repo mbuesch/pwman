@@ -112,14 +112,13 @@ def run_script(dbPath, pyModName):
 	db.flunkDirty()
 	return 0
 
-def run_ui(dbPath, commitClearsUndo, timeout, commands):
+def run_ui(dbPath, timeout, commands):
 	passphrase = getPassphrase(dbPath, verbose=not commands)
 	if passphrase is None:
 		return 1
 	try:
 		p = libpwman.PWMan(filename=dbPath,
 				   passphrase=passphrase,
-				   commitClearsUndo=commitClearsUndo,
 				   timeout=timeout)
 		if commands:
 			for command in commands:
@@ -161,8 +160,6 @@ def main():
 		       type=pathlib.Path, default=libpwman.database.getDefaultDatabase(),
 		       help="Use DB_PATH as database file. If not given, %s is used." % (
 			    libpwman.database.getDefaultDatabase()))
-	p.add_argument("-U", "--commit-clear-undo", action="store_true",
-		       help="The commit command clears undo queue.")
 	p.add_argument("--no-mlock", action="store_true",
 		       help="Do not lock memory and allow swapping to disk.")
 	if libpwman.util.osIsPosix:
@@ -221,7 +218,6 @@ def main():
 		else:
 			assert interactiveMode != bool(args.command)
 			exitcode = run_ui(dbPath=args.database,
-					  commitClearsUndo=args.commit_clear_undo,
 					  timeout=args.timeout if libpwman.util.osIsPosix else None,
 					  commands=args.command)
 	except libpwman.database.CSQLError as e:

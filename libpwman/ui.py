@@ -10,7 +10,6 @@ from libpwman.dbdiff import *
 from libpwman.exception import *
 from libpwman.otp import *
 from libpwman.ui_escape import *
-from libpwman.undo import *
 from libpwman.util import *
 
 import functools
@@ -22,7 +21,7 @@ import sys
 import time
 import traceback
 from cmd import Cmd
-from copy import copy, deepcopy
+from copy import copy
 from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
@@ -342,8 +341,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	class CommandError(Exception): pass
 	class Quit(Exception): pass
 
-	def __init__(self, filename, passphrase,
-		     commitClearsUndo=False, timeout=None):
+	def __init__(self, filename, passphrase, timeout=None):
 		super().__init__()
 
 		self.__isInteractive = False
@@ -361,8 +359,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		self.__updatePrompt()
 
 		self._timeout = PWManTimeout(timeout)
-		self.__commitClearsUndo = commitClearsUndo
-		self.__undo = UndoStack()
 
 	def __updatePrompt(self):
 		if self.__db.isDirty():
@@ -504,8 +500,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		("edit_attr", ("ea",), "Edit an entry attribute"),
 		("move", ("mv", "rename"), "Move/rename an existing entry"),
 		("remove", ("rm", "del"), "Remove an existing entry"),
-		("undo", (), "Undo the last command"),
-		("redo", (), "Redo the last undone command"),
 	)
 
 	cmdHelpDatabase = (
@@ -519,7 +513,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	cmdHelpMisc = (
 		("help", ("h",), "Show help about commands"),
 		("quit", ("q", "exit", "^D"), "Quit pwman"),
-		("cls", (), "Clear screen and undo buffers"),
+		("cls", (), "Clear screen"),
 	)
 
 	def do_help(self, params):
@@ -568,17 +562,16 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	do_EOF = do_quit
 
 	def do_cls(self, params):
-		"""--- Clear console screen and undo/redo buffer ---
+		"""--- Clear console screen ---
 		Command: cls
 
-		Clear the console screen and all undo/redo buffers.
+		Clear the console screen.
 		Note that this does not clear a possibly existing
 		'screen' session buffer or other advanced console buffers.
 
 		Aliases: None
 		"""
 		clearScreen()
-		self.__undo.clear()
 
 	def do_commit(self, params):
 		"""--- Write changes to the database file ---
@@ -587,8 +580,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		Aliases: c w
 		"""
 		self.__db.commit()
-		if self.__commitClearsUndo:
-			self.__undo.clear()
 	do_c = do_commit
 	do_w = do_commit
 
@@ -609,7 +600,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			return
 		if p != self.__db.getPassphrase():
 			self.__db.setPassphrase(p)
-			self.__undo.clear()
 
 	def do_list(self, params):
 		"""--- Print a listing ---
@@ -705,8 +695,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			self.__db.addEntry(entry)
 		except (PWManError) as e:
 			self._err("new", str(e))
-		self.__undo.do("new %s" % params,
-			       "remove %s %s" % (escapeCmd(category), escapeCmd(title)))
 	do_n = do_new
 	do_add = do_new
 
@@ -720,19 +708,11 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		if not category or not title:
 			self._err(commandName, "Invalid parameters. "
 				  "Need to supply category and title.")
-		oldEntry = self.__db.getEntry(category, title)
-		if not oldEntry:
-			self._err(commandName, "Entry does not exist")
 		newData = PWManOpts.skipParams(params, 2).strip()
 		try:
 			self.__db.editEntry(data2entry(category, title, newData))
 		except (PWManError) as e:
 			self._err(commandName, str(e))
-		self.__undo.do("%s %s" % (commandName, params),
-			       "%s %s %s %s" %\
-			       (commandName, escapeCmd(oldEntry.category),
-				escapeCmd(oldEntry.title),
-				escapeCmd(entry2data(oldEntry))))
 
 	def do_edit_user(self, params):
 		"""--- Edit the 'user' field of an existing entry ---
@@ -825,14 +805,8 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		entryBulk = self.__db.getEntryBulk(entry)
 		if not entryBulk:
 			entryBulk = PWManEntryBulk(entry=entry)
-		origEntryBulk = deepcopy(entryBulk)
 		entryBulk.data = data
 		self.__db.setEntryBulk(entryBulk)
-		self.__undo.do("edit_bulk %s" % params,
-			       "edit_bulk %s %s %s" % (
-			       escapeCmd(category),
-			       escapeCmd(title),
-			       escapeCmd(origEntryBulk.data or "")))
 	do_eb = do_edit_bulk
 
 	@completion
@@ -875,40 +849,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 				self._info("remove", "running: remove %s" % p)
 				self.do_remove(p)
 			return
-		oldEntry = self.__db.getEntry(category, title)
-		if not oldEntry:
-			self._err("remove", "Entry does not exist")
-		oldEntryBulk = self.__db.getEntryBulk(oldEntry)
-		oldEntryAttrs = self.__db.getEntryAttrs(oldEntry)
-		oldEntryTotp = self.__db.getEntryTotp(oldEntry)
 		try:
 			self.__db.delEntry(PWManEntry(category, title))
 		except (PWManError) as e:
 			self._err("remove", str(e))
-		undoCmds = [ "new %s %s %s %s" % (
-			     escapeCmd(oldEntry.category),
-			     escapeCmd(oldEntry.title),
-			     escapeCmd(oldEntry.user),
-			     escapeCmd(oldEntry.pw)) ]
-		if oldEntryBulk:
-			undoCmds.append("edit_bulk %s %s %s" % (
-					escapeCmd(oldEntry.category),
-					escapeCmd(oldEntry.title),
-					escapeCmd(oldEntryBulk.data or "")))
-		for oldEntryAttr in (oldEntryAttrs or []):
-			undoCmds.append("edit_attr %s %s %s %s" % (
-					escapeCmd(oldEntry.category),
-					escapeCmd(oldEntry.title),
-					escapeCmd(oldEntryAttr.name),
-					escapeCmd(oldEntryAttr.data or "")))
-		if oldEntryTotp:
-			undoCmds.append("edit_totp %s %s %s %s %s" % (
-					escapeCmd(oldEntry.category),
-					escapeCmd(oldEntry.title),
-					escapeCmd(oldEntryTotp.key or ""),
-					escapeCmd(("%d" % oldEntryTotp.digits) if oldEntryTotp.digits else ""),
-					escapeCmd(oldEntryTotp.hmacHash or "")))
-		self.__undo.do("remove %s" % params, undoCmds)
 	do_rm = do_remove
 	do_del = do_remove
 
@@ -939,15 +883,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			entry = self.__db.getEntry(fromCategory, fromTitle)
 			if not entry:
 				self._err("move", "Source entry does not exist.")
-			oldEntry = deepcopy(entry)
 			try:
 				self.__db.moveEntry(entry, toCategory, toTitle)
 			except (PWManError) as e:
 				self._err("move", str(e))
-			self.__undo.do("move %s" % params,
-				       "move %s %s %s %s" % (
-				       escapeCmd(entry.category), escapeCmd(entry.title),
-				       escapeCmd(oldEntry.category), escapeCmd(oldEntry.title)))
 		elif p0 and p1:
 			# Category rename
 			fromCategory, toCategory = p0, p1
@@ -955,9 +894,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 				self.__db.renameCategory(fromCategory, toCategory)
 			except (PWManError) as e:
 				self._err("move", str(e))
-			self.__undo.do("move %s" % params,
-				       "move %s %s" % (
-				       escapeCmd(toCategory), escapeCmd(fromCategory)))
 		else:
 			self._err("move", "Invalid parameters.")
 	do_mv = do_move
@@ -1218,7 +1154,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		entryTotp = self.__db.getEntryTotp(entry)
 		if not entryTotp:
 			entryTotp = PWManEntryTOTP(key=None, entry=entry)
-		origEntryTotp = deepcopy(entryTotp)
 		entryTotp.key = key
 		if digits:
 			try:
@@ -1228,13 +1163,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		if _hash:
 			entryTotp.hmacHash = _hash
 		self.__db.setEntryTotp(entryTotp)
-		self.__undo.do("edit_totp %s" % params,
-			       "edit_totp %s %s %s %s %s" % (
-			       escapeCmd(category),
-			       escapeCmd(title),
-			       escapeCmd(origEntryTotp.key or ""),
-			       escapeCmd(("%d" % origEntryTotp.digits) if origEntryTotp.digits else ""),
-			       escapeCmd(origEntryTotp.hmacHash or "")))
 	do_et = do_edit_totp
 
 	@completion
@@ -1276,15 +1204,8 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		entryAttr = self.__db.getEntryAttr(entry, name)
 		if not entryAttr:
 			entryAttr = PWManEntryAttr(name=name, entry=entry)
-		origEntryAttr = deepcopy(entryAttr)
 		entryAttr.data = data
 		self.__db.setEntryAttr(entryAttr)
-		self.__undo.do("edit_attr %s" % params,
-			       "edit_attr %s %s %s %s" % (
-			       escapeCmd(category),
-			       escapeCmd(title),
-			       escapeCmd(origEntryAttr.name or ""),
-			       escapeCmd(origEntryAttr.data or "")))
 	do_ea = do_edit_attr
 
 	@completion
@@ -1373,51 +1294,6 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			# database file path
 			return self.__getPathCompletions(text)
 		return []
-
-	def do_undo(self, params):
-		"""--- Undo the last command ---
-		Command: undo
-
-		Rewinds the last command that changed the database.
-
-		Aliases: None
-		"""
-		cmd = self.__undo.undo()
-		if not cmd:
-			self._err("undo", "There is no command to be undone.")
-		self.__undo.freeze()
-		try:
-			for undoCommand in cmd.undoCommands:
-				self.onecmd(undoCommand)
-		finally:
-			self.__undo.thaw()
-		self._info("undo",
-			   "\n    " + "\n    ".join(cmd.doCommands) +
-			   "\nsuccessfully undone with:\n" +
-			   "    " + "\n    ".join(cmd.undoCommands))
-
-	def do_redo(self, params):
-		"""--- Redo the last undone command ---
-		Command: redo
-
-		Redoes the last undone command.
-		Also see 'undo' help.
-
-		Aliases: None
-		"""
-		cmd = self.__undo.redo()
-		if not cmd:
-			self._err("redo", "There is no undone command to be redone.")
-		self.__undo.freeze()
-		try:
-			for doCommand in cmd.doCommands:
-				self.onecmd(doCommand)
-		finally:
-			self.__undo.thaw()
-		self._info("redo",
-			   "\n    " + "\n    ".join(cmd.undoCommands) +
-			   "\nsuccessfully redone with:\n" +
-			   "    " + "\n    ".join(cmd.doCommands))
 
 	def __mayQuit(self):
 		if self.__db.isDirty():
