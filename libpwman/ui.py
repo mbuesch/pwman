@@ -1522,6 +1522,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 				self._err("edit_totp", "Invalid digits parameter.")
 		if _hash:
 			entryTotp.hmacHash = _hash
+		try:
+			# Check parameters.
+			totp(key=entryTotp.key,
+			     nrDigits=entryTotp.digits,
+			     hmacHash=entryTotp.hmacHash)
+		except OtpError as e:
+			self._err("edit_totp", "TOTP error: %s" % str(e))
 		self.__db.setEntryTotp(entryTotp)
 	do_et = do_edit_totp
 
