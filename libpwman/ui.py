@@ -1038,7 +1038,11 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			# Entry title completion
 			category = opts.getParam(0)
 			if category:
-				return self.__getEntryTitleCompletions(category, text, db=sourceDb)
+				compl = self.__getEntryTitleCompletions(category, text, db=sourceDb)
+				if compl:
+					return compl
+				# Category completion
+				return self.__getCategoryCompletions(text, db=destDb)
 		elif paramIdx == 2:
 			# Category completion
 			return self.__getCategoryCompletions(text, db=destDb)
