@@ -913,27 +913,27 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	__move_opts = ("-s:", "-d:")
 	def do_move(self, params):
 		"""--- Move/rename an existing entry or a category ---
-		Options:
-		  -s SOURCE_DATABASE_NAME
-		  -d DESTINATION_DATABASE_NAME
-		  Databases default to the currently selected database.
 
 		Move/rename an existing entry:
 		Command: move CATEGORY TITLE TO_CATEGORY [NEW_TITLE]
 		(NEW_TITLE defaults to TITLE)
 
-		Rename an existing category:
-		Command: move CATEGORY NEW_CATEGORY
+		Move all entries from one category into another category.
+		Command: move FROM_CATEGORY TO_CATEGORY
 
 		Move an entry from one database to another:
 		Command: move -s main -d other CATEGORY TITLE TO_CATEGORY [NEW_TITLE]
 		(NEW_TITLE defaults to TITLE)
 
-		Move all entries from a category from one database to another database:
-		Command: move -s main -d other CATEGORY [NEW_CATEGORY]
-		(NEW_CATEGORY defaults to CATEGORY)
+		Move all entries from a category from one database into another database:
+		Command: move -s main -d other FROM_CATEGORY [TO_CATEGORY]
+		(TO_CATEGORY defaults to FROM_CATEGORY)
 
-		The named databases must be open. See 'database' command.
+		Options:
+		  -s SOURCE_DATABASE_NAME
+		  -d DESTINATION_DATABASE_NAME
+		  Databases default to the currently selected database.
+		  The named databases must be open. See 'database' command.
 
 		Aliases: mv rename
 		"""
@@ -976,13 +976,13 @@ class PWMan(Cmd, metaclass=PWManMeta):
 				self._err("move", str(e))
 		elif (sourceDb is destDb and opts.nrParams == 2) or\
 		     (sourceDb is not destDb and opts.nrParams in (1, 2)):
-			# Category rename or move between DBs.
+			# Whole category move.
 			fromCategory, toCategory = opts.getParam(0), opts.getParam(1)
 			toCategory = toCategory or fromCategory
 			try:
 				if sourceDb is destDb:
-					# Category rename in one DB.
-					sourceDb.renameCategory(fromCategory, toCategory)
+					# Category move in one DB.
+					sourceDb.moveEntries(fromCategory, toCategory)
 				else:
 					# Category move between DBs.
 					for fromTitle in sourceDb.getEntryTitles(fromCategory):
@@ -1054,27 +1054,27 @@ class PWMan(Cmd, metaclass=PWManMeta):
 	__copy_opts = ("-s:", "-d:")
 	def do_copy(self, params):
 		"""--- Copy an entry or a category ---
-		Options:
-		  -s SOURCE_DATABASE_NAME
-		  -d DESTINATION_DATABASE_NAME
-		  Databases default to the currently selected database.
 
 		Copy an existing entry:
 		Command: copy CATEGORY TITLE TO_CATEGORY [NEW_TITLE]
 		(NEW_TITLE defaults to TITLE)
 
-		Copy all entries from a category to a new category:
-		Command: copy CATEGORY NEW_CATEGORY
+		Copy all entries from a category into another category:
+		Command: copy FROM_CATEGORY TO_CATEGORY
 
 		Copy an entry from one database to another:
 		Command: copy -s main -d other CATEGORY TITLE TO_CATEGORY [NEW_TITLE]
 		(NEW_TITLE defaults to TITLE)
 
-		Copy all entries from a category from one database to another database:
-		Command: copy -s main -d other CATEGORY [NEW_CATEGORY]
-		(NEW_CATEGORY defaults to CATEGORY)
+		Copy all entries from a category from one database into another database:
+		Command: copy -s main -d other FROM_CATEGORY [TO_CATEGORY]
+		(TO_CATEGORY defaults to FROM_CATEGORY)
 
-		The named databases must be open. See 'database' command.
+		Options:
+		  -s SOURCE_DATABASE_NAME
+		  -d DESTINATION_DATABASE_NAME
+		  Databases default to the currently selected database.
+		  The named databases must be open. See 'database' command.
 
 		Aliases: cp
 		"""

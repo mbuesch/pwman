@@ -237,22 +237,6 @@ class PWManDatabase(CryptSQL):
 		titles = sorted(t[0] for t in titles)
 		return titles
 
-	def renameCategory(self, category, toCategory):
-		"""Change the name of a category.
-		category: The old name string of the category.
-		toCategory: The new name string of the category.
-		"""
-		categories = self.getCategoryNames()
-		if category not in categories:
-			raise PWManError("Source category does not exist.")
-		if toCategory in categories:
-			raise PWManError("Target category does already exist.")
-		c = self.sqlExec("UPDATE entries SET category=? "
-				 "WHERE category=?;",
-				 (toCategory,
-				  category))
-		self.__setDirty()
-
 	def getEntry(self, category, title):
 		"""Get an entry from the database.
 		category: The name string of the category to get an entry from.
@@ -460,6 +444,20 @@ class PWManDatabase(CryptSQL):
 				 (entry.category,
 				  entry.title,
 				  oldEntry.entryId))
+		self.__setDirty()
+
+	def moveEntries(self, fromCategory, toCategory):
+		"""Move all entries from one category to another category.
+		fromCategory: The category to move all entries from.
+		toCategory: The (new) category to move all entries to.
+		"""
+		categories = self.getCategoryNames()
+		if fromCategory not in categories:
+			raise PWManError("Source category does not exist.")
+		c = self.sqlExec("UPDATE entries SET category=? "
+				 "WHERE category=?;",
+				 (toCategory,
+				  fromCategory))
 		self.__setDirty()
 
 	def delEntry(self, entry):
