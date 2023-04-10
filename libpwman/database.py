@@ -214,6 +214,12 @@ class PWManDatabase(CryptSQL):
 		super().setPassphrase(passphrase)
 		self.__setDirty()
 
+	def categoryExists(self, category):
+		"""Returns True, if a category exists in the database.
+		category: The name string of the category.
+		"""
+		return category in self.getCategoryNames()
+
 	def getCategoryNames(self):
 		"""Get all category names in the database.
 		Returns a sorted list of strings.
@@ -451,8 +457,7 @@ class PWManDatabase(CryptSQL):
 		fromCategory: The category to move all entries from.
 		toCategory: The (new) category to move all entries to.
 		"""
-		categories = self.getCategoryNames()
-		if fromCategory not in categories:
+		if not self.categoryExists(fromCategory):
 			raise PWManError("Source category does not exist.")
 		c = self.sqlExec("UPDATE entries SET category=? "
 				 "WHERE category=?;",
