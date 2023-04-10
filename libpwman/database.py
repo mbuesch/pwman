@@ -218,7 +218,12 @@ class PWManDatabase(CryptSQL):
 		"""Returns True, if a category exists in the database.
 		category: The name string of the category.
 		"""
-		return category in self.getCategoryNames()
+		c = self.sqlExec("SELECT EXISTS(SELECT 1 FROM entries "
+				 "WHERE category=? "
+				 "LIMIT 1);",
+				 (category,))
+		data = c.fetchOne()
+		return data and data[0]
 
 	def getCategoryNames(self):
 		"""Get all category names in the database.
@@ -383,7 +388,13 @@ class PWManDatabase(CryptSQL):
 		category: The name string of the category.
 		title: The title string of the entry.
 		"""
-		return self.getEntry(category, title) is not None
+		c = self.sqlExec("SELECT EXISTS(SELECT 1 FROM entries "
+				 "WHERE category=? AND title=? "
+				 "LIMIT 1);",
+				 (category,
+				  title))
+		data = c.fetchOne()
+		return data and data[0]
 
 	def addEntry(self, entry):
 		"""Create a new entry in the database.
