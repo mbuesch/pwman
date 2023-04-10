@@ -153,7 +153,8 @@ class PWManDatabase(CryptSQL):
 				titles = c.fetchAll()
 				for (title, ) in titles:
 					c = self.sqlExec("SELECT category, title, user, pw, bulk FROM pw "
-							 "WHERE category=? AND title=?;",
+							 "WHERE category=? AND title=? "
+							 "LIMIT 1;",
 							 (category, title))
 					data = c.fetchOne()
 					if not data:
@@ -229,7 +230,8 @@ class PWManDatabase(CryptSQL):
 		"""Get all category names in the database.
 		Returns a sorted list of strings.
 		"""
-		c = self.sqlExec("SELECT DISTINCT category FROM entries ORDER BY category;")
+		c = self.sqlExec("SELECT DISTINCT category FROM entries "
+				 "ORDER BY category;")
 		return [ data[0] for data in c.fetchAll() ]
 
 	def getEntryTitles(self, category):
@@ -237,7 +239,9 @@ class PWManDatabase(CryptSQL):
 		category: The category name string.
 		Returns a sorted list of strings.
 		"""
-		c = self.sqlExec("SELECT title FROM entries WHERE category=? ORDER BY title;",
+		c = self.sqlExec("SELECT title FROM entries "
+				 "WHERE category=? "
+				 "ORDER BY title;",
 				 (category,))
 		return [ data[0] for data in c.fetchAll() ]
 
@@ -248,7 +252,8 @@ class PWManDatabase(CryptSQL):
 		Returns a PWManEntry() instance.
 		"""
 		c = self.sqlExec("SELECT id, category, title, user, pw FROM entries "
-				 "WHERE category=? AND title=?;",
+				 "WHERE category=? AND title=? "
+				 "LIMIT 1;",
 				 (category,
 				  title))
 		data = c.fetchOne()
@@ -473,7 +478,9 @@ class PWManDatabase(CryptSQL):
 		"""Delete an existing entry from the database.
 		entry: The PWManEntry() instance to delete from the database.
 		"""
-		c = self.sqlExec("SELECT id FROM entries WHERE category=? AND title=?;",
+		c = self.sqlExec("SELECT id FROM entries "
+				 "WHERE category=? AND title=? "
+				 "LIMIT 1;",
 				 (entry.category,
 				  entry.title))
 		entryId = c.fetchOne()
@@ -493,7 +500,8 @@ class PWManDatabase(CryptSQL):
 		c = self.sqlExec("SELECT bulk.id, bulk.data "
 				 "FROM bulk, entries "
 				 "WHERE entries.category=? AND entries.title=? AND "
-				 "bulk.entry = entries.id;",
+				 "bulk.entry = entries.id "
+				 "LIMIT 1;",
 				 (entry.category,
 				  entry.title))
 		data = c.fetchOne()
@@ -512,7 +520,7 @@ class PWManDatabase(CryptSQL):
 		if not entry or entry.entryId is None:
 			raise PWManError("Bulk: Entry does not exist.")
 		if entryBulk.data:
-			c = self.sqlExec("SELECT id FROM bulk WHERE entry=?;",
+			c = self.sqlExec("SELECT id FROM bulk WHERE entry=? LIMIT 1;",
 					 (entry.entryId, ))
 			bulkId = c.fetchOne()
 			if bulkId is None:
@@ -541,7 +549,8 @@ class PWManDatabase(CryptSQL):
 		c = self.sqlExec("SELECT totp.id, totp.key, totp.digits, totp.hash "
 				 "FROM totp, entries "
 				 "WHERE entries.category=? AND entries.title=? AND "
-				 "totp.entry = entries.id;",
+				 "totp.entry = entries.id "
+				 "LIMIT 1;",
 				 (entry.category,
 				  entry.title))
 		data = c.fetchOne()
@@ -562,7 +571,7 @@ class PWManDatabase(CryptSQL):
 		if not entry or entry.entryId is None:
 			raise PWManError("TOTP: Entry does not exist.")
 		if entryTotp.key:
-			c = self.sqlExec("SELECT id FROM totp WHERE entry=?;",
+			c = self.sqlExec("SELECT id FROM totp WHERE entry=? LIMIT 1;",
 					 (entry.entryId, ))
 			totpId = c.fetchOne()
 			if totpId is None:
@@ -596,7 +605,8 @@ class PWManDatabase(CryptSQL):
 		c = self.sqlExec("SELECT entryattr.id, entryattr.name, entryattr.data "
 				 "FROM entryattr, entries "
 				 "WHERE entries.category=? AND entries.title=? AND "
-				 "entryattr.entry = entries.id AND entryattr.name=?;",
+				 "entryattr.entry = entries.id AND entryattr.name=? "
+				 "LIMIT 1;",
 				 (entry.category,
 				  entry.title,
 				  attrName))
@@ -639,7 +649,8 @@ class PWManDatabase(CryptSQL):
 			raise PWManError("Attr: Entry does not exist.")
 		if entryAttr.data:
 			c = self.sqlExec("SELECT id FROM entryattr "
-					 "WHERE entry=? AND name=?;",
+					 "WHERE entry=? AND name=? "
+					 "LIMIT 1;",
 					 (entry.entryId,
 					  entryAttr.name))
 			attrId = c.fetchOne()
@@ -669,7 +680,9 @@ class PWManDatabase(CryptSQL):
 		Returns None, if the attribute does not exist.
 		"""
 		try:
-			c = self.sqlExec("SELECT id, data FROM globalattr WHERE name=?;",
+			c = self.sqlExec("SELECT id, data FROM globalattr "
+					 "WHERE name=? "
+					 "LIMIT 1;",
 					 (name,))
 			data = c.fetchOne()
 			return data[1] if data else None
@@ -683,7 +696,8 @@ class PWManDatabase(CryptSQL):
 		"""
 		if data:
 			c = self.sqlExec("SELECT id FROM globalattr "
-					 "WHERE name=?;",
+					 "WHERE name=? "
+					 "LIMIT 1;",
 					 (name,))
 			attrId = c.fetchOne()
 			if attrId is None:
