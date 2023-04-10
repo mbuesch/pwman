@@ -96,6 +96,7 @@ class Test_UI(TestCase):
 		except FileNotFoundError as e:
 			pass
 		# main db
+		self.ui.do_database("main")
 		self.ui.do_new("cat0 ent0 user0 pw0")
 		self.ui.do_new("cat1 ent1 user1 pw1")
 		self.ui.do_new("bigcat ent10 user10 pw10")
@@ -117,10 +118,10 @@ class Test_UI(TestCase):
 			lambda: self.ui.do_move("-s secondary -d main cat0 ent0 cat0"))
 
 		self.ui.do_move("-d secondary bigcat")
-#		self.assertRaises(libpwman.PWMan.CommandError,
-#			lambda: self.ui.do_move("-d secondary bigcat"))
-#		self.ui.do_move("-s secondary -d main bigcat bigcat2")
-#		self.assertRaises(libpwman.PWMan.CommandError,
-#			lambda: self.ui.do_move("-s secondary -d main bigcat bigcat2"))
+		self.assertRaises(libpwman.PWMan.CommandError,
+			lambda: self.ui.do_move("-d secondary bigcat"))
+		self.ui.do_move("-s secondary -d main bigcat bigcat2")
+		self.assertRaises(libpwman.PWMan.CommandError,
+			lambda: self.ui.do_move("-s secondary -d main bigcat bigcat2"))
 
 		self.ui.do_commit("-a")
