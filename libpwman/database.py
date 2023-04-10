@@ -145,19 +145,19 @@ class PWManDatabase(CryptSQL):
 
 			self.__initTables()
 
-			c = self.sqlExec("SELECT category FROM pw;")
+			c = self.sqlExec("SELECT DISTINCT category FROM pw ORDER BY category;")
 			categories = c.fetchAll()
-			categories = uniq(c[0] for c in categories)
-			for category in categories:
-				c = self.sqlExec("SELECT title FROM pw WHERE category=?;",
+			for (category, ) in categories:
+				c = self.sqlExec("SELECT title FROM pw WHERE category=? ORDER BY title;",
 						 (category,))
 				titles = c.fetchAll()
-				titles = sorted(t[0] for t in titles)
-				for title in titles:
+				for (title, ) in titles:
 					c = self.sqlExec("SELECT category, title, user, pw, bulk FROM pw "
 							 "WHERE category=? AND title=?;",
 							 (category, title))
 					data = c.fetchOne()
+					if not data:
+						continue
 					c = self.sqlExec("INSERT INTO entries(category, title, user, pw) "
 							 "VALUES(?,?,?,?);",
 							 (data[0], data[1], data[2], data[3]))
@@ -168,9 +168,9 @@ class PWManDatabase(CryptSQL):
 								 (entryId, data[4]))
 			c = self.sqlExec("SELECT name, data FROM info;")
 			infos = c.fetchAll()
-			for info in infos:
+			for name, data in infos:
 				c = self.sqlExec("INSERT INTO globalattr(name, data) VALUES(?,?);",
-						 (info[0], info[1]))
+						 (name, data))
 			c = self.sqlExec("DROP TABLE IF EXISTS pw;")
 			c = self.sqlExec("DROP TABLE IF EXISTS info;")
 			self.sqlVacuum()
@@ -224,24 +224,17 @@ class PWManDatabase(CryptSQL):
 		"""Get all category names in the database.
 		Returns a sorted list of strings.
 		"""
-		c = self.sqlExec("SELECT category FROM entries;")
-		categories = c.fetchAll()
-		if not categories:
-			return []
-		return uniq(c[0] for c in categories)
+		c = self.sqlExec("SELECT DISTINCT category FROM entries ORDER BY category;")
+		return [ data[0] for data in c.fetchAll() ]
 
 	def getEntryTitles(self, category):
 		"""Get all titles from one category in the database.
 		category: The category name string.
 		Returns a sorted list of strings.
 		"""
-		c = self.sqlExec("SELECT title FROM entries WHERE category=?;",
+		c = self.sqlExec("SELECT title FROM entries WHERE category=? ORDER BY title;",
 				 (category,))
-		titles = c.fetchAll()
-		if not titles:
-			return []
-		titles = sorted(t[0] for t in titles)
-		return titles
+		return [ data[0] for data in c.fetchAll() ]
 
 	def getEntry(self, category, title):
 		"""Get an entry from the database.

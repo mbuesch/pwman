@@ -14,7 +14,6 @@ __all__ = [
 	"str2bool",
 	"osIsWindows",
 	"osIsPosix",
-	"uniq",
 	"stdout",
 	"clearScreen",
 	"readPassphrase",
@@ -35,12 +34,6 @@ def str2bool(string, default=False):
 		return bool(int(s))
 	except ValueError:
 		return default
-
-def uniq(l, sort=True):
-	l = list(set(l))
-	if sort:
-		l.sort()
-	return l
 
 def stdout(text, flush=True):
 	if isinstance(text, str):
