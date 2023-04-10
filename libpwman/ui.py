@@ -985,6 +985,8 @@ class PWMan(Cmd, metaclass=PWManMeta):
 					sourceDb.moveEntries(fromCategory, toCategory)
 				else:
 					# Category move between DBs.
+					if not sourceDb.categoryExists(fromCategory):
+						self._err("move", "Source category does not exist.")
 					for fromTitle in sourceDb.getEntryTitles(fromCategory):
 						self._info("move",
 							"running command: move -s %s -d %s %s %s %s %s" % (
@@ -1118,6 +1120,8 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			fromCategory, toCategory = opts.getParam(0), opts.getParam(1)
 			toCategory = toCategory or fromCategory
 			try:
+				if not sourceDb.categoryExists(fromCategory):
+					self._err("copy", "Source category does not exist.")
 				for fromTitle in sourceDb.getEntryTitles(fromCategory):
 					self._info("copy",
 						"running command: copy -s %s -d %s %s %s %s %s" % (
