@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import sys
+if sys.version_info[0:2] < (3, 7):
+	raise Exception("pwman requires Python >=3.7")
+del sys
+
 import libpwman.database
 import libpwman.dbdiff
 import libpwman.exception
