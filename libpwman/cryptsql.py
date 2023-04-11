@@ -142,21 +142,21 @@ class CryptSQL:
 				return
 
 			# Get the file fields.
-			head = fc.getOne(b"HEAD", "Invalid file header object")
+			head = fc.get(b"HEAD", "Invalid file header object")
 			if head != CSQL_HEADER:
 				raise CSQLError("Invalid file header")
-			cipher = fc.getOne(b"CIPHER", "Invalid CYPHER object")
-			cipherMode = fc.getOne(b"CIPHER_MODE", "Invalid CYPHER_MODE object")
-			cipherIV = fc.getOne(b"CIPHER_IV", "Invalid CIPHER_IV object")
-			keyLen = fc.getOne(b"KEY_LEN", "Invalid KEY_LEN object")
-			kdfMethod = fc.getOne(b"KDF_METHOD", "Invalid KDF_METHOD object")
-			kdfSalt = fc.getOne(b"KDF_SALT", "Invalid KDF_SALT object")
-			kdfIter = fc.getOne(b"KDF_ITER", "Invalid KDF_ITER object")
-			kdfHash = fc.getOne(b"KDF_HASH", "Invalid KDF_HASH object")
-			kdfMac = fc.getOne(b"KDF_MAC", "Invalid KDF_MAC object")
-			compress = fc.getOne(b"COMPRESS", default=b"NONE")
-			paddingMethod = fc.getOne(b"PADDING", default=b"PWMAN")
-			payload = fc.getOne(b"PAYLOAD", "Invalid PAYLOAD object")
+			cipher = fc.get(b"CIPHER", "Invalid CIPHER object")
+			cipherMode = fc.get(b"CIPHER_MODE", "Invalid CIPHER_MODE object")
+			cipherIV = fc.get(b"CIPHER_IV", "Invalid CIPHER_IV object")
+			keyLen = fc.get(b"KEY_LEN", "Invalid KEY_LEN object")
+			kdfMethod = fc.get(b"KDF_METHOD", "Invalid KDF_METHOD object")
+			kdfSalt = fc.get(b"KDF_SALT", "Invalid KDF_SALT object")
+			kdfIter = fc.get(b"KDF_ITER", "Invalid KDF_ITER object")
+			kdfHash = fc.get(b"KDF_HASH", "Invalid KDF_HASH object")
+			kdfMac = fc.get(b"KDF_MAC", "Invalid KDF_MAC object")
+			compress = fc.get(b"COMPRESS", default=b"NONE")
+			paddingMethod = fc.get(b"PADDING", default=b"PWMAN")
+			payload = fc.get(b"PAYLOAD", "Invalid PAYLOAD object")
 
 			# Check the padding method.
 			if paddingMethod not in (b"PWMAN", b"PKCS7"):
@@ -342,7 +342,7 @@ class CryptSQL:
 
 		try:
 			# Assemble file objects
-			fc = FileObjCollection(
+			fc = FileObjCollection((
 				FileObj(b"HEAD", CSQL_HEADER),
 				FileObj(b"CIPHER", b"AES"),
 				FileObj(b"CIPHER_MODE", b"CBC"),
@@ -356,7 +356,7 @@ class CryptSQL:
 				FileObj(b"COMPRESS", b"NONE"), # compat for older versions.
 				FileObj(b"PADDING", b"PKCS7"),
 				FileObj(b"PAYLOAD", payload),
-			)
+			))
 
 			# Write to the file
 			self.__key = None

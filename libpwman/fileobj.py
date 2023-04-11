@@ -23,21 +23,26 @@ class FileObj:
 	#   [ 4 bytes ] => Payload data length
 	#   [ x bytes ] => Payload data
 
+	__slots__ = (
+		"__name",
+		"__data",
+	)
+
 	def __init__(self, name, data):
 		"""Construct FileObj().
 		name: The object name. Must be bytes-like.
 		data: The object payload. Must be bytes-like.
 		"""
-		assert isinstance(name, (bytes, bytearray)),\
+		assert isinstance(name, (bytes, bytearray, memoryview)),\
 		       "FileObj: Invalid 'name' type."
-		assert isinstance(data, (bytes, bytearray)),\
+		assert isinstance(data, (bytes, bytearray, memoryview)),\
 		       "FileObj: Invalid 'data' type."
-		if len(name) > 0x7F:
+		self.__name = memoryview(name)
+		self.__data = memoryview(data)
+		if len(self.__name) > 0x7F:
 			raise FileObjError("FileObj: Name too long")
-		self.__name = name
-		if len(data) > 0x7FFFFFFF:
+		if len(self.__data) > 0x7FFFFFFF:
 			raise FileObjError("FileObj: Data too long")
-		self.__data = data
 
 	def getName(self):
 		return self.__name
@@ -45,25 +50,24 @@ class FileObj:
 	def getData(self):
 		return self.__data
 
-	def getRaw(self):
-		r = bytearray()
+	def getRaw(self, buffer):
 		nameLen = len(self.__name)
 		assert nameLen <= 0x7F
-		r += b"%c" % (nameLen & 0xFF)
-		r += self.__name
+		buffer += b"%c" % (nameLen & 0xFF)
+		buffer += self.__name
 		dataLen = len(self.__data)
 		assert dataLen <= 0x7FFFFFFF
-		r += b"%c" % (dataLen & 0xFF)
-		r += b"%c" % ((dataLen >> 8) & 0xFF)
-		r += b"%c" % ((dataLen >> 16) & 0xFF)
-		r += b"%c" % ((dataLen >> 24) & 0xFF)
-		r += self.__data
-		return r
+		buffer += b"%c" % (dataLen & 0xFF)
+		buffer += b"%c" % ((dataLen >> 8) & 0xFF)
+		buffer += b"%c" % ((dataLen >> 16) & 0xFF)
+		buffer += b"%c" % ((dataLen >> 24) & 0xFF)
+		buffer += self.__data
 
 	@classmethod
 	def parseRaw(cls, raw):
-		assert isinstance(raw, (bytes, bytearray)),\
+		assert isinstance(raw, (bytes, bytearray, memoryview)),\
 		       "FileObj: Invalid 'raw' type."
+		raw = memoryview(raw)
 		try:
 			off = 0
 			nameLen = raw[off]
@@ -88,8 +92,17 @@ class FileObj:
 		return (cls(name, data), off)
 
 class FileObjCollection:
-	def __init__(self, *objects):
-		self.objects = objects
+	__slots__ = (
+		"__objects",
+	)
+
+	def __init__(self, objects):
+		if isinstance(objects, dict):
+			self.__objects = objects
+		elif isinstance(objects, (list, tuple)):
+			self.__objects = { obj.getName() : obj for obj in objects }
+		else:
+			assert False
 
 	def writeFile(self, filepath):
 		try:
@@ -101,34 +114,30 @@ class FileObjCollection:
 
 	def getRaw(self):
 		raw = bytearray()
-		for obj in self.objects:
-			raw += obj.getRaw()
+		for obj in self.__objects.values():
+			obj.getRaw(raw)
 		return raw
 
-	def get(self, name):
-		return [ o.getData()
-			 for o in self.objects
-			 if o.getName() == name ]
-
-	def getOne(self, name, errorMsg=None, default=None):
-		objs = self.get(name)
-		if len(objs) != 1:
+	def get(self, name, errorMsg=None, default=None):
+		obj = self.__objects.get(name, None)
+		if obj is None:
 			if errorMsg:
 				raise FileObjError(errorMsg)
 			return default
-		return objs[0]
+		return bytes(obj.getData())
 
 	@classmethod
 	def parseRaw(cls, raw):
-		assert isinstance(raw, (bytes, bytearray)),\
+		assert isinstance(raw, (bytes, bytearray, memoryview)),\
 		       "FileObjCollection: Invalid 'raw' type."
+		raw = memoryview(raw)
 		offset = 0
-		objects = []
+		objects = {}
 		while offset < len(raw):
 			obj, objLen = FileObj.parseRaw(raw[offset:])
-			objects.append(obj)
+			objects[obj.getName()] = obj
 			offset += objLen
-		return cls(*objects)
+		return cls(objects)
 
 	@classmethod
 	def parseFile(cls, filepath):
