@@ -18,6 +18,7 @@ import io
 import os
 import pathlib
 import sys
+from copy import deepcopy
 from dataclasses import dataclass
 
 __all__ = [
@@ -465,13 +466,14 @@ class PWManDatabase(CryptSQL):
 					  oldEntry.entryId))
 			self.__setDirty()
 		else:
-			bulk = self.getEntryBulk(entry)
-			attrs = self.getEntryAttrs(entry)
-			totp = self.getEntryTotp(entry)
-			entry.entryId = None
-			entry.category = newCategory
-			entry.title = newTitle
-			toDb.addEntry(entry)
+			newEntry = deepcopy(oldEntry)
+			bulk = self.getEntryBulk(newEntry)
+			attrs = self.getEntryAttrs(newEntry)
+			totp = self.getEntryTotp(newEntry)
+			newEntry.entryId = None
+			newEntry.category = newCategory
+			newEntry.title = newTitle
+			toDb.addEntry(newEntry)
 			if bulk:
 				bulk.bulkId = None
 				toDb.setEntryBulk(bulk)
@@ -482,6 +484,9 @@ class PWManDatabase(CryptSQL):
 				totp.totpId = None
 				toDb.setEntryTotp(totp)
 			if not copy:
+				entry.entryId = newEntry.entryId
+				entry.category = newEntry.category
+				entry.title = newEntry.title
 				self.delEntry(oldEntry)
 
 	def moveEntries(self, fromCategory, toCategory, toDb=None, copy=False):
