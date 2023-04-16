@@ -366,7 +366,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 
 	@property
 	def __db(self):
-		return self.__dbs[self.__selDbName]
+		return self._getDb(self.__selDbName)
+
+	def _getDb(self, name):
+		return self.__dbs.get(name, None)
 
 	def __updatePrompt(self):
 		if len(self.__dbs) > 1:
@@ -915,11 +918,11 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		opts = PWManOpts.parse(params, self.__move_copy_opts)
 
 		sourceDbName = opts.getOpt("-s", default=self.__selDbName)
-		sourceDb = self.__dbs.get(sourceDbName, None)
+		sourceDb = self._getDb(sourceDbName)
 		if sourceDb is None:
 			self._err(command, "Source database '%s' does not exist" % sourceDbName)
 		destDbName = opts.getOpt("-d", default=self.__selDbName)
-		destDb = self.__dbs.get(destDbName, None)
+		destDb = self._getDb(destDbName)
 		if destDb is None:
 			self._err(command, "Destination database '%s' does not exist" % destDbName)
 
@@ -972,11 +975,11 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			return self.__getDatabaseCompletions(text)
 
 		sourceDbName = opts.getOpt("-s", default=self.__selDbName)
-		sourceDb = self.__dbs.get(sourceDbName, None)
+		sourceDb = self._getDb(sourceDbName)
 		if sourceDb is None:
 			return []
 		destDbName = opts.getOpt("-d", default=self.__selDbName)
-		destDb = self.__dbs.get(destDbName, None)
+		destDb = self._getDb(destDbName)
 		if destDb is None:
 			return []
 
@@ -1284,7 +1287,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		name = params if params else self.__selDbName
 		if name == "main" and len(self.__dbs) > 1:
 			self._err("close", "The 'main' database can only be closed last")
-		db = self.__dbs.get(name, None)
+		db = self._getDb(name)
 		if db is None:
 			self._err("close", "The database '%s' does not exist" % name)
 		if db.isDirty():
