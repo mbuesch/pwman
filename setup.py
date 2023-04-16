@@ -7,16 +7,13 @@ try:
 	cx_Freeze = True
 except ImportError:
 	cx_Freeze = False
-import os
 import sys
-
+from pathlib import Path
 from libpwman import __version__
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-for base in (os.getcwd(), basedir):
-	sys.path.insert(0, base)
+basedir = Path(__file__).parent.absolute()
+sys.path.insert(0, basedir)
 
-# Create freeze executable list.
 extraKeywords = {}
 if cx_Freeze:
 	extraKeywords["executables"] = [ Executable(script="pwman") ]
@@ -32,7 +29,7 @@ if cx_Freeze:
 		}
 	}
 
-with open(os.path.join(basedir, "README.rst"), "rb") as fd:
+with open(basedir / "README.rst", "rb") as fd:
 	readmeText = fd.read().decode("UTF-8")
 
 setup(
@@ -62,3 +59,5 @@ setup(
 	long_description_content_type="text/x-rst",
 	**extraKeywords
 )
+
+# vim: ts=8 sw=8 noexpandtab
