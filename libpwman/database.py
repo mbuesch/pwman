@@ -440,38 +440,94 @@ class PWManDatabase(CryptSQL):
 				  entry.entryId))
 		self.__setDirty()
 
-	def moveEntry(self, entry, newCategory, newTitle):
-		"""Move an existing entry to a new category and/or set a new entry title.
-		entry: The PWManEntry() instance to move.
-		newCategory: The new category name string.
-		newTitle: The new title string.
+	def moveEntry(self, entry, newCategory, newTitle, toDb=None, copy=False):
+		"""Move or copy an existing entry to a new category and/or set a new entry title.
+		entry: The PWManEntry() instance to move/copy.
+		newCategory: The target category name string.
+		newTitle: The target title string.
+		toDb: The target database. Defaults to self.
+		copy: If False, then move. If True, then copy.
 		"""
-		if self.entryExists(newCategory, newTitle):
+		toDb = toDb or self
+		if toDb.entryExists(newCategory, newTitle):
 			raise PWManError("Entry does already exist.")
 		oldEntry = self.getEntry(entry.category, entry.title)
 		if not oldEntry:
 			raise PWManError("Entry does not exist.")
-		entry.category = newCategory
-		entry.title = newTitle
-		c = self.sqlExec("UPDATE entries SET "
-				 "category=?, title=? "
-				 "WHERE id=?;",
-				 (entry.category,
-				  entry.title,
-				  oldEntry.entryId))
+		if toDb is self and not copy:
+			entry.category = newCategory
+			entry.title = newTitle
+			c = self.sqlExec("UPDATE entries SET "
+					 "category=?, title=? "
+					 "WHERE id=?;",
+					 (entry.category,
+					  entry.title,
+					  oldEntry.entryId))
+		else:
+			bulk = self.getEntryBulk(entry)
+			attrs = self.getEntryAttrs(entry)
+			totp = self.getEntryTotp(entry)
+			entry.entryId = None
+			entry.category = newCategory
+			entry.title = newTitle
+			toDb.addEntry(entry)
+			if bulk:
+				bulk.bulkId = None
+				toDb.setEntryBulk(bulk)
+			for attr in attrs:
+				attr.attrId = None
+				toDb.setEntryAttr(attr)
+			if totp:
+				totp.totpId = None
+				toDb.setEntryTotp(totp)
+			if not copy:
+				self.delEntry(oldEntry)
 		self.__setDirty()
 
-	def moveEntries(self, fromCategory, toCategory):
-		"""Move all entries from one category to another category.
+	def moveEntries(self, fromCategory, toCategory, toDb=None, copy=False):
+		"""Move or copy all entries from one category to another category.
 		fromCategory: The category to move all entries from.
 		toCategory: The (new) category to move all entries to.
+		toDb: The target database. Defaults to self.
+		copy: If False, then move. If True, then copy.
 		"""
+		toDb = toDb or self
 		if not self.categoryExists(fromCategory):
 			raise PWManError("Source category does not exist.")
-		c = self.sqlExec("UPDATE entries SET category=? "
-				 "WHERE category=?;",
-				 (toCategory,
-				  fromCategory))
+		if toDb is self and fromCategory == toCategory:
+			return
+		fromTitles = self.getEntryTitles(fromCategory)
+		for fromTitle in fromTitles:
+			if toDb.entryExists(toCategory, fromTitle):
+				raise PWManError("Target entry %s/%s does already exist." % (
+						 toCategory, fromTitle))
+		if toDb is self and not copy:
+			c = self.sqlExec("UPDATE entries SET category=? "
+					 "WHERE category=?;",
+					 (toCategory,
+					  fromCategory))
+		else:
+			for fromTitle in fromTitles:
+				entry = self.getEntry(fromCategory, fromTitle)
+				bulk = self.getEntryBulk(entry)
+				attrs = self.getEntryAttrs(entry)
+				totp = self.getEntryTotp(entry)
+				entry.entryId = None
+				entry.category = toCategory
+				toDb.addEntry(entry)
+				if bulk:
+					bulk.bulkId = None
+					toDb.setEntryBulk(bulk)
+				for attr in attrs:
+					attr.attrId = None
+					toDb.setEntryAttr(attr)
+				if totp:
+					totp.totpId = None
+					toDb.setEntryTotp(totp)
+			if not copy:
+				for fromTitle in fromTitles:
+					entry = self.getEntry(fromCategory, fromTitle)
+					self.delEntry(entry)
 		self.__setDirty()
 
 	def delEntry(self, entry):
