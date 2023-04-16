@@ -38,7 +38,6 @@ def hotp(key, counter, nrDigits=6, hmacHash="SHA1"):
 		raise OtpError("Invalid counter.")
 	if not (1 <= nrDigits <= 8):
 		raise OtpError("Invalid number of digits.")
-
 	try:
 		hmacHash = hmacHash.replace("-", "")
 		hmacHash = hmacHash.replace("_", "")
@@ -52,20 +51,11 @@ def hotp(key, counter, nrDigits=6, hmacHash="SHA1"):
 	except KeyError:
 		raise OtpError("Invalid HMAC hash type.")
 
-	counter = bytes(((counter >> 56) & 0xFF,
-			 (counter >> 48) & 0xFF,
-			 (counter >> 40) & 0xFF,
-			 (counter >> 32) & 0xFF,
-			 (counter >> 24) & 0xFF,
-			 (counter >> 16) & 0xFF,
-			 (counter >> 8) & 0xFF,
-			 (counter >> 0) & 0xFF))
-	h = hmac.new(key, counter, hmacHash).digest()
+	counter = counter.to_bytes(length=8, byteorder="big", signed=False)
+	h = bytearray(hmac.new(key, counter, hmacHash).digest())
 	offset = h[19] & 0xF
-	hSlice = (((h[offset + 0] & 0x7F) << 24) |
-		  ((h[offset + 1] & 0xFF) << 16) |
-		  ((h[offset + 2] & 0xFF) << 8) |
-		  ((h[offset + 3] & 0xFF) << 0))
+	h[offset] &= 0x7F
+	hSlice = int.from_bytes(h[offset:offset+4], byteorder="big", signed=False)
 	otp = hSlice % (10 ** nrDigits)
 	fmt = "%0" + str(nrDigits) + "d"
 	return fmt % otp
