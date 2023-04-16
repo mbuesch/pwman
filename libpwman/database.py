@@ -463,6 +463,7 @@ class PWManDatabase(CryptSQL):
 					 (entry.category,
 					  entry.title,
 					  oldEntry.entryId))
+			self.__setDirty()
 		else:
 			bulk = self.getEntryBulk(entry)
 			attrs = self.getEntryAttrs(entry)
@@ -482,7 +483,6 @@ class PWManDatabase(CryptSQL):
 				toDb.setEntryTotp(totp)
 			if not copy:
 				self.delEntry(oldEntry)
-		self.__setDirty()
 
 	def moveEntries(self, fromCategory, toCategory, toDb=None, copy=False):
 		"""Move or copy all entries from one category to another category.
@@ -506,6 +506,7 @@ class PWManDatabase(CryptSQL):
 					 "WHERE category=?;",
 					 (toCategory,
 					  fromCategory))
+			self.__setDirty()
 		else:
 			for fromTitle in fromTitles:
 				entry = self.getEntry(fromCategory, fromTitle)
@@ -528,7 +529,6 @@ class PWManDatabase(CryptSQL):
 				for fromTitle in fromTitles:
 					entry = self.getEntry(fromCategory, fromTitle)
 					self.delEntry(entry)
-		self.__setDirty()
 
 	def delEntry(self, entry):
 		"""Delete an existing entry from the database.
