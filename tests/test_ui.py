@@ -95,6 +95,7 @@ class Test_UI(TestCase):
 			os.unlink(self.dbFileSecondary.name)
 		except FileNotFoundError as e:
 			pass
+
 		# main db
 		self.ui.do_database("main")
 		self.ui.do_new("cat0 ent0 user0 pw0")
@@ -103,9 +104,17 @@ class Test_UI(TestCase):
 		self.ui.do_new("bigcat ent11 user11 pw11")
 		self.ui.do_new("bigcat ent12 user12 pw12")
 		self.ui.do_new("bigcat ent13 user13 pw13")
+		self.ui.do_edit_bulk("cat0 ent0 bulk0")
+		self.ui.do_edit_attr("cat0 ent0 attr0 attrdata0")
+		self.ui.do_edit_totp("cat0 ent0 GEZDGNAK 6 SHA1")
+		self.ui.do_edit_bulk("bigcat ent10 bulk10")
+		self.ui.do_edit_attr("bigcat ent10 attr10 attrdata10")
+		self.ui.do_edit_totp("bigcat ent10 GEZDGNAK 8 SHA256")
 		# secondary db
 		self.ui.do_database("-f %s secondary" % self.dbFileSecondary.name)
 		self.ui.do_new("cat2 ent2 user2 pw2")
+
+		# move
 
 		self.ui.do_database("main")
 
@@ -113,15 +122,159 @@ class Test_UI(TestCase):
 		self.assertRaises(libpwman.PWMan.CommandError,
 			lambda: self.ui.do_move("-d secondary cat0 ent0 cat0"))
 
-		self.ui.do_move("-s secondary -d main cat0 ent0 cat0")
+		self.ui.do_move("-s secondary -d main cat2 ent2 cat2")
 		self.assertRaises(libpwman.PWMan.CommandError,
-			lambda: self.ui.do_move("-s secondary -d main cat0 ent0 cat0"))
+			lambda: self.ui.do_move("-s secondary -d main cat2 ent2 cat2"))
 
 		self.ui.do_move("-d secondary bigcat")
 		self.assertRaises(libpwman.PWMan.CommandError,
 			lambda: self.ui.do_move("-d secondary bigcat"))
-		self.ui.do_move("-s secondary -d main bigcat bigcat2")
-		self.assertRaises(libpwman.PWMan.CommandError,
-			lambda: self.ui.do_move("-s secondary -d main bigcat bigcat2"))
+
+		# copy
+
+		self.ui.do_database("main")
+
+		self.ui.do_copy("-s secondary -d main cat0 ent0 cat0copy ent0copy")
+		self.ui.do_copy("-s secondary -d main bigcat bigcatcopy")
+
+		# check data
+
+		db = self.ui._getDb("main")
+		# cat1/ent1
+		entry = db.getEntry("cat1", "ent1")
+		self.assertEqual(entry.user, "user1")
+		self.assertEqual(entry.pw, "pw1")
+		bulk = db.getEntryBulk(entry)
+		self.assertIsNone(bulk)
+		attr = db.getEntryAttr(entry, "attr1")
+		self.assertIsNone(attr)
+		totp = db.getEntryTotp(entry)
+		self.assertIsNone(totp)
+		# cat2/ent2
+		entry = db.getEntry("cat2", "ent2")
+		self.assertEqual(entry.user, "user2")
+		self.assertEqual(entry.pw, "pw2")
+		bulk = db.getEntryBulk(entry)
+		self.assertIsNone(bulk)
+		attr = db.getEntryAttr(entry, "attr2")
+		self.assertIsNone(attr)
+		totp = db.getEntryTotp(entry)
+		self.assertIsNone(totp)
+		# cat0copy/ent0copy
+		entry = db.getEntry("cat0copy", "ent0copy")
+		self.assertEqual(entry.user, "user0")
+		self.assertEqual(entry.pw, "pw0")
+		bulk = db.getEntryBulk(entry)
+		self.assertEqual(bulk.data, "bulk0")
+		attr = db.getEntryAttr(entry, "attr0")
+		self.assertEqual(attr.name, "attr0")
+		self.assertEqual(attr.data, "attrdata0")
+		totp = db.getEntryTotp(entry)
+		self.assertEqual(totp.key, "GEZDGNAK")
+		self.assertEqual(totp.digits, 6)
+		self.assertEqual(totp.hmacHash, "SHA1")
+		# bigcatcopy/ent10
+		entry = db.getEntry("bigcatcopy", "ent10")
+		self.assertEqual(entry.user, "user10")
+		self.assertEqual(entry.pw, "pw10")
+		bulk = db.getEntryBulk(entry)
+		self.assertEqual(bulk.data, "bulk10")
+		attr = db.getEntryAttr(entry, "attr10")
+		self.assertEqual(attr.name, "attr10")
+		self.assertEqual(attr.data, "attrdata10")
+		totp = db.getEntryTotp(entry)
+		self.assertEqual(totp.key, "GEZDGNAK")
+		self.assertEqual(totp.digits, 8)
+		self.assertEqual(totp.hmacHash, "SHA256")
+		# bigcatcopy/ent11
+		entry = db.getEntry("bigcatcopy", "ent11")
+		self.assertEqual(entry.user, "user11")
+		self.assertEqual(entry.pw, "pw11")
+		bulk = db.getEntryBulk(entry)
+		self.assertIsNone(bulk)
+		attr = db.getEntryAttr(entry, "attr11")
+		self.assertIsNone(attr)
+		totp = db.getEntryTotp(entry)
+		self.assertIsNone(totp)
+		# bigcatcopy/ent12
+		entry = db.getEntry("bigcatcopy", "ent12")
+		self.assertEqual(entry.user, "user12")
+		self.assertEqual(entry.pw, "pw12")
+		bulk = db.getEntryBulk(entry)
+		self.assertIsNone(bulk)
+		attr = db.getEntryAttr(entry, "attr12")
+		self.assertIsNone(attr)
+		totp = db.getEntryTotp(entry)
+		self.assertIsNone(totp)
+		# bigcatcopy/ent13
+		entry = db.getEntry("bigcatcopy", "ent13")
+		self.assertEqual(entry.user, "user13")
+		self.assertEqual(entry.pw, "pw13")
+		bulk = db.getEntryBulk(entry)
+		self.assertIsNone(bulk)
+		attr = db.getEntryAttr(entry, "attr13")
+		self.assertIsNone(attr)
+		totp = db.getEntryTotp(entry)
+		self.assertIsNone(totp)
+
+
+		db = self.ui._getDb("secondary")
+		# cat0/ent0
+		entry = db.getEntry("cat0", "ent0")
+		self.assertEqual(entry.user, "user0")
+		self.assertEqual(entry.pw, "pw0")
+		bulk = db.getEntryBulk(entry)
+		self.assertEqual(bulk.data, "bulk0")
+		attr = db.getEntryAttr(entry, "attr0")
+		self.assertEqual(attr.name, "attr0")
+		self.assertEqual(attr.data, "attrdata0")
+		totp = db.getEntryTotp(entry)
+		self.assertEqual(totp.key, "GEZDGNAK")
+		self.assertEqual(totp.digits, 6)
+		self.assertEqual(totp.hmacHash, "SHA1")
+		# bigcat/ent10
+		entry = db.getEntry("bigcat", "ent10")
+		self.assertEqual(entry.user, "user10")
+		self.assertEqual(entry.pw, "pw10")
+		bulk = db.getEntryBulk(entry)
+		self.assertEqual(bulk.data, "bulk10")
+		attr = db.getEntryAttr(entry, "attr10")
+		self.assertEqual(attr.name, "attr10")
+		self.assertEqual(attr.data, "attrdata10")
+		totp = db.getEntryTotp(entry)
+		self.assertEqual(totp.key, "GEZDGNAK")
+		self.assertEqual(totp.digits, 8)
+		self.assertEqual(totp.hmacHash, "SHA256")
+		# bigcat/ent11
+		entry = db.getEntry("bigcat", "ent11")
+		self.assertEqual(entry.user, "user11")
+		self.assertEqual(entry.pw, "pw11")
+		bulk = db.getEntryBulk(entry)
+		self.assertIsNone(bulk)
+		attr = db.getEntryAttr(entry, "attr11")
+		self.assertIsNone(attr)
+		totp = db.getEntryTotp(entry)
+		self.assertIsNone(totp)
+		# bigcat/ent12
+		entry = db.getEntry("bigcat", "ent12")
+		self.assertEqual(entry.user, "user12")
+		self.assertEqual(entry.pw, "pw12")
+		bulk = db.getEntryBulk(entry)
+		self.assertIsNone(bulk)
+		attr = db.getEntryAttr(entry, "attr12")
+		self.assertIsNone(attr)
+		totp = db.getEntryTotp(entry)
+		self.assertIsNone(totp)
+		# bigcat/ent13
+		entry = db.getEntry("bigcat", "ent13")
+		self.assertEqual(entry.user, "user13")
+		self.assertEqual(entry.pw, "pw13")
+		bulk = db.getEntryBulk(entry)
+		self.assertIsNone(bulk)
+		attr = db.getEntryAttr(entry, "attr13")
+		self.assertIsNone(attr)
+		totp = db.getEntryTotp(entry)
+		self.assertIsNone(totp)
+
 
 		self.ui.do_commit("-a")
