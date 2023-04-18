@@ -24,7 +24,7 @@ run_pyunit()
 	(
 		echo
 		echo "==="
-		echo "= Running $interpreter, PWMAN_CRYPTOLIB=\"$PWMAN_CRYPTOLIB\""
+		echo "= Running $interpreter, PWMAN_CRYPTOLIB=\"$PWMAN_CRYPTOLIB\", PWMAN_ARGON2LIB=\"$PWMAN_ARGON2LIB\""
 		echo "==="
 		export PYTHONPATH="$rootdir/tests:$PYTHONPATH"
 		cd "$rootdir" || die "Failed to cd to rootdir."
@@ -55,11 +55,16 @@ run_testdir()
 	unset PWMAN_DATABASE
 	unset PWMAN_RAWGETPASS
 	unset PWMAN_CRYPTOLIB
+	unset PWMAN_ARGON2LIB
 
 	run_pyunit python3 "$test_dir"
+
 	export PWMAN_CRYPTOLIB=cryptodome
+	export PWMAN_ARGON2LIB=argon2-cffi
 	run_pyunit python3 "$test_dir"
+
 	export PWMAN_CRYPTOLIB=pyaes
+	export PWMAN_ARGON2LIB=argon2-cffi
 	run_pyunit python3 "$test_dir"
 }
 

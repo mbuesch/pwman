@@ -105,3 +105,11 @@ class Test_Database_v1(TestCase):
 		self.assertEqual(entry.pw, "TEST!!")
 		entryBulk = db.getEntryBulk(entry)
 		self.assertEqual(entryBulk.data, "TEST!!!")
+
+	def test_legacy_pbkdf2(self):
+		# Test legacy PBKDF2 read support.
+		# Just check if we can open and decrypt it successfully.
+		db = PWManDatabase(filename=pathlib.Path("tests", "test_database_v1_pbkdf2.db"),
+				   passphrase="test")
+		self.assertEqual(db.getCategoryNames(),
+				 sorted([ "123", "test2", "testcat1" ]))

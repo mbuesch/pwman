@@ -19,6 +19,16 @@ pwman has support for the following things:
 * Custom Python scripts for arbitrary database processing.
 * Export of the complete database as SQL text dump, CSV dump and human readable plain text dump.
 
+Algorithms
+==========
+
++--------------------------------+--------------------------------------------+
+| Encryption algorithm:          | AES in CBC mode with 256 bit key.          |
++--------------------------------+--------------------------------------------+
+| Key derivation function (KDF): | Argon2id with 24 MiB memory cost           |
+|                                | or more (see environment variables below). |
++--------------------------------+--------------------------------------------+
+
 Install pwman
 =============
 
@@ -32,9 +42,8 @@ If you want to install pwman into a Python virtualenv, run the following command
 
 .. code:: sh
 
-	virtualenv --system-site-packages ./pwman-venv
+	python3 -m venv --system-site-packages ./pwman-venv
 	. ./pwman-venv/bin/activate
-	pip3 install -U pycryptodomex
 	pip3 install -U pwman-python
 
 Run pwman
@@ -76,34 +85,70 @@ API documentation
 
 The API documentation can be found in the `API documentation directory <doc/api/>`_.
 
-Crypto backend
-==============
+Crypto backends
+===============
 
 Pwman uses either `Cryptodome <https://pypi.org/project/pycryptodomex/>`_ or `pyaes <https://pypi.org/project/pyaes/>`_ for AES encryption.
 Therefore, either one of these Python modules has to be installed.
 Pwman first tries to use Cryptodome and then falls back to pyaes, if Cryptodome is not installed.
+
+For key derivation either `argon2-cffi <https://pypi.org/project/argon2-cffi/>`_ or `argon2pure <https://pypi.org/project/argon2pure/>`_ can be used.
+Preferably `argon2-cffi` shall be installed.
+As an option `argon2pure` is supported.
+`argon2pure` is a pure Python implementation of the algorithm and it is *extremely* slow.
+Therefore, it will never be selected automatically.
+See environment variables.
 
 Environment variables
 =====================
 
 Environment variables that affect pwman operation are:
 
-+----------------------+---------------------------------+------------------------------+----------------+
-| Environment variable | Description                     | Possible values              | Default        |
-+======================+=================================+==============================+================+
-| PWMAN_CRYPTOLIB      | Select the crypto backend       | "cryptodome", "pyaes"        | probe in order |
-+----------------------+---------------------------------+------------------------------+----------------+
-| PWMAN_ARGON2LIB      | Select the Argon2 backend       | "argon2-cffi", "argon2pure"  | "argon2-cffi"  |
-+----------------------+---------------------------------+------------------------------+----------------+
-| PWMAN_DATABASE       | Path to the default database    | any file path                | ~/.pwman.db    |
-+----------------------+---------------------------------+------------------------------+----------------+
-| PWMAN_RAWGETPASS     | If true, do not use safe master | boolean                      | false          |
-|                      | password input. Read directly   | (0, 1, true, false, yes, no) |                |
-|                      | from stdin instead.             |                              |                |
-+----------------------+---------------------------------+------------------------------+----------------+
++----------------------+--------------------------------------------+------------------------------+----------------+
+| Environment variable | Description                                | Possible values              | Default        |
++======================+============================================+==============================+================+
+| PWMAN_CRYPTOLIB      | Select the crypto backend                  | "cryptodome", "pyaes"        | probe in order |
++----------------------+--------------------------------------------+------------------------------+----------------+
+| PWMAN_ARGON2LIB      | Select the Argon2 backend                  | "argon2-cffi", "argon2pure"  | "argon2-cffi"  |
++----------------------+--------------------------------------------+------------------------------+----------------+
+| PWMAN_ARGON2MEM      | Set the amount of memory (in KiB) used     | Number of KiB,               | 24584          |
+|                      | for key derivation.                        | but not less than 24584.     |                |
+|                      | Increasing this value improves security,   |                              |                |
+|                      | but it also increases the amount of memory |                              |                |
+|                      | required during encryption and decryption. |                              |                |
++----------------------+--------------------------------------------+------------------------------+----------------+
+| PWMAN_ARGON2TIME     | Set the time used for key derivation.      | Number of iterations,        | 163            |
+|                      | Increasing this value improves security,   | but not less than 2          |                |
+|                      | but it also increases the time required    | and not less than            |                |
+|                      | for encryption and decryption.             | 2500000 / PWMAN_ARGON2MEM.   |                |
++----------------------+--------------------------------------------+------------------------------+----------------+
+| PWMAN_DATABASE       | Path to the default database               | any file path                | ~/.pwman.db    |
++----------------------+--------------------------------------------+------------------------------+----------------+
+| PWMAN_RAWGETPASS     | If true, do not use safe master            | boolean                      | false          |
+|                      | password input. Read directly              | (0, 1, true, false, yes, no) |                |
+|                      | from stdin instead.                        |                              |                |
++----------------------+--------------------------------------------+------------------------------+----------------+
 
 You probably don't need to set any environment variable to use pwman.
 The default values are most likely what you want.
+
+Out of memory errors
+====================
+
+Pwman uses a strong and memory hard algorithm (Argon2id) to derive the master encryption key from the user supplied master passphrase.
+This algorithm uses lots of memory (and time) to make brute forcing the key expensive.
+This significantly improves security, if the master passphrase has less entropy than the raw AES-256 key.
+
+Pwman also locks all memory to RAM, so that no secrets and keys are written to disk swap space.
+Therefore, pwman might crash if the actual memory usage during key derivation exceeds the system's memory lock limit.
+
+To increase the locked memory available to applications, please increase the OS limits by installing a raised limit as follows:
+
+.. code:: sh
+
+	# as root:
+	cp pwman-memlock-limits.conf /etc/security/limits.d/
+	reboot
 
 License / Copyright
 ===================

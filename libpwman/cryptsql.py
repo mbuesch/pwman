@@ -7,13 +7,16 @@
 
 import functools
 import hashlib
+import math
+import os
 import re
 import secrets
 import sqlite3 as sql
 import zlib
 
-from libpwman.fileobj import *
 from libpwman.aes import AES
+from libpwman.argon2 import Argon2
+from libpwman.fileobj import FileObj, FileObjCollection, FileObjError
 
 __all__ = [
 	"CSQLError",
@@ -21,6 +24,37 @@ __all__ = [
 ]
 
 CSQL_HEADER = b"CryptSQL v1"
+
+def decodeInt(buf, error, minValue=None, maxValue=None):
+	"""Decode bytes into a int as decimal representation.
+	buf: Bytes buffer.
+	error: Error message string, in case of conversion failure.
+	minValue: The smallest allowed integer value.
+	maxValue: The biggest allowed integer value.
+	"""
+	try:
+		value = int(buf.decode("UTF-8"), 10)
+		if minValue is not None and value < minValue:
+			raise ValueError
+		if maxValue is not None and value > maxValue:
+			raise ValueError
+		return value
+	except (ValueError, UnicodeError) as e:
+		raise CSQLError("%s: %s" % (error, buf.decode("UTF-8", "ignore")))
+
+def decodeChoices(buf, error, choices):
+	"""Decode bytes into one of the possible choices strings.
+	buf: Bytes buffer.
+	error: Error message string, in case of conversion failure.
+	choices: An iterable of possible strings.
+	"""
+	try:
+		string = buf.decode("UTF-8")
+		if string not in choices:
+			raise ValueError
+		return string
+	except (ValueError, UnicodeError) as e:
+		raise CSQLError("%s: %s" % (error, buf.decode("UTF-8", "ignore")))
 
 class CSQLError(Exception):
 	"""CryptSQL exception.
@@ -87,6 +121,17 @@ class CryptSQL:
 	"""Encrypted SQL database.
 	"""
 
+	# Argon2 KDF parameters.
+	KDF_SALT_NBYTES		= 19
+	KDF_THREADS		= 7
+	KDF_MEM_BASE		= 1024 * 24
+	KDF_MEM_CHUNK		= 4 * KDF_THREADS
+	DEFAULT_KDF_MEM		= int(math.ceil(KDF_MEM_BASE / KDF_MEM_CHUNK)) * KDF_MEM_CHUNK
+	DEFAULT_KDF_ITER	= 163
+	KDF_MEMLIMIT		= DEFAULT_KDF_MEM
+	KDF_ITERLIMIT_A		= lambda kdfMem: int(math.ceil(2500000 / kdfMem))
+	KDF_ITERLIMIT_B		= 2
+
 	def __init__(self, readOnly=True):
 		"""readOnly: If True, no commit is possible.
 		"""
@@ -142,98 +187,209 @@ class CryptSQL:
 				return
 
 			# Get the file fields.
-			head = fc.get(b"HEAD", "Invalid file header object")
+			head = fc.get(
+				name=b"HEAD",
+				error="Missing file header object",
+			)
 			if head != CSQL_HEADER:
 				raise CSQLError("Invalid file header")
-			cipher = fc.get(b"CIPHER", "Invalid CIPHER object")
-			cipherMode = fc.get(b"CIPHER_MODE", "Invalid CIPHER_MODE object")
-			cipherIV = fc.get(b"CIPHER_IV", "Invalid CIPHER_IV object")
-			keyLen = fc.get(b"KEY_LEN", "Invalid KEY_LEN object")
-			kdfMethod = fc.get(b"KDF_METHOD", "Invalid KDF_METHOD object")
-			kdfSalt = fc.get(b"KDF_SALT", "Invalid KDF_SALT object")
-			kdfIter = fc.get(b"KDF_ITER", "Invalid KDF_ITER object")
-			kdfHash = fc.get(b"KDF_HASH", "Invalid KDF_HASH object")
-			kdfMac = fc.get(b"KDF_MAC", "Invalid KDF_MAC object")
-			compress = fc.get(b"COMPRESS", default=b"NONE")
-			paddingMethod = fc.get(b"PADDING", default=b"PWMAN")
-			payload = fc.get(b"PAYLOAD", "Invalid PAYLOAD object")
+			cipher = fc.get(
+				name=b"CIPHER",
+				error="Missing CIPHER header object",
+			)
+			cipherMode = fc.get(
+				name=b"CIPHER_MODE",
+				error="Missing CIPHER_MODE header object",
+			)
+			cipherIV = fc.get(
+				name=b"CIPHER_IV",
+				error="Missing CIPHER_IV header object",
+			)
+			keyLen = fc.get(
+				name=b"KEY_LEN",
+				error="Missing KEY_LEN header object",
+			)
+			kdfMethod = fc.get(
+				name=b"KDF_METHOD",
+				error="Missing KDF_METHOD header object",
+			)
+			kdfSalt = fc.get(
+				name=b"KDF_SALT",
+				error="Missing KDF_SALT header object",
+			)
+			kdfIter = fc.get(
+				name=b"KDF_ITER",
+				error="Missing KDF_ITER header object",
+			)
+			if kdfMethod == b"PBKDF2":
+				kdfHash = fc.get(
+					name=b"KDF_HASH",
+					error="Missing KDF_HASH header object",
+				)
+				kdfMac = fc.get(
+					name=b"KDF_MAC",
+					error="Missing KDF_MAC header object",
+				)
+			elif kdfMethod == b"ARGON2":
+				kdfType = fc.get(
+					name=b"KDF_TYPE",
+					error="Missing KDF_TYPE header object",
+				)
+				kdfVer = fc.get(
+					name=b"KDF_VER",
+					error="Missing KDF_VER header object",
+				)
+				kdfPar = fc.get(
+					name=b"KDF_PAR",
+					error="Missing KDF_PAR header object",
+				)
+				kdfMem = fc.get(
+					name=b"KDF_MEM",
+					error="Missing KDF_MEM header object",
+				)
+			compress = fc.get(
+				name=b"COMPRESS",
+				default=b"NONE",
+			)
+			paddingMethod = fc.get(
+				name=b"PADDING",
+				default=b"PWMAN",
+			)
+			payload = fc.get(
+				name=b"PAYLOAD",
+				error="Missing PAYLOAD object",
+			)
+
+			# Check payload.
+			if len(payload) < 1:
+				raise CSQLError("Invalid PAYLOAD length: %d" % (
+						len(payload)))
 
 			# Check the padding method.
-			if paddingMethod not in (b"PWMAN", b"PKCS7"):
-				raise CSQLError("Unknown padding: %s" % (
-						paddingMethod.decode("UTF-8", "ignore")))
+			paddingMethod = decodeChoices(
+				buf=paddingMethod,
+				choices=("PWMAN", "PKCS7"),
+				error="Unknown padding method header",
+			)
 
 			# Check the cipher.
-			if cipher == b"AES" and cipherMode == b"CBC":
-				cipherBlockSize = AES.BLOCK_SIZE
-			else:
-				raise CSQLError("Unknown cipher/mode: %s/%s" % (
-					cipher.decode("UTF-8", "ignore"),
-					cipherMode.decode("UTF-8", "ignore")))
+			cipher = decodeChoices(
+				buf=cipher,
+				choices=("AES",),
+				error="Unknown CIPHER header value",
+			)
+			cipherMode = decodeChoices(
+				buf=cipherMode,
+				choices=("CBC",),
+				error="Unknown CIPHER_MODE header value",
+			)
+			cipherBlockSize = AES.BLOCK_SIZE
 
 			# Check the cipher IV.
 			if len(cipherIV) != cipherBlockSize:
-				raise CSQLError("Invalid IV len: %d" % len(cipherIV))
+				raise CSQLError("Invalid CIPHER_IV header length: %d" % (
+						len(cipherIV)))
 
 			# Check the cipher key length.
-			if keyLen == b"256":
-				keyLen = 256 // 8
-			else:
-				raise CSQLError("Unknown key len: %s" % keyLen.decode("UTF-8", "ignore"))
+			keyLen = decodeChoices(
+				buf=keyLen,
+				choices=("256",),
+				error="Unknown KEY_LEN header value",
+			)
+			keyLen = int(keyLen) // 8
 
-			# Check the key derivation function hash.
-			if kdfHash in (b"SHA256", b"SHA512", b"SHA3-512"):
-				kdfHash = kdfHash.decode("UTF-8")
-			else:
-				raise CSQLError("Unknown kdf-hash: %s" % kdfHash.decode("UTF-8", "ignore"))
-			if len(kdfSalt) < 32:
-				raise CSQLError("Invalid salt len: %d" % len(kdfSalt))
+			# Check the key derivation function salt.
+			if len(kdfSalt) < 16:
+				raise CSQLError("Invalid KDF_SALT header length: %d" % (
+						len(kdfSalt)))
 
 			# Check the key derivation function iterations.
-			try:
-				kdfIter = int(kdfIter.decode("UTF-8"), 10)
-			except (ValueError, UnicodeError) as e:
-				raise CSQLError("Unknown kdf-iter: %s" % kdfIter.decode("UTF-8", "ignore"))
+			kdfIter = decodeInt(
+				buf=kdfIter,
+				minValue=1,
+				maxValue=((1 << 32) - 1),
+				error="Invalid KDF_ITER header value",
+			)
 
 			# Check the key derivation function.
-			if kdfMethod == b"PBKDF2":
-				if kdfMac != b"HMAC":
-					raise CSQLError("Unknown kdf-mac: %s" % kdfMac)
-				kdfMethod = lambda: hashlib.pbkdf2_hmac(hash_name=kdfHash,
-									password=self.__passphrase,
-									salt=kdfSalt,
-									iterations=kdfIter,
-									dklen=keyLen)
+			kdfMethod = decodeChoices(
+				buf=kdfMethod,
+				choices=("PBKDF2", "ARGON2"),
+				error="Unknown KDF_METHOD header value",
+			)
+			if kdfMethod == "PBKDF2":
+				kdfHash = decodeChoices(
+					buf=kdfHash,
+					choices=("SHA256", "SHA512", "SHA3-512"),
+					error="Unknown KDF_HASH header value",
+				)
+				kdfMac = decodeChoices(
+					buf=kdfMac,
+					choices=("HMAC",),
+					error="Unknown KDF_MAC header value",
+				)
+				kdf = lambda: hashlib.pbkdf2_hmac(
+					hash_name=kdfHash,
+					password=self.__passphrase,
+					salt=kdfSalt,
+					iterations=kdfIter,
+					dklen=keyLen,
+				)
+			elif kdfMethod == "ARGON2":
+				kdfType = decodeChoices(
+					buf=kdfType,
+					choices=("ID",),
+					error="Unknown KDF_TYPE header value",
+				)
+				kdfVer = decodeChoices(
+					buf=kdfVer,
+					choices=(str(0x13), ),
+					error="Unknown KDF_VER header value",
+				)
+				kdfPar = decodeInt(
+					buf=kdfPar,
+					minValue=1,
+					maxValue=((1 << 24) - 1),
+					error="Invalid KDF_PAR header value",
+				)
+				kdfMem = decodeInt(
+					buf=kdfMem,
+					minValue=(8 * kdfPar),
+					maxValue=((1 << 32) - 1),
+					error="Invalid KDF_MEM header value",
+				)
+				kdf = lambda: Argon2.get().argon2id_v1p3(
+					passphrase=self.__passphrase,
+					salt=kdfSalt,
+					timeCost=kdfIter,
+					memCost=kdfMem,
+					parallel=kdfPar,
+					keyLen=keyLen,
+				)
 			else:
-				raise CSQLError("Unknown kdf method: %s" % kdfMethod)
+				assert False
 
 			# Check the compression method.
-			if compress == b"NONE":
-				class DecompressDummy:
-					def decompress(self, payload):
-						return payload
-				compress = DecompressDummy()
-			elif compress == b"ZLIB": # legacy
-				compress = zlib
-			else:
-				raise CSQLError("Unknown compression: %s" % compress)
-
-			# Generate the key.
-			if self.__key is None:
-				key = kdfMethod()
-			else:
-				key = self.__key
+			compress = decodeChoices(
+				buf=compress,
+				choices=("NONE", "ZLIB"),
+				error="Unknown COMPRESS header value",
+			)
 
 			try:
-				# Decrypt payload.
+				# Generate the key.
+				key = kdf() if self.__key is None else self.__key
+
+				# Decrypt the payload.
 				payload = AES.get().decrypt(
 					key=key,
 					iv=cipherIV,
 					data=payload,
-					legacyPadding=(paddingMethod == b"PWMAN"))
+					legacyPadding=(paddingMethod == "PWMAN"))
 
-				# Decompress payload (legacy).
-				payload = compress.decompress(payload)
+				# Decompress the payload (legacy).
+				if compress == "ZLIB":
+					payload = zlib.decompress(payload)
 
 				# Import the SQL database.
 				self.importSqlScript(payload.decode("UTF-8"))
@@ -244,7 +400,7 @@ class CryptSQL:
 				raise CSQLError("Failed to decrypt database. "
 						"Wrong passphrase?")
 		except FileObjError as e:
-			raise CSQLError("File error: %s" % str(e))
+			raise CSQLError("Database file error: %s" % str(e))
 
 	def isOpen(self):
 		"""Returns True, if a database file is opened.
@@ -291,17 +447,6 @@ class CryptSQL:
 			raise CSQLError("__random(): Sanity check failed (ones).")
 		return data
 
-	def __randomInt(self, belowVal):
-		"""Return a cryptographically secure random integer.
-		belowVal: The returned integer (ret) shall be 0 <= ret < belowVal.
-		"""
-		if belowVal <= 0:
-			raise CSQLError("__randomInt(): Invalid range.")
-		val = secrets.randbelow(belowVal)
-		if not (0 <= val < belowVal):
-			raise CSQLError("__randomInt(): Sanity check failed.")
-		return val
-
 	def dropUncommitted(self):
 		"""Drop all changes that are not committed, yet.
 		"""
@@ -310,6 +455,7 @@ class CryptSQL:
 	def commit(self):
 		"""Write all changes to the encrypted database file.
 		"""
+		cls = self.__class__
 		if self.__readOnly:
 			raise CSQLError("The database is read-only. "
 					"Cannot commit changes.")
@@ -321,17 +467,40 @@ class CryptSQL:
 		# Dump the database
 		payload = self.sqlPlainDump()
 
+		# Get the KDF parameters.
+		kdfSalt = self.__random(cls.KDF_SALT_NBYTES)
+		kdfMem = cls.DEFAULT_KDF_MEM
+		kdfMemUser = os.getenv("PWMAN_ARGON2MEM", "").lower().strip()
+		if kdfMemUser:
+			try:
+				kdfMem = int(kdfMemUser, 10)
+			except ValueError:
+				raise CSQLError("The value of the environment variable "
+						"PWMAN_ARGON2MEM is invalid.")
+		kdfMem = max(kdfMem, cls.KDF_MEMLIMIT)
+		kdfIter = cls.DEFAULT_KDF_ITER
+		kdfIterUser = os.getenv("PWMAN_ARGON2TIME", "").lower().strip()
+		if kdfIterUser:
+			try:
+				kdfIter = int(kdfIterUser, 10)
+			except ValueError:
+				raise CSQLError("The value of the environment variable "
+						"PWMAN_ARGON2TIME is invalid.")
+		kdfIter = max(kdfIter, cls.KDF_ITERLIMIT_A(kdfMem))
+		kdfIter = max(kdfIter, cls.KDF_ITERLIMIT_B)
+		kdfPar = cls.KDF_THREADS
+		keyLen = 256 // 8
+
 		try:
 			# Generate the key.
-			kdfHash = "SHA3-512"
-			kdfSalt = self.__random(34)
-			kdfIter = self.__randomInt(10000) + 1000000
-			keyLen = 256 // 8
-			key = hashlib.pbkdf2_hmac(hash_name=kdfHash,
-						  password=self.__passphrase,
-						  salt=kdfSalt,
-						  iterations=kdfIter,
-						  dklen=keyLen)
+			key = Argon2.get().argon2id_v1p3(
+				passphrase=self.__passphrase,
+				salt=kdfSalt,
+				timeCost=kdfIter,
+				memCost=kdfMem,
+				parallel=kdfPar,
+				keyLen=keyLen,
+			)
 
 			# Encrypt payload
 			cipherIV = self.__random(AES.BLOCK_SIZE)
@@ -347,12 +516,13 @@ class CryptSQL:
 				FileObj(b"CIPHER_MODE", b"CBC"),
 				FileObj(b"CIPHER_IV", cipherIV),
 				FileObj(b"KEY_LEN", str(keyLen * 8).encode("UTF-8")),
-				FileObj(b"KDF_METHOD", b"PBKDF2"),
+				FileObj(b"KDF_METHOD", b"ARGON2"),
+				FileObj(b"KDF_TYPE", b"ID"),
+				FileObj(b"KDF_VER", str(0x13).encode("UTF-8")),
 				FileObj(b"KDF_SALT", kdfSalt),
 				FileObj(b"KDF_ITER", str(kdfIter).encode("UTF-8")),
-				FileObj(b"KDF_HASH", kdfHash.encode("UTF-8")),
-				FileObj(b"KDF_MAC", b"HMAC"),
-				FileObj(b"COMPRESS", b"NONE"), # compat for older versions.
+				FileObj(b"KDF_MEM", str(kdfMem).encode("UTF-8")),
+				FileObj(b"KDF_PAR", str(kdfPar).encode("UTF-8")),
 				FileObj(b"PADDING", b"PKCS7"),
 				FileObj(b"PAYLOAD", payload),
 			))
