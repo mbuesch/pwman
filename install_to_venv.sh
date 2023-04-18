@@ -57,6 +57,8 @@ python3 -m venv --clear --system-site-packages "$venvdir" || die "python3 -m ven
 . "$venvdir"/bin/activate || die "venv activate failed."
 pip3 install pycryptodomex || die "pip install pycryptodomex failed."
 pip3 install pyaes || die "pip install pyaes failed."
+pip3 install argon2-cffi || die "pip install argon2-cffi failed."
+pip3 install argon2pure || die "pip install argon2pure failed."
 if [ $opt_install -ne 0 ]; then
 	./setup.py install || die "Failed to install pwman."
 fi

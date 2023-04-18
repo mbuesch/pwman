@@ -40,7 +40,11 @@ setup(
 	author_email	= "m@bues.ch",
 	url		= "https://bues.ch/h/pwman",
 	python_requires = ">=3.7",
-	install_requires = [ "pycryptodomex", ],
+	install_requires = [
+		"argon2-cffi",
+		"cffi",
+		"pycryptodomex",
+	],
 	packages	= [ "libpwman", ],
 	scripts		= [ "pwman", ],
 	keywords	= "password manager command line TOTP 2FA",

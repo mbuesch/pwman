@@ -170,17 +170,11 @@ def run_ui(dbPath, timeout, commands):
 	return 0
 
 def runQuickSelfTests():
+	from libpwman.argon2 import Argon2
+	Argon2.get().quickSelfTest()
+
 	from libpwman.aes import AES
 	AES.get().quickSelfTest()
-
-	import hashlib
-	k = hashlib.pbkdf2_hmac(hash_name="SHA3-512",
-				password=b"pwman",
-				salt=b"salt",
-				iterations=2,
-				dklen=256//8)
-	if k != bytes.fromhex("7aafdabd814932463bc7d0febbf077df7da426334847e5411596e1ab6da9eb7c"):
-		raise libpwman.PWManError("PBKDF2: Quick self test failed.")
 
 def main():
 	p = argparse.ArgumentParser(

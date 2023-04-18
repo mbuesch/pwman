@@ -93,6 +93,8 @@ Environment variables that affect pwman operation are:
 +======================+=================================+==============================+================+
 | PWMAN_CRYPTOLIB      | Select the crypto backend       | "cryptodome", "pyaes"        | probe in order |
 +----------------------+---------------------------------+------------------------------+----------------+
+| PWMAN_ARGON2LIB      | Select the Argon2 backend       | "argon2-cffi", "argon2pure"  | "argon2-cffi"  |
++----------------------+---------------------------------+------------------------------+----------------+
 | PWMAN_DATABASE       | Path to the default database    | any file path                | ~/.pwman.db    |
 +----------------------+---------------------------------+------------------------------+----------------+
 | PWMAN_RAWGETPASS     | If true, do not use safe master | boolean                      | false          |
