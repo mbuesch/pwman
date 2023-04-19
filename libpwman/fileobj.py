@@ -118,11 +118,11 @@ class FileObjCollection:
 			obj.getRaw(raw)
 		return raw
 
-	def get(self, name, errorMsg=None, default=None):
+	def get(self, name, error=None, default=None):
 		obj = self.__objects.get(name, None)
 		if obj is None:
-			if errorMsg:
-				raise FileObjError(errorMsg)
+			if error:
+				raise FileObjError(error)
 			return default
 		return bytes(obj.getData())
 
