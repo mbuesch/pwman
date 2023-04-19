@@ -423,7 +423,7 @@ class CryptSQL:
 
 	def sqlPlainDump(self):
 		"""Get a plain text dump of the database.
-		Returns a string.
+		Returns bytes.
 		"""
 		return ("\n".join(self.__db.iterdump())).encode("UTF-8")
 
