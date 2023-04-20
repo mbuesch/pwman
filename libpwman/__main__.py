@@ -32,6 +32,40 @@ def getPassphrase(dbPath, verbose=True, infoFile=sys.stdout):
 						  verify=not dbExists)
 	return passphrase
 
+def run_infodump(dbPath):
+	try:
+		fc = libpwman.fileobj.FileObjCollection.parseFile(dbPath)
+		print("pwman database: %s" % dbPath)
+		head = fc.get(b"HEAD")
+		if head != libpwman.cryptsql.CSQL_HEADER:
+			head = str(head)
+			if len(head) > 16:
+				head = head[:16] + "..."
+			raise libpwman.PWManError("Invalid HEAD: %s" % head)
+		for obj in fc.objects:
+			name = bytes(obj.getName())
+			data = bytes(obj.getData())
+			trunc = False
+			if name == b"PAYLOAD" and len(data) > 8:
+				data = data[:8]
+				trunc = True
+			try:
+				name = name.decode("UTF-8")
+			except UnicodeError as e:
+				raise libpwman.PWManError(
+					"Failed to decode file header name.")
+			try:
+				data = data.decode("UTF-8")
+			except UnicodeError as e:
+				data = data.hex()
+			if trunc:
+				data += "..."
+			pad = " " * (12 - len(name))
+			print("  %s%s: %s" % (name, pad, data))
+	except libpwman.fileobj.FileObjError as e:
+		raise libpwman.PWManError(str(e))
+	return 0
+
 def run_diff(dbPath, oldDbPath, diffFormat):
 	for p in (dbPath, oldDbPath):
 		if not p.exists():
@@ -165,6 +199,8 @@ def main():
 	grp.add_argument("-c", "--command", action="append",
 			 help="Run this command instead of starting in interactive mode. "
 			      "-c|--command may be used multiple times.")
+	grp.add_argument("-I", "--info", action="store_true",
+			 help="Dump basic information about the database (without decrypting it).")
 	p.add_argument("-F", "--diff-format", type=lambda x: str(x).lower().strip(),
 		       default="unified",
 		       choices=("unified", "context", "ndiff", "html"),
@@ -188,10 +224,11 @@ def main():
 	try:
 		interactiveMode = (not args.command and
 				   not args.diff and
-				   not args.call_pymod)
+				   not args.call_pymod and
+				   not args.info)
 
 		# Lock memory to RAM.
-		if not args.no_mlock:
+		if not args.no_mlock and not args.info:
 			MLockWrapper = libpwman.mlock.MLockWrapper
 			err = MLockWrapper.mlockall(MLockWrapper.MCL_CURRENT |
 						    MLockWrapper.MCL_FUTURE)
@@ -214,9 +251,13 @@ def main():
 							  "%s" % (
 							  err, baseMsg))
 
-		runQuickSelfTests()
+		if not args.info:
+			runQuickSelfTests()
 
-		if args.diff:
+		if args.info:
+			assert not interactiveMode
+			exitcode = run_infodump(dbPath=args.database)
+		elif args.diff:
 			assert not interactiveMode
 			exitcode = run_diff(dbPath=args.database,
 					    oldDbPath=args.diff,

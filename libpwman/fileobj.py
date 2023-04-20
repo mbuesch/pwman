@@ -118,6 +118,10 @@ class FileObjCollection:
 			obj.getRaw(raw)
 		return raw
 
+	@property
+	def objects(self):
+		return self.__objects.values()
+
 	def get(self, name, error=None, default=None):
 		obj = self.__objects.get(name, None)
 		if obj is None:
