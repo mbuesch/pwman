@@ -133,5 +133,15 @@ class AES:
 		"""
 		index = data.rfind(b"\xFF")
 		if index < 0 or index >= len(data):
-			raise CSQLError("unpad_PWMAN: error")
+			raise ValueError("unpad_PWMAN: error")
 		return data[:index]
+
+	@classmethod
+	def quickSelfTest(cls):
+		inst = cls.get()
+		enc = inst.encrypt(key=(b"_keykey_" * 4), iv=(b"iv" * 8), data=b"pwman")
+		if enc != bytes.fromhex("cf73a286509e1265d26490a76dcbb2fd"):
+			raise PWManError("AES encrypt: Quick self test failed.")
+		dec = inst.decrypt(key=(b"_keykey_" * 4), iv=(b"iv" * 8), data=enc)
+		if dec != b"pwman":
+			raise PWManError("AES decrypt: Quick self test failed.")
