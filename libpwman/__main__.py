@@ -54,7 +54,7 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 		oldDb = libpwman.database.PWManDatabase(filename=oldDbPath,
 							passphrase=dbPassphrase,
 							readOnly=True)
-	except PWManError:
+	except libpwman.PWManError:
 		# The attempt failed. Ask the user for the proper passphrase.
 		dbPassphrase = getPassphrase(oldDbPath, verbose=True,
 					     infoFile=sys.stderr)
