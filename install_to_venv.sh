@@ -53,7 +53,7 @@ fi
 
 [ "$(id -u)" != "0" ] || die "Don't run this script as root."
 cd "$basedir" || die "Failed to cd to basedir."
-virtualenv --clear --system-site-packages "$venvdir" || die "virtualenv failed."
+python3 -m venv --clear --system-site-packages "$venvdir" || die "python3 -m venv failed."
 . "$venvdir"/bin/activate || die "venv activate failed."
 pip3 install pycryptodomex || die "pip install pycryptodomex failed."
 pip3 install pyaes || die "pip install pyaes failed."
