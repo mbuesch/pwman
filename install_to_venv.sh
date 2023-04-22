@@ -8,18 +8,47 @@
 
 basedir="$(realpath "$0" | xargs dirname)"
 
+default_venvdir="$basedir/pwman-venv"
+
 die()
 {
 	echo "ERROR: $*" >&2
 	exit 1
 }
 
-if [ $# -eq 0 ]; then
-	venvdir="$basedir/pwman-venv"
-elif [ $# -eq 1 ]; then
-	venvdir="$1"
-else
-	die "Usage: $0 [VENV_PATH]"
+usage()
+{
+	echo "Usage: install_to_venv.sh [OPTS] [VENV_PATH]"
+	echo
+	echo "VENV_PATH: Path to the venv to create. Default: $default_venvdir"
+	echo
+	echo "Opts:"
+	echo "  -i|--no-install   Only create the venv. Do not install pwman into it."
+}
+
+venvdir="$default_venvdir"
+opt_install=1
+
+while [ $# -ge 1 ]; do
+	case "$1" in
+		-h|--help)
+			usage
+			exit 0
+			;;
+		-i|--no-install)
+			opt_install=0
+			;;
+		*)
+			venvdir="$1"
+			shift
+			break
+			;;
+	esac
+	shift
+done
+if [ $# -ne 0 ]; then
+	usage
+	die "Invalid options"
 fi
 
 [ "$(id -u)" != "0" ] || die "Don't run this script as root."
@@ -28,4 +57,6 @@ virtualenv --clear --system-site-packages "$venvdir" || die "virtualenv failed."
 . "$venvdir"/bin/activate || die "venv activate failed."
 pip3 install pycryptodomex || die "pip install pycryptodomex failed."
 pip3 install pyaes || die "pip install pyaes failed."
-./setup.py install || die "Failed to install pwman."
+if [ $opt_install -ne 0 ]; then
+	./setup.py install || die "Failed to install pwman."
+fi
