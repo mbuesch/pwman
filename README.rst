@@ -83,6 +83,26 @@ Pwman uses either `Cryptodome <https://pypi.org/project/pycryptodomex/>`_ or `py
 Therefore, either one of these Python modules has to be installed.
 Pwman first tries to use Cryptodome and then falls back to pyaes, if Cryptodome is not installed.
 
+Environment variables
+=====================
+
+Environment variables that affect pwman operation are:
+
++----------------------+---------------------------------+------------------------------+----------------+
+| Environment variable | Description                     | Possible values              | Default        |
++======================+=================================+==============================+================+
+| PWMAN_CRYPTOLIB      | Select the crypto backend       | "cryptodome", "pyaes"        | probe in order |
++----------------------+---------------------------------+------------------------------+----------------+
+| PWMAN_DATABASE       | Path to the default database    | any file path                | ~/.pwman.db    |
++----------------------+---------------------------------+------------------------------+----------------+
+| PWMAN_RAWGETPASS     | If true, do not use safe master | boolean                      | false          |
+|                      | password input. Read directly   | (0, 1, true, false, yes, no) |                |
+|                      | from stdin instead.             |                              |                |
++----------------------+---------------------------------+------------------------------+----------------+
+
+You probably don't need to set any environment variable to use pwman.
+The default values are most likely what you want.
+
 License / Copyright
 ===================
 
