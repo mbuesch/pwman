@@ -64,68 +64,90 @@ class AES:
 	def encrypt(self, key, iv, data):
 		"""Encrypt data.
 		"""
-		assert len(key) == 256 // 8
-		assert len(iv) == self.BLOCK_SIZE
 
-		if self.__cryptodome is not None:
-			padData = self.__cryptodome.Util.Padding.pad(
-				data_to_pad=data,
-				block_size=self.BLOCK_SIZE,
-				style="pkcs7")
-			cipher = self.__cryptodome.Cipher.AES.new(
-				key=key,
-				mode=self.__cryptodome.Cipher.AES.MODE_CBC,
-				iv=iv)
-			encData = cipher.encrypt(padData)
-			return encData
+		# Check parameters.
+		if len(key) != 256 // 8:
+			raise PWManError("AES: Invalid key length.")
+		if len(iv) != self.BLOCK_SIZE:
+			raise PWManError("AES: Invalid iv length.")
+		if len(data) <= 0:
+			raise PWManError("AES: Invalid data length.")
 
-		if self.__pyaes is not None:
-			mode = self.__pyaes.AESModeOfOperationCBC(key=key, iv=iv)
-			padding = self.__pyaes.PADDING_DEFAULT
-			enc = self.__pyaes.Encrypter(mode=mode, padding=padding)
-			encData = enc.feed(data)
-			encData += enc.feed()
-			return encData
+		try:
+			if self.__cryptodome is not None:
+				# Use Cryptodome
+				padData = self.__cryptodome.Util.Padding.pad(
+					data_to_pad=data,
+					block_size=self.BLOCK_SIZE,
+					style="pkcs7")
+				cipher = self.__cryptodome.Cipher.AES.new(
+					key=key,
+					mode=self.__cryptodome.Cipher.AES.MODE_CBC,
+					iv=iv)
+				encData = cipher.encrypt(padData)
+				return encData
 
-		raise NotImplementedError
+			if self.__pyaes is not None:
+				# Use pyaes
+				mode = self.__pyaes.AESModeOfOperationCBC(key=key, iv=iv)
+				padding = self.__pyaes.PADDING_DEFAULT
+				enc = self.__pyaes.Encrypter(mode=mode, padding=padding)
+				encData = enc.feed(data)
+				encData += enc.feed()
+				return encData
+
+		except Exception as e:
+			raise PWManError("AES error: %s: %s" % (type(e), str(e)))
+		raise PWManError("AES not implemented.")
 
 	def decrypt(self, key, iv, data, legacyPadding=False):
 		"""Decrypt data.
 		"""
-		assert len(key) == 256 // 8
-		assert len(iv) == self.BLOCK_SIZE
 
-		if self.__cryptodome is not None:
-			cipher = self.__cryptodome.Cipher.AES.new(
-				key=key,
-				mode=self.__cryptodome.Cipher.AES.MODE_CBC,
-				iv=iv)
-			decData = cipher.decrypt(data)
-			if legacyPadding:
-				unpadData = self.__unpadLegacy(decData)
-			else:
-				unpadData = self.__cryptodome.Util.Padding.unpad(
-					padded_data=decData,
-					block_size=self.BLOCK_SIZE,
-					style="pkcs7")
-			return unpadData
+		# Check parameters.
+		if len(key) != 256 // 8:
+			raise PWManError("AES: Invalid key length.")
+		if len(iv) != self.BLOCK_SIZE:
+			raise PWManError("AES: Invalid iv length.")
+		if len(data) <= 0:
+			raise PWManError("AES: Invalid data length.")
 
-		if self.__pyaes is not None:
-			mode = self.__pyaes.AESModeOfOperationCBC(key=key, iv=iv)
-			if legacyPadding:
-				padding = self.__pyaes.PADDING_NONE
-			else:
-				padding = self.__pyaes.PADDING_DEFAULT
-			dec = self.__pyaes.Decrypter(mode=mode, padding=padding)
-			decData = dec.feed(data)
-			decData += dec.feed()
-			if legacyPadding:
-				unpadData = self.__unpadLegacy(decData)
-			else:
-				unpadData = decData
-			return unpadData
+		try:
+			if self.__cryptodome is not None:
+				# Use Cryptodome
+				cipher = self.__cryptodome.Cipher.AES.new(
+					key=key,
+					mode=self.__cryptodome.Cipher.AES.MODE_CBC,
+					iv=iv)
+				decData = cipher.decrypt(data)
+				if legacyPadding:
+					unpadData = self.__unpadLegacy(decData)
+				else:
+					unpadData = self.__cryptodome.Util.Padding.unpad(
+						padded_data=decData,
+						block_size=self.BLOCK_SIZE,
+						style="pkcs7")
+				return unpadData
 
-		raise NotImplementedError
+			if self.__pyaes is not None:
+				# Use pyaes
+				mode = self.__pyaes.AESModeOfOperationCBC(key=key, iv=iv)
+				if legacyPadding:
+					padding = self.__pyaes.PADDING_NONE
+				else:
+					padding = self.__pyaes.PADDING_DEFAULT
+				dec = self.__pyaes.Decrypter(mode=mode, padding=padding)
+				decData = dec.feed(data)
+				decData += dec.feed()
+				if legacyPadding:
+					unpadData = self.__unpadLegacy(decData)
+				else:
+					unpadData = decData
+				return unpadData
+
+		except Exception as e:
+			raise PWManError("AES error: %s: %s" % (type(e), str(e)))
+		raise PWManError("AES not implemented.")
 
 	@staticmethod
 	def __unpadLegacy(data):
@@ -133,7 +155,7 @@ class AES:
 		"""
 		index = data.rfind(b"\xFF")
 		if index < 0 or index >= len(data):
-			raise ValueError("unpad_PWMAN: error")
+			raise PWManError("Legacy padding: Did not find start.")
 		return data[:index]
 
 	@classmethod
