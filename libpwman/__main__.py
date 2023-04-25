@@ -229,9 +229,7 @@ def main():
 
 		# Lock memory to RAM.
 		if not args.no_mlock and not args.info:
-			MLockWrapper = libpwman.mlock.MLockWrapper
-			err = MLockWrapper.mlockall(MLockWrapper.MCL_CURRENT |
-						    MLockWrapper.MCL_FUTURE)
+			err = libpwman.mlock.MLockWrapper.mlockall()
 			baseMsg1 = "Failed to lock the pwman program memory to RAM to avoid "\
 				   "swapping secrets to disk.\nThe system call returned:"
 			baseMsg2 = "The contents of the decrypted password database "\

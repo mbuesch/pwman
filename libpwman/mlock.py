@@ -19,18 +19,6 @@ class MLockWrapper:
 
 	singleton = None
 
-	if platform.machine().lower() in (
-			"alpha",
-			"ppc", "ppc64", "ppcle", "ppc64le",
-			"sparc", "sparc64" ):
-		MCL_CURRENT	= 0x2000
-		MCL_FUTURE	= 0x4000
-		MCL_ONFAULT	= 0x8000
-	else:
-		MCL_CURRENT	= 0x1
-		MCL_FUTURE	= 0x2
-		MCL_ONFAULT	= 0x4
-
 	def __init__(self):
 		self.__ffi = None
 		self.__libc = None
@@ -50,13 +38,7 @@ class MLockWrapper:
 
 		self.__ffi = FFI()
 		# Use getattr to avoid Cython cdef compile error.
-		getattr(self.__ffi, "cdef")("""
-			int mlock(const void *addr, size_t len);
-			int mlock2(const void *addr, size_t len, int flags);
-			int munlock(const void *addr, size_t len);
-			int mlockall(int flags);
-			int munlockall(void);
-		""")
+		getattr(self.__ffi, "cdef")("int mlockall(int flags);")
 		self.__libc = self.__ffi.dlopen(None)
 
 	@classmethod
@@ -67,19 +49,21 @@ class MLockWrapper:
 		return s
 
 	@classmethod
-	def mlockall(cls, flags):
+	def mlockall(cls):
+		"""Lock all current and all future memory.
+		"""
 		error = "mlockall() is not supported on this operating system."
 		s = cls.get()
 		if s.__libc:
-			ret = s.__libc.mlockall(flags)
-			error = os.strerror(s.__ffi.errno) if ret else ""
-		return error
-
-	@classmethod
-	def munlockall(cls):
-		error = "munlockall() is not supported on this operating system."
-		s = cls.get()
-		if s.__libc:
-			ret = s.__libc.munlockall()
+			if platform.machine().lower() in (
+					"alpha",
+					"ppc", "ppc64", "ppcle", "ppc64le",
+					"sparc", "sparc64" ):
+				MCL_CURRENT	= 0x2000
+				MCL_FUTURE	= 0x4000
+			else:
+				MCL_CURRENT	= 0x1
+				MCL_FUTURE	= 0x2
+			ret = s.__libc.mlockall(MCL_CURRENT | MCL_FUTURE)
 			error = os.strerror(s.__ffi.errno) if ret else ""
 		return error
