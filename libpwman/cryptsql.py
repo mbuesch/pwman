@@ -240,8 +240,7 @@ class CryptSQL:
 
 				# Store the raw key.
 				self.__key = key
-
-			except (CSQLError, zlib.error, sql.Error, sql.DatabaseError, UnicodeError, ValueError) as e:
+			except Exception as e:
 				raise CSQLError("Failed to decrypt database. "
 						"Wrong passphrase?")
 		except FileObjError as e:
