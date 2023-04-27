@@ -23,8 +23,6 @@ __all__ = [
 	"CryptSQL",
 ]
 
-CSQL_HEADER = b"CryptSQL v1"
-
 def decodeInt(buf, error, minValue=None, maxValue=None):
 	"""Decode bytes into a int as decimal representation.
 	buf: Bytes buffer.
@@ -121,6 +119,8 @@ class CryptSQL:
 	"""Encrypted SQL database.
 	"""
 
+	CSQL_HEADER = b"CryptSQL v1"
+
 	# Argon2 KDF parameters.
 	KDF_SALT_NBYTES		= 19
 	KDF_THREADS		= 7
@@ -181,6 +181,7 @@ class CryptSQL:
 	def __parseFile(self, filename):
 		"""Read all data from 'filename' and decrypt it into memory.
 		"""
+		cls = self.__class__
 		try:
 			fc = FileObjCollection.parseFile(filename)
 			if fc is None:
@@ -191,7 +192,7 @@ class CryptSQL:
 				name=b"HEAD",
 				error="Missing file header object",
 			)
-			if head != CSQL_HEADER:
+			if head != cls.CSQL_HEADER:
 				raise CSQLError("Invalid file header")
 			cipher = fc.get(
 				name=b"CIPHER",
@@ -511,7 +512,7 @@ class CryptSQL:
 		try:
 			# Assemble file objects
 			fc = FileObjCollection((
-				FileObj(b"HEAD", CSQL_HEADER),
+				FileObj(b"HEAD", cls.CSQL_HEADER),
 				FileObj(b"CIPHER", b"AES"),
 				FileObj(b"CIPHER_MODE", b"CBC"),
 				FileObj(b"CIPHER_IV", cipherIV),
@@ -531,7 +532,6 @@ class CryptSQL:
 			self.__key = None
 			fc.writeFile(self.__filename)
 			self.__key = key
-
 		except FileObjError as e:
 			raise CSQLError("File error: %s" % str(e))
 

@@ -37,7 +37,7 @@ def run_infodump(dbPath):
 		fc = libpwman.fileobj.FileObjCollection.parseFile(dbPath)
 		print("pwman database: %s" % dbPath)
 		head = fc.get(b"HEAD")
-		if head != libpwman.cryptsql.CSQL_HEADER:
+		if head != libpwman.cryptsql.CryptSQL.CSQL_HEADER:
 			head = str(head)
 			if len(head) > 16:
 				head = head[:16] + "..."
