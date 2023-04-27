@@ -380,7 +380,11 @@ class CryptSQL:
 			try:
 				# Generate the key.
 				key = kdf() if self.__key is None else self.__key
+			except Exception as e:
+				raise CSQLError("Failed to generate decryption key: %s: %s" % (
+						type(e), str(e)))
 
+			try:
 				# Decrypt the payload.
 				payload = AES.get().decrypt(
 					key=key,
