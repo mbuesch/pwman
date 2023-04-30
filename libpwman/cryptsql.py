@@ -127,7 +127,7 @@ class CryptSQL:
 	KDF_MEM_BASE		= 1024 * 24
 	KDF_MEM_CHUNK		= 4 * KDF_THREADS
 	DEFAULT_KDF_MEM		= int(math.ceil(KDF_MEM_BASE / KDF_MEM_CHUNK)) * KDF_MEM_CHUNK
-	DEFAULT_KDF_ITER	= 163
+	DEFAULT_KDF_ITER	= lambda kdfMem: int(math.ceil(4000000 / kdfMem))
 	KDF_MEMLIMIT		= DEFAULT_KDF_MEM
 	KDF_ITERLIMIT_A		= lambda kdfMem: int(math.ceil(2500000 / kdfMem))
 	KDF_ITERLIMIT_B		= 2
@@ -139,6 +139,7 @@ class CryptSQL:
 		self.__db = None
 		self.__filename = None
 		self.__passphrase = None
+		self.__kdfMemFile = 0
 		self.__key = None
 
 	def getPassphrase(self):
@@ -367,6 +368,7 @@ class CryptSQL:
 					parallel=kdfPar,
 					keyLen=keyLen,
 				)
+				self.__kdfMemFile = kdfMem
 			else:
 				assert False
 
@@ -436,6 +438,7 @@ class CryptSQL:
 		self.__db = None
 		self.__filename = None
 		self.__passphrase = None
+		self.__kdfMemFile = 0
 
 	def __random(self, nrBytes):
 		"""Return cryptographically secure random bytes.
@@ -477,15 +480,21 @@ class CryptSQL:
 		kdfMem = cls.DEFAULT_KDF_MEM
 		kdfMemUser = os.getenv("PWMAN_ARGON2MEM", "").lower().strip()
 		if kdfMemUser:
+			# User override.
 			try:
 				kdfMem = int(kdfMemUser, 10)
 			except ValueError:
 				raise CSQLError("The value of the environment variable "
 						"PWMAN_ARGON2MEM is invalid.")
+		else:
+			# By default never reduce the memory cost,
+			# if the file already uses a higher cost.
+			kdfMem = max(kdfMem, self.__kdfMemFile)
 		kdfMem = max(kdfMem, cls.KDF_MEMLIMIT)
-		kdfIter = cls.DEFAULT_KDF_ITER
+		kdfIter = cls.DEFAULT_KDF_ITER(kdfMem)
 		kdfIterUser = os.getenv("PWMAN_ARGON2TIME", "").lower().strip()
 		if kdfIterUser:
+			# User override.
 			try:
 				kdfIter = int(kdfIterUser, 10)
 			except ValueError:
