@@ -204,7 +204,9 @@ def main():
 		       help="Use DB_PATH as database file. If not given, %s is used." % (
 			    libpwman.database.getDefaultDatabase()))
 	p.add_argument("--no-mlock", action="store_true",
-		       help="Do not lock memory and allow swapping to disk.")
+		       help="Do not lock memory and allow swapping to disk. "
+			    "Do not use this option, if you don't know what this means, "
+			    "because this option has security implications.")
 	if libpwman.util.osIsPosix:
 		p.add_argument("-t", "--timeout", type=int, default=600, metavar="SECONDS",
 			       help="Sets the session timeout in seconds. Default is 10 minutes.")
