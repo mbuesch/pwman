@@ -470,10 +470,8 @@ class CryptSQL:
 		if not self.__db or not self.__filename:
 			raise CSQLError("Database is not open")
 
+		# Cleanup the database.
 		self.sqlVacuum()
-
-		# Dump the database
-		payload = self.sqlPlainDump()
 
 		# Get the KDF parameters.
 		kdfSalt = self.__random(cls.KDF_SALT_NBYTES)
@@ -515,10 +513,20 @@ class CryptSQL:
 				parallel=kdfPar,
 				keyLen=keyLen,
 			)
+		except Exception as e:
+			raise CSQLError("Failed to generate the encryption key: %s" % str(e))
 
+		# Dump the database
+		payload = self.sqlPlainDump()
+
+		try:
 			# Encrypt payload
 			cipherIV = self.__random(AES.BLOCK_SIZE)
-			payload = AES.get().encrypt(key=key, iv=cipherIV, data=payload)
+			payload = AES.get().encrypt(
+				key=key,
+				iv=cipherIV,
+				data=payload,
+			)
 		except Exception as e:
 			raise CSQLError("Failed to encrypt: %s" % str(e))
 
