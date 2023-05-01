@@ -109,7 +109,7 @@ class Argon2:
 		key = None
 		try:
 			if self.__argon2cffi is not None:
-				# Use argon2-cffi
+				# Use argon2-cffi.
 				low_level = self.__argon2cffi.low_level
 				key = low_level.hash_secret_raw(
 					secret=passphrase,
@@ -122,7 +122,10 @@ class Argon2:
 					version=0x13,
 				)
 			elif self.__argon2pure is not None:
-				# Use argon2pure
+				# Use argon2pure.
+				# Avoid subprocesses:
+				# Do not use multiprocessing to keep all memory locked.
+				# Subprocesses do not inherit mlockall().
 				argon2pure = self.__argon2pure
 				key = argon2pure.argon2(
 					password=passphrase,
@@ -132,7 +135,8 @@ class Argon2:
 					parallelism=parallel,
 					tag_length=keyLen,
 					type_code=argon2pure.ARGON2ID,
-					threads=(os.cpu_count() or 1),
+					threads=1, # no threads
+					use_threads=True, # no subprocesses
 					version=0x13,
 				)
 		except Exception as e:
