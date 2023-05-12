@@ -139,7 +139,7 @@ Pwman uses a strong and memory hard algorithm (Argon2id) to derive the master en
 This algorithm uses lots of memory (and time) to make brute forcing the key expensive.
 This significantly improves security, if the master passphrase has less entropy than the raw AES-256 key.
 
-Pwman also locks all memory to RAM, so that no secrets and keys are written to disk swap space.
+Pwman also locks all memory to RAM, so that no secrets and keys are written to swap disk space.
 Therefore, pwman might crash if the actual memory usage during key derivation exceeds the system's memory lock limit.
 
 To increase the locked memory available to applications, please increase the OS limits by installing a raised limit as follows:
@@ -149,6 +149,24 @@ To increase the locked memory available to applications, please increase the OS 
 	# as root:
 	cp pwman-memlock-limits.conf /etc/security/limits.d/
 	reboot
+
+Swap partition
+==============
+
+Pwman locks all memory to ensure that no secrets are copied from RAM to possibly unencrypted swap disk space.
+
+However, pwman can only lock its own memory.
+It cannot lock memory owned by the window manager, X11, Wayland, the terminal emulator or anything else.
+Therefore, it is *strongly* recommended to avoid using unencrypted swap disk space when using pwman.
+If you have unencrypted swap space it is possible that (parts of) the database or the master passphrase end up being written to it.
+
+Therefore, please use encrypted swap space, if you need swap space.
+If you do not need swap space, please disable swap entirely.
+
+Do *not* use unencrypted swap space.
+
+Pwman currently only locks memory on Linux and Android platforms.
+If pwman is unable to lock memory, it will print a warning message and give you a chance to abort.
 
 License / Copyright
 ===================
