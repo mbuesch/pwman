@@ -225,7 +225,7 @@ class PWManDatabase(CryptSQL):
 				 "LIMIT 1);",
 				 (category,))
 		data = c.fetchOne()
-		return data and data[0]
+		return bool(data) and bool(data[0])
 
 	def getCategoryNames(self):
 		"""Get all category names in the database.
@@ -400,7 +400,7 @@ class PWManDatabase(CryptSQL):
 				 (category,
 				  title))
 		data = c.fetchOne()
-		return data and data[0]
+		return bool(data) and bool(data[0])
 
 	def addEntry(self, entry):
 		"""Create a new entry in the database.
