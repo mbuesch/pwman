@@ -688,7 +688,8 @@ class PWManDatabase(CryptSQL):
 		c = self.sqlExec("SELECT entryattr.id, entryattr.name, entryattr.data "
 				 "FROM entryattr, entries "
 				 "WHERE entries.category=? AND entries.title=? AND "
-				 "entryattr.entry = entries.id;",
+				 "entryattr.entry = entries.id "
+				 "ORDER BY entryattr.name;",
 				 (entry.category,
 				  entry.title))
 		dataSet = c.fetchAll()
