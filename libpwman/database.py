@@ -381,7 +381,8 @@ class PWManDatabase(CryptSQL):
 		      "FROM entries "\
 		      "WHERE entries.id IN ( "
 		sql += ", ".join("?" for ID in IDs)
-		sql += " );"
+		sql += " ) "
+		sql += "ORDER BY entries.category, entries.title;"
 		params = [ str(ID) for ID in IDs ]
 		dump(sql, params)
 		c = self.sqlExec(sql, params)
