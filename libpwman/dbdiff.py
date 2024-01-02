@@ -20,8 +20,8 @@ class PWManDatabaseDiff:
 
 	def getUnifiedDiff(self, contextLines=3):
 		diff = difflib.unified_diff(
-			a=self.__oldDb.dumpEntries(showTotpKey=True).splitlines(),
-			b=self.__db.dumpEntries(showTotpKey=True).splitlines(),
+			a=self.__oldDb.dumpEntries(totp="show").splitlines(),
+			b=self.__db.dumpEntries(totp="show").splitlines(),
 			fromfile=str(self.__oldDb.getFilename()),
 			tofile=str(self.__db.getFilename()),
 			n=contextLines,
@@ -30,8 +30,8 @@ class PWManDatabaseDiff:
 
 	def getContextDiff(self, contextLines=3):
 		diff = difflib.context_diff(
-			a=self.__oldDb.dumpEntries(showTotpKey=True).splitlines(),
-			b=self.__db.dumpEntries(showTotpKey=True).splitlines(),
+			a=self.__oldDb.dumpEntries(totp="show").splitlines(),
+			b=self.__db.dumpEntries(totp="show").splitlines(),
 			fromfile=str(self.__oldDb.getFilename()),
 			tofile=str(self.__db.getFilename()),
 			n=contextLines,
@@ -40,8 +40,8 @@ class PWManDatabaseDiff:
 
 	def getNdiffDiff(self):
 		diff = difflib.ndiff(
-			a=self.__oldDb.dumpEntries(showTotpKey=True).splitlines(),
-			b=self.__db.dumpEntries(showTotpKey=True).splitlines(),
+			a=self.__oldDb.dumpEntries(totp="show").splitlines(),
+			b=self.__db.dumpEntries(totp="show").splitlines(),
 			linejunk=None,
 			charjunk=None)
 		return "\n".join(diff)
@@ -51,8 +51,8 @@ class PWManDatabaseDiff:
 			linejunk=None,
 			charjunk=None)
 		diff = htmldiff.make_file(
-			fromlines=self.__oldDb.dumpEntries(showTotpKey=True).splitlines(),
-			tolines=self.__db.dumpEntries(showTotpKey=True).splitlines(),
+			fromlines=self.__oldDb.dumpEntries(totp="show").splitlines(),
+			tolines=self.__db.dumpEntries(totp="show").splitlines(),
 			fromdesc=str(self.__oldDb.getFilename()),
 			todesc=str(self.__db.getFilename()),
 			context=True,

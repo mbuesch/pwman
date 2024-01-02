@@ -12,6 +12,7 @@
 from libpwman.cryptsql import *
 from libpwman.exception import *
 from libpwman.util import *
+import libpwman.otp
 
 import csv
 import io
@@ -79,6 +80,11 @@ class PWManEntryTOTP:
 	hmacHash	: str = "SHA1"
 	entry		: PWManEntry = None
 	totpId		: int = None
+
+	def generate(self):
+		return libpwman.otp.totp(key=self.key,
+					 nrDigits=self.digits,
+					 hmacHash=self.hmacHash)
 
 class PWManDatabase(CryptSQL):
 	"""Encrypted pwman database.
@@ -822,9 +828,8 @@ class PWManDatabase(CryptSQL):
 				    silent=True)
 		return db
 
-	def dumpEntry(self, entry, showTotpKey=False):
+	def dumpEntry(self, entry, totp="hide"):
 		"""Returns a human readable dump string of an entry.
-		If showTotpKey=True: Also dump the TOTP key and parameters.
 		"""
 		res = []
 		res.append("===  %s  ===" % entry.category)
@@ -838,12 +843,21 @@ class PWManDatabase(CryptSQL):
 			res.append("\tBulk data:\t%s" % entryBulk.data)
 		entryTotp = self.getEntryTotp(entry)
 		if entryTotp:
-			if showTotpKey:
+			if totp == "show":
 				res.append("\tTOTP key:\t%s" % entryTotp.key)
 				res.append("\tTOTP digits:\t%d" % entryTotp.digits)
 				res.append("\tTOTP hash:\t%s" % entryTotp.hmacHash)
-			else:
+			elif totp == "gen":
+				try:
+					token = entryTotp.generate()
+				except libpwman.otp.OtpError as e:
+					raise PWManError("Failed to generate TOTP token: "
+							 "%s" % str(e))
+				res.append(token)
+			elif totp == "hide":
 				res.append("\tTOTP:\t\tavailable")
+			else:
+				assert False
 		entryAttrs = self.getEntryAttrs(entry)
 		if entryAttrs:
 			res.append("\tAttributes:")
@@ -856,21 +870,19 @@ class PWManDatabase(CryptSQL):
 					entryAttr.data))
 		return "\n".join(res) + "\n"
 
-	def dumpEntries(self, showTotpKey=False):
+	def dumpEntries(self, totp="hide"):
 		"""Returns a human readable dump string of all entries.
-		If showTotpKey=True: Also dump the TOTP key and parameters.
 		"""
 		ret = []
 		for category in self.getCategoryNames():
 			for title in self.getEntryTitles(category):
 				entry = self.getEntry(category, title)
-				dump = self.dumpEntry(entry, showTotpKey)
+				dump = self.dumpEntry(entry, totp)
 				ret.append(dump)
 		return "\n".join(ret)
 
-	def dumpEntriesCsv(self, showTotpKey=False):
+	def dumpEntriesCsv(self, totp="hide"):
 		"""Returns a CSV format dump string of all entries.
-		If showTotpKey=True: Also dump the TOTP key and parameters.
 		"""
 		csvHeads = [
 			"Category",
@@ -898,12 +910,21 @@ class PWManDatabase(CryptSQL):
 					row["Bulk data"] = entryBulk.data
 				entryTotp = self.getEntryTotp(entry)
 				if entryTotp:
-					if showTotpKey:
+					if totp == "show":
 						row["TOTP key"] = entryTotp.key
 						row["TOTP digits"] = entryTotp.digits
 						row["TOTP hash"] = entryTotp.hmacHash
-					else:
+					elif totp == "gen":
+						try:
+							token = entryTotp.generate()
+						except libpwman.otp.OtpError as e:
+							raise PWManError("Failed to generate TOTP token: "
+									 "%s" % str(e))
+						row["TOTP"] = token
+					elif totp == "hide":
 						row["TOTP key"] = "available"
+					else:
+						assert False
 				entryAttrs = self.getEntryAttrs(entry)
 				if entryAttrs:
 					for entryAttr in entryAttrs:

@@ -1198,10 +1198,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			if optFmtSqlDump:
 				dump = self.__db.sqlPlainDump() + b"\n"
 			elif optFmtHumanReadable:
-				dump = self.__db.dumpEntries(showTotpKey=True)
+				dump = self.__db.dumpEntries(totp="show")
 				dump = dump.encode("UTF-8") + b"\n"
 			elif optFmtCsv:
-				dump = self.__db.dumpEntriesCsv(showTotpKey=True)
+				dump = self.__db.dumpEntriesCsv(totp="show")
 				dump = dump.encode("UTF-8")
 			else:
 				assert(0)
@@ -1421,9 +1421,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			self._err("totp", "'%s/%s' does not have "
 				   "TOTP key information" % (category, title))
 		try:
-			token = totp(key=entryTotp.key,
-				     nrDigits=entryTotp.digits,
-				     hmacHash=entryTotp.hmacHash)
+			token = entryTotp.generate()
 		except OtpError as e:
 			self._err("totp", "Failed to generate TOTP: %s" % str(e))
 		self._info(None, "%s" % token)
@@ -1464,9 +1462,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			entryTotp.hmacHash = _hash
 		try:
 			# Check parameters.
-			totp(key=entryTotp.key,
-			     nrDigits=entryTotp.digits,
-			     hmacHash=entryTotp.hmacHash)
+			entryTotp.generate()
 		except OtpError as e:
 			self._err("edit_totp", "TOTP error: %s" % str(e))
 		self.__db.setEntryTotp(entryTotp)
