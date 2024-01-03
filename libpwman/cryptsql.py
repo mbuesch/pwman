@@ -421,7 +421,6 @@ class CryptSQL:
 		if self.isOpen():
 			raise CSQLError("A database is already open")
 		self.__db = sql.connect(":memory:")
-		self.__db.text_factory = str
 		self.setRegexpFlags()
 		self.sqlCreateFunction("regexp", 2, self._sqlRegexpMatch)
 		try:
