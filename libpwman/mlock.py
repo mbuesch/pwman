@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 # mlock support
-# Copyright (c) 2019-2023 Michael Büsch <m@bues.ch>
+# Copyright (c) 2019-2024 Michael Büsch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
