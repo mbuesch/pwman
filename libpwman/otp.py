@@ -69,5 +69,5 @@ def totp(key, nrDigits=6, hmacHash="SHA1", t=None):
 	"""
 	if t is None:
 		t = time.time()
-	t = (int(round(t)) // 30) - 1
+	t = int(round(t / 30.0))
 	return hotp(key, t, nrDigits, hmacHash)
