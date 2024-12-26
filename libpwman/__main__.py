@@ -241,9 +241,7 @@ def main():
 				      baseMsg3),
 				      file=sys.stderr)
 			if err and not interactiveMode:
-				raise libpwman.PWManError("Failed to lock memory: %s\n"
-							  "%s" % (
-							  err, baseMsg))
+				raise libpwman.PWManError("Failed to lock memory: %s" % (err, ))
 
 		if not args.info:
 			runQuickSelfTests()
