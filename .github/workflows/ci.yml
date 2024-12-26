@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo apt install python3-pyaes python3-pycryptodome python3-argon2 python3-cffi expect
       - run: sh ./tests/run.sh
-      - run: python3 ./pwman --help
-      - run: expect -c "spawn python3 ./pwman ./tests/test_database_v1.db -c ls" -c "expect \"Master passphrase\" { send \"test\\r\"; exp_continue }" -c "catch wait res; exit [lindex \$res 3]"
+      - run: python3 ./pwman --no-mlock --help
+      - run: expect -c "spawn python3 ./pwman --no-mlock -c ls ./tests/test_database_v1.db" -c "expect \"Master passphrase\" { send \"test\\r\"; exp_continue }" -c "catch wait res; exit [lindex \$res 3]"
 
 # vim: ts=2 sw=2 expandtab
