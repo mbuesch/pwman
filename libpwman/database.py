@@ -829,7 +829,7 @@ class PWManDatabase(CryptSQL):
 				    silent=True)
 		return db
 
-	def dumpEntry(self, entry, totp="hide"):
+	def dumpEntry(self, entry, totp="gen"):
 		"""Returns a human readable dump string of an entry.
 		"""
 		res = []
@@ -854,7 +854,7 @@ class PWManDatabase(CryptSQL):
 				except libpwman.otp.OtpError as e:
 					raise PWManError("Failed to generate TOTP token: "
 							 "%s" % str(e))
-				res.append(token)
+				res.append("\tTOTP:\t\t%s" % token)
 			elif totp == "hide":
 				res.append("\tTOTP:\t\tavailable")
 			else:
