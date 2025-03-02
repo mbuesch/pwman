@@ -124,11 +124,11 @@ class CryptSQL:
 	# Argon2 KDF parameters.
 	KDF_SALT_NBYTES		= 19
 	KDF_THREADS		= 7
-	KDF_MEM_BASE		= 1024 * 24
+	KDF_MEM_BASE		= 1024 * 128
 	KDF_MEM_CHUNK		= 4 * KDF_THREADS
 	DEFAULT_KDF_MEM		= int(math.ceil(KDF_MEM_BASE / KDF_MEM_CHUNK)) * KDF_MEM_CHUNK
 	DEFAULT_KDF_ITER	= lambda kdfMem: int(math.ceil(4000000 / kdfMem))
-	KDF_MEMLIMIT		= DEFAULT_KDF_MEM
+	KDF_MEMLIMIT		= 24584
 	KDF_ITERLIMIT_A		= lambda kdfMem: int(math.ceil(2500000 / kdfMem))
 	KDF_ITERLIMIT_B		= 2
 

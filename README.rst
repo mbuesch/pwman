@@ -111,13 +111,13 @@ Environment variables that affect pwman operation are:
 +----------------------+--------------------------------------------+------------------------------+----------------+
 | PWMAN_ARGON2LIB      | Select the Argon2 backend                  | "argon2-cffi", "argon2pure"  | "argon2-cffi"  |
 +----------------------+--------------------------------------------+------------------------------+----------------+
-| PWMAN_ARGON2MEM      | Set the amount of memory (in KiB) used     | Number of KiB,               | 24584          |
+| PWMAN_ARGON2MEM      | Set the amount of memory (in KiB) used     | Number of KiB,               | 131096         |
 |                      | for key derivation.                        | but not less than 24584.     |                |
 |                      | Increasing this value improves security,   |                              |                |
 |                      | but it also increases the amount of memory |                              |                |
 |                      | required during encryption and decryption. |                              |                |
 +----------------------+--------------------------------------------+------------------------------+----------------+
-| PWMAN_ARGON2TIME     | Set the time used for key derivation.      | Number of iterations,        | 163            |
+| PWMAN_ARGON2TIME     | Set the time used for key derivation.      | Number of iterations,        | 31             |
 |                      | Increasing this value improves security,   | but not less than 2          |                |
 |                      | but it also increases the time required    | and not less than            |                |
 |                      | for encryption and decryption.             | 2500000 / PWMAN_ARGON2MEM.   |                |
@@ -171,7 +171,7 @@ If pwman is unable to lock memory, it will print a warning message and give you 
 License / Copyright
 ===================
 
-Copyright (c) 2011-2024 Michael Büsch <m@bues.ch>
+Copyright (c) 2011-2025 Michael Büsch <m@bues.ch>
 
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
