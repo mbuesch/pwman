@@ -328,12 +328,12 @@ class PWManMeta(type):
 			    attr.__doc__):
 				# Remove leading double-tabs.
 				attr.__doc__, n = re.subn("^\t\t", "\t", attr.__doc__,
-							  0, re.MULTILINE)
+							  count=0, flags=re.MULTILINE)
 				# Remove trailing white space.
 				attr.__doc__ = attr.__doc__.rstrip()
 				# Tabs to spaces.
 				attr.__doc__, n = re.subn("\t", " " * 8, attr.__doc__,
-							  0, re.MULTILINE)
+							  count=0, flags=re.MULTILINE)
 				attr._pwman_fixed = True
 		return super().__new__(cls, name, bases, dct)
 

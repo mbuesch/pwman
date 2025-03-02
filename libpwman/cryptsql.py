@@ -575,7 +575,7 @@ class CryptSQL:
 		"""
 		return 0 if self._regexpMatch(pattern,
 					      string,
-					      self._regexpFlags) is None else 1
+					      flags=self._regexpFlags) is None else 1
 
 	def sqlVacuum(self):
 		"""Run the SQL VACUUM statement.
