@@ -27,6 +27,10 @@ from typing import Optional, Tuple
 
 if osIsPosix:
 	import signal
+if osIsWindows:
+	# https://github.com/pyreadline3/pyreadline3/issues/37
+	if not hasattr(readline, "backend"):
+		readline.backend = "readline"
 
 __all__ = [
 	"PWMan",
@@ -658,7 +662,7 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		"""--- Print a listing ---
 		Command: list [category] [title] [item]
 
-		If a category is given as parameter, list the 
+		If a category is given as parameter, list the
 		contents of the category. If category and entry
 		are given, list the contents of the entry.
 		If item is given, then only list one specific content item.
