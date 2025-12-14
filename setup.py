@@ -38,6 +38,7 @@ setup(
 	description	= "Commandline password manager",
 	author		= "Michael Büsch",
 	author_email	= "m@bues.ch",
+	license		= "GPL-2.0-or-later",
 	url		= "https://bues.ch/h/pwman",
 	python_requires = ">=3.7",
 	install_requires = [
@@ -55,7 +56,6 @@ setup(
 		"Intended Audience :: Information Technology",
 		"Intended Audience :: End Users/Desktop",
 		"Intended Audience :: System Administrators",
-		"License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
 		"Operating System :: OS Independent",
 		"Programming Language :: Python :: 3",
 	],
