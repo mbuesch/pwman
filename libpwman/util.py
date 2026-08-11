@@ -11,6 +11,7 @@ import os
 import sys
 
 __all__ = [
+	"getenv",
 	"str2bool",
 	"osIsWindows",
 	"osIsPosix",
@@ -21,6 +22,9 @@ __all__ = [
 
 osIsWindows = os.name == "nt" or os.name == "ce"
 osIsPosix = os.name == "posix"
+
+def getenv(key, default=None):
+	return os.getenv(key, default)
 
 def str2bool(string, default=False):
 	s = string.lower().strip()
@@ -56,7 +60,7 @@ def clearScreen():
 	stdout("\x1B[2J\x1B[0;0f")
 
 def _do_getpass(prompt):
-	if str2bool(os.getenv("PWMAN_RAWGETPASS", "")):
+	if str2bool(getenv("PWMAN_RAWGETPASS", "")):
 		return input(prompt)
 	else:
 		return getpass.getpass(prompt)

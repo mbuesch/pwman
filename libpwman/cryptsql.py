@@ -8,7 +8,6 @@
 import functools
 import hashlib
 import math
-import os
 import re
 import secrets
 import sqlite3 as sql
@@ -17,6 +16,7 @@ import zlib
 from libpwman.aes import AES
 from libpwman.argon2 import Argon2
 from libpwman.fileobj import FileObj, FileObjCollection, FileObjError
+from libpwman.util import getenv
 
 __all__ = [
 	"CSQLError",
@@ -475,7 +475,7 @@ class CryptSQL:
 		# Get the KDF parameters.
 		kdfSalt = self.__random(cls.KDF_SALT_NBYTES)
 		kdfMem = cls.DEFAULT_KDF_MEM
-		kdfMemUser = os.getenv("PWMAN_ARGON2MEM", "").lower().strip()
+		kdfMemUser = getenv("PWMAN_ARGON2MEM", "").lower().strip()
 		if kdfMemUser:
 			# User override.
 			try:
@@ -489,7 +489,7 @@ class CryptSQL:
 			kdfMem = max(kdfMem, self.__kdfMemFile)
 		kdfMem = max(kdfMem, cls.KDF_MEMLIMIT)
 		kdfIter = cls.DEFAULT_KDF_ITER(kdfMem)
-		kdfIterUser = os.getenv("PWMAN_ARGON2TIME", "").lower().strip()
+		kdfIterUser = getenv("PWMAN_ARGON2TIME", "").lower().strip()
 		if kdfIterUser:
 			# User override.
 			try:

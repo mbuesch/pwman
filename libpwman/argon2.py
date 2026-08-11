@@ -6,6 +6,7 @@
 """
 
 from libpwman.exception import PWManError
+from libpwman.util import getenv
 
 import gc
 import os
@@ -33,7 +34,7 @@ class Argon2:
 		self.__argon2cffi = None
 		self.__argon2pure = None
 
-		argon2lib = os.getenv("PWMAN_ARGON2LIB", "").lower().strip()
+		argon2lib = getenv("PWMAN_ARGON2LIB", "").lower().strip()
 
 		if argon2lib in ("", "argon2-cffi", "argon2cffi"):
 			# Try to use argon2-cffi

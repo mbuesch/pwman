@@ -6,8 +6,7 @@
 """
 
 from libpwman.exception import PWManError
-
-import os
+from libpwman.util import getenv
 
 __all__ = [
 	"AES",
@@ -32,7 +31,7 @@ class AES:
 		self.__pyaes = None
 		self.__cryptodome = None
 
-		cryptolib = os.getenv("PWMAN_CRYPTOLIB", "").lower().strip()
+		cryptolib = getenv("PWMAN_CRYPTOLIB", "").lower().strip()
 
 		if cryptolib in ("", "cryptodome"):
 			# Try to use Cryptodome

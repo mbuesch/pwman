@@ -16,7 +16,6 @@ import libpwman.otp
 
 import csv
 import io
-import os
 import pathlib
 import sys
 from copy import deepcopy
@@ -36,7 +35,7 @@ def getDefaultDatabase():
 	"""Get the default database path.
 	Returns a pathlib.Path() instance.
 	"""
-	db = os.getenv("PWMAN_DATABASE")
+	db = getenv("PWMAN_DATABASE")
 	if db:
 		return pathlib.Path(db)
 	home = pathlib.Path.home()
