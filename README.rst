@@ -25,8 +25,8 @@ Algorithms
 +--------------------------------+--------------------------------------------+
 | Encryption algorithm:          | AES in CBC mode with 256 bit key.          |
 +--------------------------------+--------------------------------------------+
-| Key derivation function (KDF): | Argon2id with 128 MiB memory cost          |
-|                                | or more (see environment variables below). |
+| Key derivation function (KDF): | Argon2id with 128 MiB memory cost.         |
+|                                | (Default; See environment variables below) |
 +--------------------------------+--------------------------------------------+
 
 Install pwman
