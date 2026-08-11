@@ -1,7 +1,8 @@
+*.swp
+/*.egg-info/
+/*.html
+/.mcp.json
 /build/
 /dist/
-/*.egg-info/
 /pwman-venv/
 __pycache__/
-/*.html
-*.swp
