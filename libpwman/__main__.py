@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 # Simple password manager
-# Copyright (c) 2011-2024 Michael Büsch <m@bues.ch>
+# Copyright (c) 2011-2026 Michael Büsch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
 import argparse
 import importlib
+import importlib.util
 import libpwman
 import pathlib
 import sys
@@ -112,21 +113,48 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 		return 1
 	return 0
 
-def run_script(dbPath, pyModName):
-	try:
-		if pyModName.lower().endswith(".py"):
-			pyModName = pyModName[:-3]
-		pyMod = importlib.import_module(pyModName)
-	except ImportError as e:
-		print("Failed to import --call-pymod "
-		      "Python module '%s':\n%s" % (
-		      pyModName, str(e)),
+def run_script(dbPath, pyModName=None, pyFileName=None):
+	assert not (pyModName and pyFileName)
+	if pyFileName is not None: # Import from a Python file
+		displayName = pyFileName
+		sanName = "".join(c if c.isalnum() else "_" for c in str(pyFileName))
+		pyModName = f"__pwman_call_pyfile__{sanName}"
+		try:
+			spec = importlib.util.spec_from_file_location(
+				pyModName, pyFileName)
+			if spec is None or spec.loader is None:
+				raise ImportError("Failed to load module spec.")
+			pyMod = importlib.util.module_from_spec(spec)
+			sys.modules[pyModName] = pyMod
+			spec.loader.exec_module(pyMod)
+		except Exception as e:
+			print("Failed to import --call-pyfile "
+				"Python file '%s':\n%s" % (
+				pyFileName, str(e)),
+				file=sys.stderr)
+			return 1
+	elif pyModName is not None: # Import from a Python module
+		displayName = pyModName
+		try:
+			if pyModName.startswith("."):
+				raise ImportError("Relative imports are not supported.")
+			if pyModName.lower().endswith(".py"):
+				pyModName = pyModName[:-3]
+			pyMod = importlib.import_module(pyModName)
+		except Exception as e:
+			print("Failed to import --call-pymod "
+				"Python module '%s':\n%s" % (
+				pyModName, str(e)),
+				file=sys.stderr)
+			return 1
+	else:
+		print("Either pyModName or pyFileName must be given.",
 		      file=sys.stderr)
 		return 1
+
 	run = getattr(pyMod, "run", None)
 	if not callable(run):
-		print("%s.run is not a callable." % (
-		      pyModName),
+		print(f"run() from `{displayName}` is not present or is not a callable.",
 		      file=sys.stderr)
 		return 1
 
@@ -139,8 +167,8 @@ def run_script(dbPath, pyModName):
 	try:
 		run(db)
 	except Exception as e:
-		print("%s.run(database) raised an exception:\n\n%s" % (
-		      pyModName, traceback.format_exc()),
+		print(f"Calling 'run(database)' raised an exception in `{displayName}`:\n\n"
+		      f"{traceback.format_exc()}",
 		      file=sys.stderr)
 		return 1
 	db.flunkDirty()
@@ -183,10 +211,14 @@ def main():
 	p.add_argument("-v", "--version", action="store_true",
 		       help="show the pwman version and exit")
 	grp = p.add_mutually_exclusive_group()
-	grp.add_argument("-p", "--call-pymod", type=str, metavar="PYTHONSCRIPT.py",
+	grp.add_argument("-P", "--call-pyfile", type=pathlib.Path, metavar="path/to/PYTHONFILE.py",
 			 help="Calls the Python function run(database) from "
-			      "Python module PYTHONSCRIPT. An open PWManDatabase "
-			      "object is passed to run().")
+			      "Python file PYTHONFILE.py.")
+	grp.add_argument("-p", "--call-pymod", type=str, metavar="PYTHONMODULE",
+			 help="Calls the Python function run(database) from "
+			      "Python module PYTHONMODULE. The module is searched for in "
+				  "the local directory and in the $PYTHONPATH. "
+				  "NOTE: You probably want to use -P|--call-pyfile instead.")
 	grp.add_argument("-D", "--diff", type=pathlib.Path, default=None, metavar="OLD_DB_PATH",
 			 help="Diff the database (see DB_PATH) to the "
 			      "older version specified as OLD_DB_PATH.")
@@ -220,6 +252,7 @@ def main():
 	try:
 		interactiveMode = (not args.command and
 				   not args.diff and
+				   not args.call_pyfile and
 				   not args.call_pymod and
 				   not args.info)
 
@@ -254,6 +287,10 @@ def main():
 			exitcode = run_diff(dbPath=args.database,
 					    oldDbPath=args.diff,
 					    diffFormat=args.diff_format)
+		elif args.call_pyfile:
+			assert not interactiveMode
+			exitcode = run_script(dbPath=args.database,
+					      pyFileName=args.call_pyfile)
 		elif args.call_pymod:
 			assert not interactiveMode
 			exitcode = run_script(dbPath=args.database,
