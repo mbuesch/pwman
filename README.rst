@@ -25,7 +25,7 @@ Algorithms
 +--------------------------------+--------------------------------------------+
 | Encryption algorithm:          | AES in CBC mode with 256 bit key.          |
 +--------------------------------+--------------------------------------------+
-| Key derivation function (KDF): | Argon2id with 24 MiB memory cost           |
+| Key derivation function (KDF): | Argon2id with 128 MiB memory cost          |
 |                                | or more (see environment variables below). |
 +--------------------------------+--------------------------------------------+
 
