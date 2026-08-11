@@ -11,11 +11,11 @@ pwman is a commandline based password manager. It encrypts the password database
 
 pwman has support for the following things:
 
+* Shell-style Tab-completion for all commands.
 * Store arbitrary attributes and text data along with the passwords and login credentials.
 * Generate two factor authentication tokens (`TOTP <https://en.wikipedia.org/wiki/Time-based_One-time_Password_algorithm>`_).
 * Database search with Regular Expressions or SQL LIKE syntax.
 * Database compare (diff). In pwman prompt, at pwman command line and as `git diff` extension.
-* Shell-style Tab-completion for all commands.
 * Custom Python scripts for arbitrary database processing.
 * Export of the complete database as SQL text dump, CSV dump and human readable plain text dump.
 
@@ -150,8 +150,8 @@ To increase the locked memory available to applications, please increase the OS 
 	cp pwman-memlock-limits.conf /etc/security/limits.d/
 	reboot
 
-Swap partition
-==============
+Swap partition / Swap file
+==========================
 
 Pwman locks all memory to ensure that no secrets are copied from RAM to possibly unencrypted swap disk space.
 
@@ -171,7 +171,7 @@ If pwman is unable to lock memory, it will print a warning message and give you 
 License / Copyright
 ===================
 
-Copyright (c) 2011-2025 Michael Büsch <m@bues.ch>
+Copyright (c) 2011-2026 Michael Büsch <m@bues.ch>
 
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
