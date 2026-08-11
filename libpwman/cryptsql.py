@@ -606,9 +606,8 @@ class CryptSQL:
 	def sqlIsEmpty(self):
 		"""Returns True, if the database does not contain any tables.
 		"""
-		c = self.sqlExec("ANALYZE;")
-		tbl = c.sqlExec("SELECT tbl FROM sqlite_stat1;").fetchOne()
-		return not bool(tbl)
+		c = self.sqlExec("SELECT name FROM sqlite_schema WHERE type='table';")
+		return not bool(c.fetchOne())
 
 	def sqlPlainDump(self):
 		"""Get a plain text dump of the database.
