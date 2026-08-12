@@ -617,6 +617,10 @@ class PWMan(Cmd, metaclass=PWManMeta):
 		"""--- Write changes to the database file(s) ---
 		Command: commit
 
+		All uncommitted changed from the selected database
+		will be committed.
+		See `database` command for database selection.
+
 		Options:
 		  -a   Commit all open databases.
 
@@ -1260,13 +1264,33 @@ class PWMan(Cmd, metaclass=PWManMeta):
 			return self.__getPathCompletions(text)
 		return []
 
+	__drop_opts = ("-a",)
 	def do_drop(self, params):
 		"""--- Drop all uncommitted changes ---
 		Command: drop
 
+		All uncommitted changed from the selected database
+		will be dropped.
+		See `database` command for database selection.
+
+		Options:
+		  -a   Drop all uncommitted changes from all open databases.
+
 		Aliases: None
 		"""
-		self.__db.dropUncommitted()
+		opts = PWManOpts.parse(params, self.__drop_opts)
+		dbs = self.__dbs.values() if "-a" in opts else [ self.__db ]
+		try:
+			for db in dbs:
+				db.dropUncommitted()
+		except PWManError as e:
+			self._err("drop", str(e))
+
+	@completion
+	def complete_drop(self, text, line, begidx, endidx):
+		if text == "-":
+			return PWManOpts.rawOptTemplates(self.__drop_opts)
+		return []
 
 	def do_close(self, params):
 		"""--- Close a database ---
