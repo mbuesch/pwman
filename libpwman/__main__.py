@@ -114,8 +114,11 @@ def run_diff(dbPath, oldDbPath, diffFormat):
 	return 0
 
 def run_script(dbPath, pyModName=None, pyFileName=None):
-	assert not (pyModName and pyFileName)
-	if pyFileName is not None: # Import from a Python file
+	if pyFileName is not None and pyModName is not None:
+		print("Either pyModName or pyFileName must be given, not both.",
+		      file=sys.stderr)
+		return 1
+	elif pyFileName is not None: # Import from a Python file
 		displayName = pyFileName
 		sanName = "".join(c if c.isalnum() else "_" for c in str(pyFileName))
 		pyModName = f"__pwman_call_pyfile__{sanName}"
