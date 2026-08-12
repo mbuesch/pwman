@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 # Simple object file format.
-# Copyright (c) 2011-2024 Michael Büsch <m@bues.ch>
+# Copyright (c) 2011-2026 Michael Büsch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
 import errno
+from collections import OrderedDict
 
 __all__ = [
 	"FileObjError",
@@ -23,9 +24,14 @@ class FileObj:
 	#   [ 4 bytes ] => Payload data length
 	#   [ x bytes ] => Payload data
 
+	NAMELEN_LEN = 1
+	DATALEN_LEN = 4
+
 	__slots__ = (
 		"__name",
 		"__data",
+		"__index",
+		"__rawOffset",
 	)
 
 	def __init__(self, name, data):
@@ -39,16 +45,36 @@ class FileObj:
 		       "FileObj: Invalid 'data' type."
 		self.__name = memoryview(name)
 		self.__data = memoryview(data)
+		self.__index = None
+		self.__rawOffset = None
 		if len(self.__name) > 0x7F:
 			raise FileObjError("FileObj: Name too long")
 		if len(self.__data) > 0x7FFFFFFF:
 			raise FileObjError("FileObj: Data too long")
 
 	def getName(self):
-		return self.__name
+		return bytes(self.__name)
 
 	def getData(self):
 		return self.__data
+
+	def getIndex(self):
+		return self.__index
+
+	def setIndex(self, index):
+		self.__index = index
+
+	def getRawOffset(self):
+		return self.__rawOffset
+
+	def setRawOffset(self, rawOffset):
+		self.__rawOffset = rawOffset
+
+	def getRawPayloadOffset(self):
+		return self.getRawOffset() + self.NAMELEN_LEN + len(self.__name) + self.DATALEN_LEN
+
+	def __len__(self):
+		return self.NAMELEN_LEN + len(self.__name) + self.DATALEN_LEN + len(self.__data)
 
 	def getRaw(self, buffer):
 		nameLen = len(self.__name)
@@ -94,15 +120,14 @@ class FileObj:
 class FileObjCollection:
 	__slots__ = (
 		"__objects",
+		"__rawOffset",
 	)
 
 	def __init__(self, objects):
-		if isinstance(objects, dict):
-			self.__objects = objects
-		elif isinstance(objects, (list, tuple)):
-			self.__objects = { obj.getName() : obj for obj in objects }
-		else:
-			assert False
+		self.__objects = OrderedDict()
+		self.__rawOffset = 0
+		for obj in objects:
+			self.setObj(obj)
 
 	def writeFile(self, filepath):
 		try:
@@ -123,12 +148,33 @@ class FileObjCollection:
 		return self.__objects.values()
 
 	def get(self, name, error=None, default=None):
-		obj = self.__objects.get(name, None)
+		obj = self.getObj(name)
 		if obj is None:
 			if error:
 				raise FileObjError(error)
 			return default
 		return bytes(obj.getData())
+
+	def getObj(self, name):
+		return self.__objects.get(name, None)
+
+	def setObj(self, obj, override=False):
+		assert obj.getIndex() is None
+		assert obj.getRawOffset() is None
+		name = obj.getName()
+		oldObj = self.__objects.get(name, None)
+		if oldObj is None:
+			obj.setIndex(len(self))
+			obj.setRawOffset(self.__rawOffset)
+			self.__rawOffset += len(obj)
+		else:
+			if not override:
+				raise FileObjError(f"Object '{name}' already exists.")
+			if len(oldObj.getData()) != len(obj.getData()):
+				raise FileObjError(f"Object '{name}' exists, but length differs.")
+			obj.setIndex(oldObj.getIndex())
+			obj.setRawOffset(oldObj.getRawOffset())
+		self.__objects[name] = obj
 
 	@classmethod
 	def parseRaw(cls, raw):
@@ -136,10 +182,10 @@ class FileObjCollection:
 		       "FileObjCollection: Invalid 'raw' type."
 		raw = memoryview(raw)
 		offset = 0
-		objects = {}
+		objects = []
 		while offset < len(raw):
 			obj, objLen = FileObj.parseRaw(raw[offset:])
-			objects[obj.getName()] = obj
+			objects.append(obj)
 			offset += objLen
 		return cls(objects)
 
@@ -153,3 +199,6 @@ class FileObjCollection:
 				raise FileObjError("Failed to read file: %s" % e.strerror)
 			return None
 		return cls.parseRaw(rawData)
+
+	def __len__(self):
+		return len(self.__objects)
