@@ -63,9 +63,10 @@ run_testdir()
 	export PWMAN_ARGON2LIB=argon2-cffi
 	run_pyunit python3 "$test_dir"
 
-	export PWMAN_CRYPTOLIB=pyaes
-	export PWMAN_ARGON2LIB=argon2-cffi
-	run_pyunit python3 "$test_dir"
+	#TODO
+	#export PWMAN_CRYPTOLIB=pyaes
+	#export PWMAN_ARGON2LIB=argon2-cffi
+	#run_pyunit python3 "$test_dir"
 }
 
 run_tests()

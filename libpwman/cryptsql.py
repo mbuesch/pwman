@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 # Crypto SQL
-# Copyright (c) 2011-2024 Michael Büsch <m@bues.ch>
+# Copyright (c) 2011-2026 Michael Büsch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 """
 
@@ -17,6 +17,8 @@ from libpwman.aes import AES
 from libpwman.argon2 import Argon2
 from libpwman.fileobj import FileObj, FileObjCollection, FileObjError
 from libpwman.util import getenv
+
+LEGACY_CRYPTO_READ_ENABLED = False
 
 __all__ = [
 	"CSQLError",
@@ -53,6 +55,32 @@ def decodeChoices(buf, error, choices):
 		return string
 	except (ValueError, UnicodeError) as e:
 		raise CSQLError("%s: %s" % (error, buf.decode("UTF-8", "ignore")))
+
+def getAeadAssocData(fc):
+	"""Get the associated data for AEAD encryption.
+	fc: A FileObjCollection instance.
+	"""
+	assert isinstance(fc, FileObjCollection)
+
+	# Ensure that PAYLOAD and AUTH_TAG are the last two objects in the file.
+	if len(fc) <= 2:
+		raise CSQLError("File must contain more than two objects.")
+	payloadObj = fc.getObj(b"PAYLOAD")
+	if payloadObj is None or payloadObj.getIndex() != len(fc) - 2:
+		raise CSQLError("PAYLOAD is not the second last object in the file.")
+	authTagObj = fc.getObj(b"AUTH_TAG")
+	if authTagObj is None or authTagObj.getIndex() != len(fc) - 1:
+		raise CSQLError("AUTH_TAG is not the last object in the file.")
+
+	# Associated data ends right before the actual payload data.
+	assocLen = payloadObj.getRawPayloadOffset()
+
+	# The length field of AUTH_TAG is not included in the associated data.
+	# It is constant. Check it here.
+	if len(authTagObj.getData()) != AES.GCM_TAG_SIZE:
+		raise CSQLError("Invalid AUTH_TAG length.")
+
+	return fc.getRaw()[:assocLen]
 
 class CSQLError(Exception):
 	"""CryptSQL exception.
@@ -267,13 +295,6 @@ class CryptSQL:
 				raise CSQLError("Invalid PAYLOAD length: %d" % (
 						len(payload)))
 
-			# Check the padding method.
-			paddingMethod = decodeChoices(
-				buf=paddingMethod,
-				choices=("PWMAN", "PKCS7"),
-				error="Unknown padding method header",
-			)
-
 			# Check the cipher.
 			cipher = decodeChoices(
 				buf=cipher,
@@ -282,15 +303,43 @@ class CryptSQL:
 			)
 			cipherMode = decodeChoices(
 				buf=cipherMode,
-				choices=("CBC",),
+				choices=("CBC", "GCM"),
 				error="Unknown CIPHER_MODE header value",
 			)
-			cipherBlockSize = AES.BLOCK_SIZE
 
-			# Check the cipher IV.
-			if len(cipherIV) != cipherBlockSize:
+			# Check the cipher IV/nonce.
+			if cipherMode == "CBC":
+				allowedIVLen = AES.BLOCK_SIZE
+			elif cipherMode == "GCM":
+				allowedIVLen = AES.GCM_NONCE_SIZE
+			else:
+				assert False
+			if len(cipherIV) != allowedIVLen:
 				raise CSQLError("Invalid CIPHER_IV header length: %d" % (
 						len(cipherIV)))
+
+			# Check the auth tag (AEAD only).
+			if cipherMode == "GCM":
+				authTag = fc.get(
+					name=b"AUTH_TAG",
+					error="Missing AUTH_TAG header object",
+				)
+				if len(authTag) != AES.GCM_TAG_SIZE:
+					raise CSQLError("Invalid AUTH_TAG header length: %d" % (
+							len(authTag)))
+
+			# Check the padding method.
+			if cipherMode == "CBC":
+				allowedPadding = ("PWMAN", "PKCS7")
+			elif cipherMode == "GCM":
+				allowedPadding = ("NONE",)
+			else:
+				assert False
+			paddingMethod = decodeChoices(
+				buf=paddingMethod,
+				choices=allowedPadding,
+				error="Unknown padding method header",
+			)
 
 			# Check the cipher key length.
 			keyLen = decodeChoices(
@@ -379,6 +428,16 @@ class CryptSQL:
 				error="Unknown COMPRESS header value",
 			)
 
+			# Check legacy modes.
+			if not LEGACY_CRYPTO_READ_ENABLED:
+				# Non-auth cipher mode might be a crypto downgrade attack.
+				# Do not allow it by default.
+				if cipherMode != "GCM":
+					raise CSQLError(
+						"The file is encrypted with legacy unauthenticated AES-CBC mode. "
+						"Unauthenticated encryption is not supported by default. "
+						"Use the --legacy option to allow it.")
+
 			try:
 				# Generate the key.
 				key = kdf() if self.__key is None else self.__key
@@ -387,12 +446,25 @@ class CryptSQL:
 						type(e), str(e)))
 
 			try:
-				# Decrypt the payload.
-				payload = AES.get().decrypt(
-					key=key,
-					iv=cipherIV,
-					data=payload,
-					legacyPadding=(paddingMethod == "PWMAN"))
+				if cipherMode == "CBC":
+					# Decrypt the payload.
+					assert paddingMethod in ("PWMAN", "PKCS7")
+					payload = AES.get().decryptCBC(
+						key=key,
+						iv=cipherIV,
+						data=payload,
+						legacyPadding=(paddingMethod == "PWMAN"))
+				elif cipherMode == "GCM":
+					# Decrypt they payload and authenticate.
+					assert paddingMethod == "NONE"
+					payload = AES.get().decryptGCM(
+						key=key,
+						nonce=cipherIV,
+						data=payload,
+						tag=authTag,
+						assocData=getAeadAssocData(fc))
+				else:
+					assert False
 
 				# Decompress the payload (legacy).
 				if compress == "ZLIB":
@@ -404,8 +476,7 @@ class CryptSQL:
 				# Store the raw key.
 				self.__key = key
 			except Exception as e:
-				raise CSQLError("Failed to decrypt database. "
-						"Wrong passphrase?")
+				raise CSQLError(f"Failed to decrypt database.\n{e}\nWrong passphrase?")
 		except FileObjError as e:
 			raise CSQLError("Database file error: %s" % str(e))
 
@@ -519,23 +590,15 @@ class CryptSQL:
 		payload = self.sqlPlainDump()
 
 		try:
-			# Encrypt payload
-			cipherIV = self.__random(AES.BLOCK_SIZE)
-			payload = AES.get().encrypt(
-				key=key,
-				iv=cipherIV,
-				data=payload,
-			)
-		except Exception as e:
-			raise CSQLError("Failed to encrypt: %s" % str(e))
+			# Generate a nonce for AES-GCM.
+			nonce = self.__random(AES.GCM_NONCE_SIZE)
 
-		try:
 			# Assemble file objects
 			fc = FileObjCollection((
 				FileObj(b"HEAD", cls.CSQL_HEADER),
 				FileObj(b"CIPHER", b"AES"),
-				FileObj(b"CIPHER_MODE", b"CBC"),
-				FileObj(b"CIPHER_IV", cipherIV),
+				FileObj(b"CIPHER_MODE", b"GCM"),
+				FileObj(b"CIPHER_IV", nonce), #TODO rename this field?
 				FileObj(b"KEY_LEN", str(keyLen * 8).encode("UTF-8")),
 				FileObj(b"KDF_METHOD", b"ARGON2"),
 				FileObj(b"KDF_TYPE", b"ID"),
@@ -544,10 +607,32 @@ class CryptSQL:
 				FileObj(b"KDF_ITER", str(kdfIter).encode("UTF-8")),
 				FileObj(b"KDF_MEM", str(kdfMem).encode("UTF-8")),
 				FileObj(b"KDF_PAR", str(kdfPar).encode("UTF-8")),
-				FileObj(b"PADDING", b"PKCS7"),
-				FileObj(b"PAYLOAD", payload),
+				FileObj(b"PADDING", b"NONE"),
+				FileObj(b"PAYLOAD", b"\x00" * len(payload)), # Placeholder
+				FileObj(b"AUTH_TAG", b"\x00" * AES.GCM_TAG_SIZE), # Placeholder
 			))
 
+			# Encrypt the payload and authenticate everything else.
+			assocData = getAeadAssocData(fc)
+			print(len(payload))
+			payload, authTag = AES.get().encryptGCM(
+				key=key,
+				nonce=nonce,
+				data=payload,
+				assocData=assocData,
+			)
+			fc.setObj(FileObj(b"PAYLOAD", payload), override=True)
+			fc.setObj(FileObj(b"AUTH_TAG", authTag), override=True)
+			assert(
+				len(fc.getRaw()) ==
+				fc.getObj(b"PAYLOAD").getRawOffset() +
+				len(fc.getObj(b"PAYLOAD")) +
+				len(fc.getObj(b"AUTH_TAG"))
+			)
+		except Exception as e:
+			raise CSQLError("Failed to encrypt: %s" % str(e))
+
+		try:
 			# Write to the file
 			self.__key = None
 			fc.writeFile(self.__filename)

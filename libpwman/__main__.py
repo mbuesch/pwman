@@ -249,6 +249,9 @@ def main():
 		       help="Do not lock memory and allow swapping to disk. "
 			    "Do not use this option, if you don't know what this means, "
 			    "because this option has security implications.")
+	p.add_argument("-L", "--legacy", action="store_true",
+		       help="Allow reading a legacy database that was encrypted with "
+			    "legacy less secure encryption methods.")
 	if libpwman.util.osIsPosix:
 		p.add_argument("-t", "--timeout", type=int, default=600, metavar="SECONDS",
 			       help="Sets the session timeout in seconds. Default is 10 minutes.")
@@ -257,6 +260,8 @@ def main():
 	if args.version:
 		print("pwman version %s" % libpwman.__version__)
 		return 0
+
+	libpwman.cryptsql.LEGACY_CRYPTO_READ_ENABLED = args.legacy
 
 	exitcode = 1
 	try:

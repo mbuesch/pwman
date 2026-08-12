@@ -2,7 +2,10 @@ from pwman_tstlib import *
 initTest(__file__)
 
 import pathlib
+import libpwman
 from libpwman.database import *
+
+libpwman.cryptsql.LEGACY_CRYPTO_READ_ENABLED = True
 
 class Test_Database_v1(TestCase):
 	"""Version 1 database format.
