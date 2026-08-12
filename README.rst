@@ -18,6 +18,7 @@ pwman has support for the following things:
 * Database compare (diff). In pwman prompt, at pwman command line and as `git diff` extension.
 * Custom Python scripts for arbitrary database processing.
 * Export of the complete database as SQL text dump, CSV dump and human readable plain text dump.
+* Open multiple databases to safely copy/move entries between them.
 
 Algorithms
 ==========
