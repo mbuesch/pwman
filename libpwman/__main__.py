@@ -36,16 +36,22 @@ def getPassphrase(dbPath, verbose=True, infoFile=sys.stdout):
 def run_infodump(dbPath):
 	try:
 		fc = libpwman.fileobj.FileObjCollection.parseFile(dbPath)
-		print("pwman database: %s" % dbPath)
+		if fc is None:
+			raise libpwman.PWManError(
+				f"Database file `{dbPath}` does not exist.")
+		print(f"# pwman database\n\n`{dbPath}`\n\n# file content\n")
 		head = fc.get(b"HEAD")
 		if head != libpwman.cryptsql.CryptSQL.CSQL_HEADER:
 			head = str(head)
 			if len(head) > 16:
 				head = head[:16] + "..."
 			raise libpwman.PWManError("Invalid HEAD: %s" % head)
+		print("| Field name  | Bytes    | Field value |")
+		print("| ----------- | -------- | ----------- |")
 		for obj in fc.objects:
 			name = bytes(obj.getName())
 			data = bytes(obj.getData())
+			dataLen = str(len(data))
 			trunc = False
 			if name == b"PAYLOAD" and len(data) > 8:
 				data = data[:8]
@@ -61,8 +67,9 @@ def run_infodump(dbPath):
 				data = data.hex()
 			if trunc:
 				data += "..."
-			pad = " " * (12 - len(name))
-			print("  %s%s: %s" % (name, pad, data))
+			namePad = " " * (11 - len(name))
+			lenPad = " " * (8 - len(dataLen))
+			print(f"| {name}{namePad} | {dataLen}{lenPad} | {data} |")
 	except libpwman.fileobj.FileObjError as e:
 		raise libpwman.PWManError(str(e))
 	return 0
