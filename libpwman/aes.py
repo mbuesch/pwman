@@ -7,6 +7,7 @@
 
 from libpwman.exception import PWManError
 from libpwman.util import getenv
+from libpwman.crypto_fallback.aesgcm import AESGCM
 
 __all__ = [
 	"AES",
@@ -187,8 +188,18 @@ class AES:
 				return encData, tag
 
 			if self.__pyaes is not None:
-				# Use pyaes
-				raise PWManError("AES-GCM: pyaes does not support GCM mode.")
+				# Use pyaes and fallback-AESGCM
+				aes = self.__pyaes.AES(key)
+				aesgcm = AESGCM(lambda block: aes.encrypt(block))
+				encData, tag = aesgcm.encrypt(
+					nonce=nonce,
+					plaintext=data,
+					associated_data=assocData)
+				if len(encData) != len(data):
+					raise PWManError("AES-GCM: Encrypted data length mismatch.")
+				if len(tag) != self.GCM_TAG_SIZE:
+					raise PWManError("AES-GCM: Invalid tag length.")
+				return encData, tag
 
 		except PWManError as e:
 			raise e
@@ -229,8 +240,20 @@ class AES:
 				return decData
 
 			if self.__pyaes is not None:
-				# Use pyaes
-				raise PWManError("AES-GCM: pyaes does not support GCM mode.")
+				# Use pyaes and fallback-AESGCM
+				aes = self.__pyaes.AES(key)
+				aesgcm = AESGCM(lambda block: aes.encrypt(block))
+				try:
+					decData = aesgcm.decrypt(
+						nonce=nonce,
+						ciphertext=data,
+						authentication_tag=tag,
+						associated_data=assocData)
+				except ValueError as e:
+					raise PWManError("AES-GCM: Authentication failed.")
+				if len(decData) != len(data):
+					raise PWManError("AES-GCM: Decrypted data length mismatch.")
+				return decData
 
 		except PWManError as e:
 			raise e
@@ -246,11 +269,6 @@ class AES:
 		if index < 0 or index >= len(data):
 			raise PWManError("Legacy padding: Did not find start.")
 		return data[:index]
-
-	@classmethod
-	def quickSelfTest(cls):
-		cls.__quickTestCBC()
-		cls.__quickTestGCM()
 
 	@classmethod
 	def __quickTestCBC(cls):
@@ -285,3 +303,8 @@ class AES:
 			assocData=assoc)
 		if dec != b"pwman":
 			raise PWManError("AES-GCM decrypt: Quick self test failed.")
+
+	@classmethod
+	def quickSelfTest(cls):
+		cls.__quickTestCBC()
+		cls.__quickTestGCM()
