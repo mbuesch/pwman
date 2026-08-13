@@ -15,7 +15,7 @@ class AESGCM:
     """
 
     __slots__ = (
-        "__encrypt_block",
+        "__encrypt_block_callback",
         "__h",
     )
 
@@ -23,9 +23,19 @@ class AESGCM:
         """Initialize AES-GCM with a block encryption function.
         `encrypt_block` must be a callable that takes a 16-byte block and returns the encrypted 16-byte block.
         """
-        self.__encrypt_block = encrypt_block
+        self.__encrypt_block_callback = encrypt_block
         # H = CIPH_K(0^128) -- the hash subkey used throughout GHASH.
         self.__h = int.from_bytes(self.__encrypt_block(b"\x00" * 16), "big")
+
+    def __encrypt_block(self, block: bytes) -> bytes:
+        """Encrypt a single 16-byte block using the provided AES block cipher.
+        """
+        if len(block) != 16:
+            raise ValueError("encrypt_block: Input block must be 16 bytes")
+        cblock = bytes(self.__encrypt_block_callback(block))
+        if len(cblock) != 16:
+            raise ValueError("encrypt_block: Returned block must be 16 bytes")
+        return cblock
 
     # --------------------------------------------------------------------------
     # GF(2^128) arithmetic for GHASH
@@ -46,11 +56,10 @@ class AESGCM:
         """
         z = 0
         v = x
-        R = 0xE1000000_00000000_00000000_00000000  # top byte 0xE1 followed by 120 zero bits
+        R = 0xE1000000_00000000_00000000_00000000
         for i in range(128):
             if (y >> (127 - i)) & 1:
                 z ^= v
-            # v = v * x  (multiply by the field's "x", i.e. a bit-shift + conditional reduce)
             if v & 1:
                 v = (v >> 1) ^ R
             else:
@@ -61,7 +70,8 @@ class AESGCM:
     def __ghash(cls, h: int, data: bytes) -> int:
         """GHASH_H(data), where `data` must be a multiple of 16 bytes.
         """
-        assert len(data) % 16 == 0
+        if len(data) % 16 != 0:
+            raise ValueError("GHASH input must be a multiple of 16 bytes")
         y = 0
         for i in range(0, len(data), 16):
             block = int.from_bytes(data[i:i + 16], "big")
@@ -80,7 +90,7 @@ class AESGCM:
     def __inc32(self, block_int: int) -> int:
         """Increment the low 32 bits of a 128-bit block integer, mod 2^32.
         """
-        high = block_int & 0xFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_00000000
+        high = block_int & 0xFFFFFFFF_FFFFFFFF_FFFFFFFF_00000000
         low = ((block_int & 0xFFFFFFFF) + 1) & 0xFFFFFFFF
         return high | low
 
@@ -120,7 +130,7 @@ class AESGCM:
         s = self.__ghash(self.__h, s_input)
         return self.__gctr(j0, s.to_bytes(16, "big"))
 
-    def encrypt(self, nonce: bytes, plaintext: bytes, associated_data: bytes = b""):
+    def encrypt(self, nonce, plaintext, associated_data=b""):
         """
         Encrypt with AES-GCM.
 
@@ -130,16 +140,25 @@ class AESGCM:
 
         Returns a tuple (ciphertext, authentication_tag).
         """
+        nonce = bytes(nonce)
+        plaintext = bytes(plaintext)
+        associated_data = bytes(associated_data)
+
         if len(nonce) < 96 // 8:
             raise ValueError("nonce must be at least 96 bits")
+        if len(nonce) > ((1 << 61) - 1):
+            raise ValueError("nonce too long for AES-GCM")
+        if len(plaintext) > ((1 << 32) - 2) * 16:
+            raise ValueError("plaintext too long for AES-GCM")
+        if len(associated_data) > ((1 << 61) - 1):
+            raise ValueError("associated_data too long for AES-GCM")
 
         j0 = self.__compute_j0(nonce)
         ciphertext = self.__gctr(self.__inc32(j0), plaintext)
         tag = self.__compute_tag(j0, associated_data, ciphertext)
         return ciphertext, tag
 
-    def decrypt(self, nonce: bytes, ciphertext: bytes, authentication_tag: bytes,
-                associated_data: bytes = b""):
+    def decrypt(self, nonce, ciphertext, authentication_tag, associated_data=b""):
         """
         Decrypt and verify AES-GCM ciphertext and verify authenticated data.
 
@@ -150,10 +169,21 @@ class AESGCM:
 
         Raises ValueError if authentication fails (tag mismatch).
         """
+        nonce = bytes(nonce)
+        ciphertext = bytes(ciphertext)
+        authentication_tag = bytes(authentication_tag)
+        associated_data = bytes(associated_data)
+
         if len(nonce) < 96 // 8:
             raise ValueError("nonce must be at least 96 bits")
+        if len(nonce) > ((1 << 61) - 1):
+            raise ValueError("nonce too long for AES-GCM")
+        if len(ciphertext) > ((1 << 32) - 2) * 16:
+            raise ValueError("ciphertext too long for AES-GCM")
         if len(authentication_tag) != 16:
             raise ValueError("authentication_tag must be 16 bytes")
+        if len(associated_data) > ((1 << 61) - 1):
+            raise ValueError("associated_data too long for AES-GCM")
 
         j0 = self.__compute_j0(nonce)
         expected_tag = self.__compute_tag(j0, associated_data, ciphertext)
