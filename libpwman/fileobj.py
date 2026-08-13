@@ -96,13 +96,19 @@ class FileObj:
 		raw = memoryview(raw)
 		try:
 			off = 0
+			if len(raw) < off + 1:
+				raise FileObjError("FileObj: Raw data too short")
 			nameLen = raw[off]
 			if nameLen & 0x80:
 				raise FileObjError("FileObj: Name length extension bit is set, "
 						   "but not supported by this pwman version.")
 			off += 1
+			if len(raw) < off + nameLen:
+				raise FileObjError("FileObj: Raw data too short")
 			name = raw[off : off + nameLen]
 			off += nameLen
+			if len(raw) < off + 4:
+				raise FileObjError("FileObj: Raw data too short")
 			dataLen = (raw[off] |
 				   (raw[off + 1] << 8) |
 				   (raw[off + 2] << 16) |
@@ -111,6 +117,8 @@ class FileObj:
 				raise FileObjError("FileObj: Data length extension bit is set, "
 						   "but not supported by this pwman version.")
 			off += 4
+			if len(raw) < off + dataLen:
+				raise FileObjError("FileObj: Raw data too short")
 			data = raw[off : off + dataLen]
 			off += dataLen
 		except (IndexError, KeyError) as e:
