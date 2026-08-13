@@ -57,14 +57,15 @@ class AESGCM:
         z = 0
         v = x
         R = 0xE1000000_00000000_00000000_00000000
+        M = 0xFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF
         for i in range(128):
-            if (y >> (127 - i)) & 1:
-                z ^= v
-            if v & 1:
-                v = (v >> 1) ^ R
-            else:
-                v = v >> 1
-        return z & 0xFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF
+            bit = (y >> (127 - i)) & 1
+            mask = -bit & M
+            z ^= v & mask
+            bit = v & 1
+            mask = -bit & M
+            v = (v >> 1) ^ (R & mask)
+        return z & M
 
     @classmethod
     def __ghash(cls, h: int, data: bytes) -> int:
