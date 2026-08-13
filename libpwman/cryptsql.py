@@ -601,7 +601,7 @@ class CryptSQL:
 				FileObj(b"HEAD", cls.CSQL_HEADER),
 				FileObj(b"CIPHER", b"AES"),
 				FileObj(b"CIPHER_MODE", b"GCM"),
-				FileObj(b"CIPHER_IV", nonce), #TODO rename this field?
+				FileObj(b"CIPHER_IV", nonce),
 				FileObj(b"KEY_LEN", str(keyLen * 8).encode("UTF-8")),
 				FileObj(b"KDF_METHOD", b"ARGON2"),
 				FileObj(b"KDF_TYPE", b"ID"),
