@@ -434,9 +434,12 @@ class CryptSQL:
 				# Do not allow it by default.
 				if cipherMode != "GCM":
 					raise CSQLError(
-						"The file is encrypted with legacy unauthenticated AES-CBC mode. "
-						"Unauthenticated encryption is not supported by default. "
-						"Use the --legacy option to allow it.")
+						"This database file is encrypted with legacy unauthenticated AES-CBC mode. "
+						"Unauthenticated encryption is disabled for security reasons by default. "
+						"If you are sure the database file is safe and has not been tampered with, "
+						"you can use the --legacy command line option to allow reading it. "
+						"Note that if you save the database file again, it will be re-encrypted "
+						"with modern authenticated AES-GCM mode.")
 
 			try:
 				# Generate the key.
@@ -614,7 +617,6 @@ class CryptSQL:
 
 			# Encrypt the payload and authenticate everything else.
 			assocData = getAeadAssocData(fc)
-			print(len(payload))
 			payload, authTag = AES.get().encryptGCM(
 				key=key,
 				nonce=nonce,
