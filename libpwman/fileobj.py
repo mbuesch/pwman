@@ -43,7 +43,7 @@ class FileObj:
 		       "FileObj: Invalid 'name' type."
 		assert isinstance(data, (bytes, bytearray, memoryview)),\
 		       "FileObj: Invalid 'data' type."
-		self.__name = memoryview(name)
+		self.__name = bytes(name)
 		self.__data = memoryview(data)
 		self.__index = None
 		self.__rawOffset = None
