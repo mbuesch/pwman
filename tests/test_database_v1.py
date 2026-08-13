@@ -5,12 +5,11 @@ import pathlib
 import libpwman
 from libpwman.database import *
 
-libpwman.cryptsql.LEGACY_CRYPTO_READ_ENABLED = True
-
 class Test_Database_v1(TestCase):
 	"""Version 1 database format.
 	"""
 	def test_read_contents(self):
+		libpwman.cryptsql.LEGACY_CRYPTO_READ_ENABLED = False
 		db = PWManDatabase(filename=pathlib.Path("tests", "test_database_v1.db"),
 				   passphrase="test")
 
@@ -112,7 +111,17 @@ class Test_Database_v1(TestCase):
 	def test_legacy_pbkdf2(self):
 		# Test legacy PBKDF2 read support.
 		# Just check if we can open and decrypt it successfully.
+		libpwman.cryptsql.LEGACY_CRYPTO_READ_ENABLED = True
 		db = PWManDatabase(filename=pathlib.Path("tests", "test_database_v1_pbkdf2.db"),
+				   passphrase="test")
+		self.assertEqual(db.getCategoryNames(),
+				 sorted([ "123", "test2", "testcat1" ]))
+
+	def test_legacy_aescbc(self):
+		# Test legacy AES-CBC read support.
+		# Just check if we can open and decrypt it successfully.
+		libpwman.cryptsql.LEGACY_CRYPTO_READ_ENABLED = True
+		db = PWManDatabase(filename=pathlib.Path("tests", "test_database_v1_aescbc.db"),
 				   passphrase="test")
 		self.assertEqual(db.getCategoryNames(),
 				 sorted([ "123", "test2", "testcat1" ]))
