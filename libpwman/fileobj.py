@@ -97,18 +97,18 @@ class FileObj:
 		try:
 			off = 0
 			if len(raw) < off + 1:
-				raise FileObjError("FileObj: Raw data too short")
+				raise FileObjError("FileObj: Raw data too short (1)")
 			nameLen = raw[off]
 			if nameLen & 0x80:
 				raise FileObjError("FileObj: Name length extension bit is set, "
 						   "but not supported by this pwman version.")
 			off += 1
 			if len(raw) < off + nameLen:
-				raise FileObjError("FileObj: Raw data too short")
+				raise FileObjError("FileObj: Raw data too short (2)")
 			name = raw[off : off + nameLen]
 			off += nameLen
 			if len(raw) < off + 4:
-				raise FileObjError("FileObj: Raw data too short")
+				raise FileObjError("FileObj: Raw data too short (3)")
 			dataLen = (raw[off] |
 				   (raw[off + 1] << 8) |
 				   (raw[off + 2] << 16) |
@@ -118,7 +118,7 @@ class FileObj:
 						   "but not supported by this pwman version.")
 			off += 4
 			if len(raw) < off + dataLen:
-				raise FileObjError("FileObj: Raw data too short")
+				raise FileObjError("FileObj: Raw data too short (4)")
 			data = raw[off : off + dataLen]
 			off += dataLen
 		except (IndexError, KeyError) as e:
@@ -159,8 +159,8 @@ class FileObjCollection:
 		return self.__objects.get(name, None)
 
 	def setObj(self, obj, override=False):
-		assert obj.getIndex() is None
-		assert obj.getRawOffset() is None
+		if obj.getIndex() is not None or obj.getRawOffset() is not None:
+			raise FileObjError("FileObjCollection.setObj: Object is already inserted.")
 		name = obj.getName()
 		oldObj = self.__objects.get(name, None)
 		if oldObj is None:

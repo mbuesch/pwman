@@ -88,22 +88,20 @@ class AES:
 					mode=self.__cryptodome.Cipher.AES.MODE_CBC,
 					iv=iv)
 				encData = cipher.encrypt(padData)
-				return encData
-
-			if self.__pyaes is not None:
+			elif self.__pyaes is not None:
 				# Use pyaes
 				mode = self.__pyaes.AESModeOfOperationCBC(key=key, iv=iv)
 				padding = self.__pyaes.PADDING_DEFAULT
 				enc = self.__pyaes.Encrypter(mode=mode, padding=padding)
 				encData = enc.feed(data)
 				encData += enc.feed()
-				return encData
-
+			else:
+				raise PWManError("AES-CBC: No implementation available.")
 		except PWManError as e:
 			raise e
 		except Exception as e:
 			raise PWManError("AES error: %s: %s" % (type(e), str(e)))
-		raise PWManError("AES not implemented.")
+		return encData
 
 	def decryptCBC(self, key, iv, data, legacyPadding=False):
 		"""Decrypt data.
@@ -132,9 +130,7 @@ class AES:
 						padded_data=decData,
 						block_size=self.BLOCK_SIZE,
 						style="pkcs7")
-				return unpadData
-
-			if self.__pyaes is not None:
+			elif self.__pyaes is not None:
 				# Use pyaes
 				mode = self.__pyaes.AESModeOfOperationCBC(key=key, iv=iv)
 				if legacyPadding:
@@ -148,13 +144,13 @@ class AES:
 					unpadData = self.__unpadLegacy(decData)
 				else:
 					unpadData = decData
-				return unpadData
-
+			else:
+				raise PWManError("AES-CBC: No implementation available.")
 		except PWManError as e:
 			raise e
 		except Exception as e:
 			raise PWManError("AES error: %s: %s" % (type(e), str(e)))
-		raise PWManError("AES not implemented.")
+		return unpadData
 
 	def encryptGCM(self, key, nonce, data, assocData):
 		"""Encrypt data with AES-256-GCM.
@@ -181,13 +177,7 @@ class AES:
 				cipher.update(assocData)
 				encData = cipher.encrypt(data)
 				tag = cipher.digest()
-				if len(encData) != len(data):
-					raise PWManError("AES-GCM: Encrypted data length mismatch.")
-				if len(tag) != self.GCM_TAG_SIZE:
-					raise PWManError("AES-GCM: Invalid tag length.")
-				return encData, tag
-
-			if self.__pyaes is not None:
+			elif self.__pyaes is not None:
 				# Use pyaes and fallback-AESGCM
 				aes = self.__pyaes.AES(key)
 				aesgcm = AESGCM(lambda block: aes.encrypt(block))
@@ -195,17 +185,18 @@ class AES:
 					nonce=nonce,
 					plaintext=data,
 					associated_data=assocData)
-				if len(encData) != len(data):
-					raise PWManError("AES-GCM: Encrypted data length mismatch.")
-				if len(tag) != self.GCM_TAG_SIZE:
-					raise PWManError("AES-GCM: Invalid tag length.")
-				return encData, tag
+			else:
+				raise PWManError("AES-GCM: No implementation available.")
 
+			if len(encData) != len(data):
+				raise PWManError("AES-GCM: Encrypted data length mismatch.")
+			if len(tag) != self.GCM_TAG_SIZE:
+				raise PWManError("AES-GCM: Invalid tag length.")
 		except PWManError as e:
 			raise e
 		except Exception as e:
 			raise PWManError("AES-GCM error: %s: %s" % (type(e), str(e)))
-		raise PWManError("AES-GCM not implemented.")
+		return encData, tag
 
 	def decryptGCM(self, key, nonce, data, tag, assocData):
 		"""Decrypt data with AES-256-GCM.
@@ -235,11 +226,7 @@ class AES:
 					decData = cipher.decrypt_and_verify(data, tag)
 				except ValueError as e:
 					raise PWManError("AES-GCM: Authentication failed.")
-				if len(decData) != len(data):
-					raise PWManError("AES-GCM: Decrypted data length mismatch.")
-				return decData
-
-			if self.__pyaes is not None:
+			elif self.__pyaes is not None:
 				# Use pyaes and fallback-AESGCM
 				aes = self.__pyaes.AES(key)
 				aesgcm = AESGCM(lambda block: aes.encrypt(block))
@@ -251,15 +238,16 @@ class AES:
 						associated_data=assocData)
 				except ValueError as e:
 					raise PWManError("AES-GCM: Authentication failed.")
-				if len(decData) != len(data):
-					raise PWManError("AES-GCM: Decrypted data length mismatch.")
-				return decData
+			else:
+				raise PWManError("AES-GCM: No implementation available.")
 
+			if len(decData) != len(data):
+				raise PWManError("AES-GCM: Decrypted data length mismatch.")
 		except PWManError as e:
 			raise e
 		except Exception as e:
 			raise PWManError("AES-GCM error: %s: %s" % (type(e), str(e)))
-		raise PWManError("AES-GCM not implemented.")
+		return decData
 
 	@staticmethod
 	def __unpadLegacy(data):
@@ -288,19 +276,10 @@ class AES:
 		key = b"_keykey_" * 4
 		nonce = b"n" * inst.GCM_NONCE_SIZE
 		assoc = b"_assoc_" * 4
-		enc, tag = inst.encryptGCM(
-			key=key,
-			nonce=nonce,
-			data=b"pwman",
-			assocData=assoc)
+		enc, tag = inst.encryptGCM(key=key, nonce=nonce, data=b"pwman", assocData=assoc)
 		if enc != bytes.fromhex("c71c5f2f94") or tag != bytes.fromhex("72629905a2a0ac6be642c9ea62de0d52"):
 			raise PWManError("AES-GCM encrypt: Quick self test failed.")
-		dec = inst.decryptGCM(
-			key=key,
-			nonce=nonce,
-			data=enc,
-			tag=tag,
-			assocData=assoc)
+		dec = inst.decryptGCM(key=key, nonce=nonce, data=enc, tag=tag, assocData=assoc)
 		if dec != b"pwman":
 			raise PWManError("AES-GCM decrypt: Quick self test failed.")
 

@@ -119,7 +119,17 @@ class Test_Database_v1(TestCase):
 
 	def test_legacy_aescbc(self):
 		# Test legacy AES-CBC read support.
-		# Just check if we can open and decrypt it successfully.
+
+		# Must fail, if legacy support is not enabled.
+		libpwman.cryptsql.LEGACY_CRYPTO_READ_ENABLED = False
+		self.assertRaisesRegex(
+			libpwman.PWManError,
+			"Unauthenticated encryption is disabled",
+			lambda: PWManDatabase(filename=pathlib.Path("tests", "test_database_v1_aescbc.db"),
+			                      passphrase="test")
+		)
+
+		# Check if we can open and decrypt it successfully.
 		libpwman.cryptsql.LEGACY_CRYPTO_READ_ENABLED = True
 		db = PWManDatabase(filename=pathlib.Path("tests", "test_database_v1_aescbc.db"),
 				   passphrase="test")

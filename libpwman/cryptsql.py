@@ -18,6 +18,7 @@ from libpwman.argon2 import Argon2
 from libpwman.fileobj import FileObj, FileObjCollection, FileObjError
 from libpwman.util import getenv
 
+# Enable legacy non-authenticated decryption?
 LEGACY_CRYPTO_READ_ENABLED = False
 
 __all__ = [
@@ -429,18 +430,16 @@ class CryptSQL:
 				error="Unknown COMPRESS header value",
 			)
 
-			# Check legacy modes.
-			if not LEGACY_CRYPTO_READ_ENABLED:
-				# Non-auth cipher mode might be a crypto downgrade attack.
-				# Do not allow it by default.
-				if cipherMode != "GCM":
-					raise CSQLError(
-						"This database file is encrypted with legacy unauthenticated AES-CBC mode. "
-						"Unauthenticated encryption is disabled for security reasons by default. "
-						"If you are sure the database file is safe and has not been tampered with, "
-						"you can use the --legacy command line option to allow reading it. "
-						"Note that if you save the database file again, it will be re-encrypted "
-						"with modern authenticated AES-GCM mode.")
+			# Non-auth cipher mode might be a crypto downgrade attack.
+			# Do not allow it by default.
+			if cipherMode != "GCM" and not LEGACY_CRYPTO_READ_ENABLED:
+				raise CSQLError(
+					"This database file is encrypted with legacy unauthenticated AES-CBC mode. "
+					"Unauthenticated encryption is disabled for security reasons by default. "
+					"If you are sure the database file is safe and has not been tampered with, "
+					"you can use the --legacy command line option to allow reading it. "
+					"Note that if you save the database file again, it will be re-encrypted "
+					"with modern authenticated AES-GCM mode.")
 
 			try:
 				# Generate the key.
