@@ -60,7 +60,8 @@ def getAeadAssocData(fc):
 	"""Get the associated data for AEAD encryption.
 	fc: A FileObjCollection instance.
 	"""
-	assert isinstance(fc, FileObjCollection)
+	if not isinstance(fc, FileObjCollection):
+		raise CSQLError("Internal error: getAeadAssocData: Expected a FileObjCollection instance.")
 
 	# Ensure that PAYLOAD and AUTH_TAG are the last two objects in the file.
 	if len(fc) <= 2:
@@ -181,8 +182,8 @@ class CryptSQL:
 	def setPassphrase(self, passphrase):
 		"""Set a new passphrase string for encryption and decryption.
 		"""
-		assert isinstance(passphrase, str),\
-		       "CryptSQL: Passphrase is not 'str'."
+		if not isinstance(passphrase, str):
+			raise CSQLError("setPassphrase: Passphrase is not 'str'.")
 		try:
 			self.__key = None
 			self.__passphrase = passphrase.encode("UTF-8")
@@ -313,7 +314,7 @@ class CryptSQL:
 			elif cipherMode == "GCM":
 				allowedIVLen = AES.GCM_NONCE_SIZE
 			else:
-				assert False
+				raise CSQLError("Internal error: Invalid CipherMode (1)")
 			if len(cipherIV) != allowedIVLen:
 				raise CSQLError("Invalid CIPHER_IV header length: %d" % (
 						len(cipherIV)))
@@ -334,7 +335,7 @@ class CryptSQL:
 			elif cipherMode == "GCM":
 				allowedPadding = ("NONE",)
 			else:
-				assert False
+				raise CSQLError("Internal error: Invalid CipherMode (2)")
 			paddingMethod = decodeChoices(
 				buf=paddingMethod,
 				choices=allowedPadding,
@@ -419,7 +420,7 @@ class CryptSQL:
 				)
 				self.__kdfMemFile = kdfMem
 			else:
-				assert False
+				raise CSQLError("Internal error: Invalid KDF method")
 
 			# Check the compression method.
 			compress = decodeChoices(
@@ -451,7 +452,8 @@ class CryptSQL:
 			try:
 				if cipherMode == "CBC":
 					# Decrypt the payload.
-					assert paddingMethod in ("PWMAN", "PKCS7")
+					if paddingMethod not in ("PWMAN", "PKCS7"):
+						raise CSQLError("Internal error: Invalid padding method (1)")
 					payload = AES.get().decryptCBC(
 						key=key,
 						iv=cipherIV,
@@ -459,7 +461,8 @@ class CryptSQL:
 						legacyPadding=(paddingMethod == "PWMAN"))
 				elif cipherMode == "GCM":
 					# Decrypt they payload and authenticate.
-					assert paddingMethod == "NONE"
+					if paddingMethod != "NONE":
+						raise CSQLError("Internal error: Invalid padding method (2)")
 					payload = AES.get().decryptGCM(
 						key=key,
 						nonce=cipherIV,
@@ -467,7 +470,7 @@ class CryptSQL:
 						tag=authTag,
 						assocData=getAeadAssocData(fc))
 				else:
-					assert False
+					raise CSQLError("Internal error: Invalid CipherMode (3)")
 
 				# Decompress the payload (legacy).
 				if compress == "ZLIB":
@@ -625,21 +628,28 @@ class CryptSQL:
 			)
 			fc.setObj(FileObj(b"PAYLOAD", payload), override=True)
 			fc.setObj(FileObj(b"AUTH_TAG", authTag), override=True)
-			assert(
-				len(fc.getRaw()) ==
+
+			# Get the raw file data.
+			rawFileData = fc.getRaw()
+
+			# Sanity check the raw file data length.
+			if len(rawFileData) != (
 				fc.getObj(b"PAYLOAD").getRawOffset() +
 				len(fc.getObj(b"PAYLOAD")) +
 				len(fc.getObj(b"AUTH_TAG"))
-			)
+			):
+				raise ValueError("Raw file data length mismatch.")
 		except Exception as e:
 			raise CSQLError("Failed to encrypt: %s" % str(e))
 
 		try:
 			# Write to the file
 			self.__key = None
-			fc.writeFile(self.__filename)
+			with open(self.__filename, "wb") as f:
+				f.write(rawFileData)
+				f.flush()
 			self.__key = key
-		except FileObjError as e:
+		except IOError as e:
 			raise CSQLError("File error: %s" % str(e))
 
 	def setRegexpFlags(self, search=True, ignoreCase=True, multiLine=True, dotAll=True):

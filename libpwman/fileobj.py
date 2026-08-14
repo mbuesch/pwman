@@ -137,14 +137,6 @@ class FileObjCollection:
 		for obj in objects:
 			self.setObj(obj)
 
-	def writeFile(self, filepath):
-		try:
-			with open(filepath, "wb") as f:
-				f.write(self.getRaw())
-				f.flush()
-		except IOError as e:
-			raise FileObjError("Failed to write file: %s" % e.strerror)
-
 	def getRaw(self):
 		raw = bytearray()
 		for obj in self.__objects.values():
