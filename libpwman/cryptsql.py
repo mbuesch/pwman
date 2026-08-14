@@ -459,7 +459,7 @@ class CryptSQL:
 						data=payload,
 						legacyPadding=(paddingMethod == "PWMAN"))
 				elif cipherMode == "GCM":
-					# Decrypt they payload and authenticate.
+					# Decrypt the payload and authenticate payload and headers.
 					if paddingMethod != "NONE":
 						raise CSQLError("Internal error: Invalid padding method (2)")
 					payload = AES.get().decryptGCM(
