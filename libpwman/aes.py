@@ -265,10 +265,10 @@ class AES:
 		iv = b"iv" * 8
 		enc = inst.encryptCBC(key=key, iv=iv, data=b"pwman")
 		if enc != bytes.fromhex("cf73a286509e1265d26490a76dcbb2fd"):
-			raise PWManError("AES encrypt: Quick self test failed.")
+			raise PWManError("AES-CBC encrypt: Quick self test failed.")
 		dec = inst.decryptCBC(key=key, iv=iv, data=enc)
 		if dec != b"pwman":
-			raise PWManError("AES decrypt: Quick self test failed.")
+			raise PWManError("AES-CBC decrypt: Quick self test failed.")
 
 	@classmethod
 	def __quickTestGCM(cls):
