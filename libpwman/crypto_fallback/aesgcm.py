@@ -17,12 +17,14 @@ class AESGCM:
     __slots__ = (
         "__encrypt_block_callback",
         "__h",
+        "_testing",
     )
 
     def __init__(self, encrypt_block):
         """Initialize AES-GCM with a block encryption function.
         `encrypt_block` must be a callable that takes a 16-byte block and returns the encrypted 16-byte block.
         """
+        self._testing = False
         self.__encrypt_block_callback = encrypt_block
         # H = CIPH_K(0^128) -- the hash subkey used throughout GHASH.
         self.__h = int.from_bytes(self.__encrypt_block(b"\x00" * 16), "big")
@@ -145,7 +147,7 @@ class AESGCM:
         plaintext = bytes(plaintext)
         associated_data = bytes(associated_data)
 
-        if len(nonce) < 96 // 8:
+        if len(nonce) < 96 // 8 and not self._testing:
             raise ValueError("nonce must be at least 96 bits")
         if len(nonce) > ((1 << 61) - 1):
             raise ValueError("nonce too long for AES-GCM")
@@ -175,7 +177,7 @@ class AESGCM:
         authentication_tag = bytes(authentication_tag)
         associated_data = bytes(associated_data)
 
-        if len(nonce) < 96 // 8:
+        if len(nonce) < 96 // 8 and not self._testing:
             raise ValueError("nonce must be at least 96 bits")
         if len(nonce) > ((1 << 61) - 1):
             raise ValueError("nonce too long for AES-GCM")
@@ -195,64 +197,126 @@ class AESGCM:
         return self.__gctr(self.__inc32(j0), ciphertext)
 
     @classmethod
-    def quickSelfTest(cls):
+    def selfTest(cls):
         import pyaes
-
-        def new_aesgcm(key):
-            aes = pyaes.AES(key)
-            encrypt_block = lambda block: aes.encrypt(block)
-            return AESGCM(encrypt_block)
+        from dataclasses import dataclass
+        from pathlib import Path
+        from typing import Optional
 
         def hbytes(hexstr):
+            if hexstr == '""':
+                return b""
             return bytes.fromhex(hexstr)
 
-        def check(cond, msg):
-            if not cond:
-                raise Exception("AES-GCM self-test failed: " + msg)
+        @dataclass
+        class TC:
+            key: Optional[bytes] = None
+            nonce: Optional[bytes] = None
+            plaintext: Optional[bytes] = None
+            associated_data: Optional[bytes] = None
+            ciphertext: Optional[bytes] = None
+            tag: Optional[bytes] = None
 
-        # Test Case 1
-        key = bytes(16)
-        nonce = bytes(12)
-        plaintext = b""
-        aad = b""
-        aesgcm = new_aesgcm(key)
-        ciphertext, tag = aesgcm.encrypt(nonce, plaintext, aad)
-        check(ciphertext == b"", "TC1: ciphertext")
-        check(tag == hbytes("58e2fccefa7e3061367f1d57a4e7455a"), "TC1: tag")
+            def check(self, cond, msg):
+                if not cond:
+                    print(self)
+                    raise Exception("AES-GCM self-test failed: " + msg)
 
-        # Test Case 2
-        key = bytes(16)
-        nonce = bytes(12)
-        plaintext = bytes(16)
-        aesgcm = new_aesgcm(key)
-        ciphertext, tag = aesgcm.encrypt(nonce, plaintext)
-        check(ciphertext == hbytes("0388dace60b6a392f328c2b971b2fe78"), "TC2: ciphertext")
-        check(tag == hbytes("ab6e47d42cec13bdf53a67b21257bddf"), "TC2: tag")
-        check(aesgcm.decrypt(nonce, ciphertext, tag) == plaintext, "TC2: decryption")
-        bad_tag = bytes([tag[0] ^ 1]) + tag[1:]
-        try:
-            aesgcm.decrypt(nonce, ciphertext, bad_tag)
-            check(False, "TC2: expected authentication failure")
-        except ValueError:
-            pass
+            def run(self):
+                assert self.key is not None
+                assert self.nonce is not None
+                assert self.plaintext is not None
+                assert self.associated_data is not None
+                assert self.ciphertext is not None
+                assert self.tag is not None
+                aes = pyaes.AES(self.key)
+                encrypt_block = lambda block: aes.encrypt(block)
+                aesgcm = AESGCM(encrypt_block)
+                aesgcm._testing = True
+                ciphertext, tag = aesgcm.encrypt(self.nonce, self.plaintext, self.associated_data)
+                self.check(ciphertext == self.ciphertext, "ciphertext")
+                self.check(tag == self.tag, "tag")
+                self.check(aesgcm.decrypt(self.nonce, ciphertext, tag, self.associated_data) == self.plaintext, "decryption")
+                bad_tag = bytes([tag[0] ^ 1]) + tag[1:]
+                try:
+                    aesgcm.decrypt(self.nonce, ciphertext, bad_tag, self.associated_data)
+                    self.check(False, "expected authentication failure")
+                except ValueError:
+                    pass
 
-        # Test Case 3
-        key = hbytes("feffe9928665731c6d6a8f9467308308")
-        nonce = hbytes("cafebabefacedbaddecaf888")
-        plaintext = hbytes("d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a721c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39")
-        associated_data = hbytes("feedfacedeadbeeffeedfacedeadbeefabaddad2")
-        aesgcm = new_aesgcm(key)
-        ciphertext, tag = aesgcm.encrypt(nonce, plaintext, associated_data)
-        check(ciphertext == hbytes("42831ec2217774244b7221b784d0d49ce3aa212f2c02a4e035c17e2329aca12e21d514b25466931c7d8f6a5aac84aa051ba30b396a0aac973d58e091"), "TC3: ciphertext")
-        check(tag == hbytes("5bc94fbc3221a5db94fae95ae7121a47"), "TC3: tag")
-        check(aesgcm.decrypt(nonce, ciphertext, tag, associated_data) == plaintext, "TC3: decryption")
-        bad_tag = bytes([tag[0] ^ 1]) + tag[1:]
-        try:
-            aesgcm.decrypt(nonce, ciphertext, bad_tag, associated_data)
-            check(False, "TC3: expected authentication failure")
-        except ValueError:
-            pass
+        def parse_tv_file(path):
+            tv = []
+            tc = None
+            with open(path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        if tc is not None:
+                            tv.append(tc)
+                        tc = None
+                        continue
+                    if not tc:
+                        tc = TC()
+                    if line.startswith("KEY:"):
+                        tc.key = hbytes(line[len("KEY:"):].strip())
+                    elif line.startswith("NONCE:"):
+                        tc.nonce = hbytes(line[len("NONCE:"):].strip())
+                    elif line.startswith("IN:"):
+                        tc.plaintext = hbytes(line[len("IN:"):].strip())
+                    elif line.startswith("AD:"):
+                        tc.associated_data = hbytes(line[len("AD:"):].strip())
+                    elif line.startswith("CT:"):
+                        tc.ciphertext = hbytes(line[len("CT:"):].strip())
+                    elif line.startswith("TAG:"):
+                        tc.tag = hbytes(line[len("TAG:"):].strip())
+                    else:
+                        assert False, f"Unexpected line in test vector file: {line}"
+            if tc is not None:
+                tv.append(tc)
+            return tv
+
+        aes128tv = parse_tv_file(Path(__file__).parent / "testvectors" / "aes_128_gcm_tests.txt")
+        aes192tv = parse_tv_file(Path(__file__).parent / "testvectors" / "aes_192_gcm_tests.txt")
+        aes256tv = parse_tv_file(Path(__file__).parent / "testvectors" / "aes_256_gcm_tests.txt")
+
+        testCount = 0
+
+        TC(
+            key = bytes(16),
+            nonce = bytes(12),
+            plaintext = b"",
+            associated_data = b"",
+            ciphertext = b"",
+            tag = hbytes("58e2fccefa7e3061367f1d57a4e7455a"),
+        ).run()
+        testCount += 1
+
+        TC(
+            key = bytes(16),
+            nonce = bytes(12),
+            plaintext = bytes(16),
+            associated_data = b"",
+            ciphertext = hbytes("0388dace60b6a392f328c2b971b2fe78"),
+            tag = hbytes("ab6e47d42cec13bdf53a67b21257bddf"),
+        ).run()
+        testCount += 1
+
+        TC(
+            key = hbytes("feffe9928665731c6d6a8f9467308308"),
+            nonce = hbytes("cafebabefacedbaddecaf888"),
+            plaintext = hbytes("d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a721c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39"),
+            associated_data = hbytes("feedfacedeadbeeffeedfacedeadbeefabaddad2"),
+            ciphertext = hbytes("42831ec2217774244b7221b784d0d49ce3aa212f2c02a4e035c17e2329aca12e21d514b25466931c7d8f6a5aac84aa051ba30b396a0aac973d58e091"),
+            tag = hbytes("5bc94fbc3221a5db94fae95ae7121a47"),
+        ).run()
+        testCount += 1
+
+        for tv in aes128tv + aes192tv + aes256tv:
+            tv.run()
+            testCount += 1
+
+        return testCount
 
 if __name__ == "__main__":
-    AESGCM.quickSelfTest()
-    print("Self-tests passed.")
+    testCount = AESGCM.selfTest()
+    print(f"{testCount} self-tests passed.")
