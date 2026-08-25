@@ -252,10 +252,10 @@ def main():
 	p.add_argument("--legacy", action="store_true",
 		       help="Allow reading a legacy database that was encrypted with "
 			    "legacy less secure encryption methods. "
-				"This option enables non-authenticated decryption. "
-				"Warning: Do not use this option, unless must read an old database. "
-				"You must manually ensure to fully trust the database file and "
-				"that it has not been tampered with.")
+			    "This option enables non-authenticated decryption. "
+			    "Warning: Do not use this option, unless must read an old database. "
+			    "You must manually ensure to fully trust the database file and "
+			    "that it has not been tampered with.")
 	if libpwman.util.osIsPosix:
 		p.add_argument("-t", "--timeout", type=int, default=600, metavar="SECONDS",
 			       help="Sets the session timeout in seconds. Default is 10 minutes.")
