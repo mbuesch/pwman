@@ -192,6 +192,8 @@ class FileObjCollection:
 			obj, objLen = FileObj.parseRaw(raw[offset:])
 			objects.append(obj)
 			offset += objLen
+		if offset != len(raw):
+			raise FileObjError(f"Raw length sanity check failed.")
 		return cls(objects)
 
 	@classmethod
