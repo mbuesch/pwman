@@ -167,6 +167,8 @@ class FileObjCollection:
 		name = obj.getName()
 		oldObj = self.__objects.get(name, None)
 		if oldObj is None:
+			if override:
+				raise FileObjError(f"Override set, but object '{name}' does not exist.")
 			obj.setIndex(len(self))
 			obj.setRawOffset(self.__rawOffset)
 			self.__rawOffset += len(obj)
