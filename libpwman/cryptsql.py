@@ -633,9 +633,9 @@ class CryptSQL:
 
 			# Sanity check the raw file data length.
 			if len(rawFileData) != (
-				fc.getObj(b"PAYLOAD").getRawOffset() +
-				len(fc.getObj(b"PAYLOAD")) +
-				len(fc.getObj(b"AUTH_TAG"))
+				fc.getObj(b"PAYLOAD").getRawPayloadOffset() +
+				len(payload) +
+				fc.getObj(b"AUTH_TAG").getHeaderLen() + AES.GCM_TAG_SIZE
 			):
 				raise ValueError("Raw file data length mismatch.")
 		except Exception as e:

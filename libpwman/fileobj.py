@@ -71,10 +71,13 @@ class FileObj:
 		self.__rawOffset = rawOffset
 
 	def getRawPayloadOffset(self):
-		return self.getRawOffset() + self.NAMELEN_LEN + len(self.__name) + self.DATALEN_LEN
+		return self.getRawOffset() + self.getHeaderLen()
+
+	def getHeaderLen(self):
+		return self.NAMELEN_LEN + len(self.__name) + self.DATALEN_LEN
 
 	def __len__(self):
-		return self.NAMELEN_LEN + len(self.__name) + self.DATALEN_LEN + len(self.__data)
+		return self.getHeaderLen() + len(self.__data)
 
 	def getRaw(self, buffer):
 		nameLen = len(self.__name)
