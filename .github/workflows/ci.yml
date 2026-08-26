@@ -17,5 +17,11 @@ jobs:
       - run: sh ./tests/run.sh
       - run: python3 ./pwman --no-mlock --help
       - run: expect -c "spawn python3 ./pwman --no-mlock -c ls ./tests/test_database_v1.db" -c "expect \"Master passphrase\" { send \"test\\r\"; exp_continue }" -c "catch wait res; exit [lindex \$res 3]"
+      - run: |
+          cp ./tests/test_database_v1.db ./tests/test_database_v1.db.tmp
+          expect -c "spawn python3 ./pwman --no-mlock --call-pyfile ./examplescript.py ./tests/test_database_v1.db.tmp" -c "expect \"Master passphrase\" { send \"test\\r\"; exp_continue }" -c "catch wait res; exit [lindex \$res 3]"
+      - run: |
+          cp ./tests/test_database_v1.db ./tests/test_database_v1.db.tmp
+          expect -c "spawn python3 ./pwman --no-mlock --call-pymod examplescript.py ./tests/test_database_v1.db.tmp" -c "expect \"Master passphrase\" { send \"test\\r\"; exp_continue }" -c "catch wait res; exit [lindex \$res 3]"
 
 # vim: ts=2 sw=2 expandtab
