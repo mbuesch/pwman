@@ -1,7 +1,6 @@
 #
-# This is an example script that can be used as
-# pwman -p examplescript.py
-# pwman --call-pymod examplescript.py
+# This is an example script that can be used like this:
+#   pwman --call-pyfile examplescript.py
 #
 # See pwman --help for more information about the command line options.
 # See doc/api/ for a description of the Python API.
