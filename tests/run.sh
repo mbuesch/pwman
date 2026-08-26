@@ -1,8 +1,7 @@
 #!/bin/sh
 
 # basedir is the root of the test directory in the package
-basedir="$(dirname "$0")"
-[ "$(echo "$basedir" | cut -c1)" = '/' ] || basedir="$PWD/$basedir"
+basedir="$(dirname "$(realpath "$0")")"
 
 # rootdir is the root of the package
 rootdir="$basedir/.."

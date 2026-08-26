@@ -1,8 +1,7 @@
 #!/bin/sh
 
-srcdir="$(realpath "$0" | xargs dirname)"
-
-srcdir="$srcdir/.."
+basedir="$(dirname "$(realpath "$0")")"
+srcdir="$basedir/.."
 
 die() { echo "$*"; exit 1; }
 

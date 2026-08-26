@@ -6,7 +6,7 @@
 # Another directory may be selected as an argument to this script.
 #
 
-basedir="$(realpath "$0" | xargs dirname)"
+basedir="$(dirname "$(realpath "$0")")"
 
 default_venvdir="$basedir/pwman-venv"
 

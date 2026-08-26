@@ -3,12 +3,8 @@
 # Generate documentation
 #
 
-
-basedir="$(dirname "$0")"
-[ "$(echo "$basedir" | cut -c1)" = '/' ] || basedir="$PWD/$basedir"
-
+basedir="$(dirname "$(realpath "$0")")"
 srcdir="$basedir/.."
-
 
 die()
 {
