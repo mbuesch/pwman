@@ -64,94 +64,6 @@ class AES:
 			msg += "\n'PWMAN_CRYPTOLIB=%s' is not supported or not installed." % cryptolib
 		raise PWManError(msg)
 
-	def encryptCBC(self, key, iv, data):
-		"""Encrypt data.
-		"""
-
-		# Check parameters.
-		if len(key) != 256 // 8:
-			raise PWManError("AES: Invalid key length.")
-		if len(iv) != self.BLOCK_SIZE:
-			raise PWManError("AES: Invalid iv length.")
-		if len(data) <= 0:
-			raise PWManError("AES: Invalid data length.")
-
-		try:
-			if self.__cryptodome is not None:
-				# Use Cryptodome
-				padData = self.__cryptodome.Util.Padding.pad(
-					data_to_pad=data,
-					block_size=self.BLOCK_SIZE,
-					style="pkcs7")
-				cipher = self.__cryptodome.Cipher.AES.new(
-					key=key,
-					mode=self.__cryptodome.Cipher.AES.MODE_CBC,
-					iv=iv)
-				encData = cipher.encrypt(padData)
-			elif self.__pyaes is not None:
-				# Use pyaes
-				mode = self.__pyaes.AESModeOfOperationCBC(key=key, iv=iv)
-				padding = self.__pyaes.PADDING_DEFAULT
-				enc = self.__pyaes.Encrypter(mode=mode, padding=padding)
-				encData = enc.feed(data)
-				encData += enc.feed()
-			else:
-				raise PWManError("AES-CBC: No implementation available.")
-		except PWManError as e:
-			raise e
-		except Exception as e:
-			raise PWManError("AES error: %s: %s" % (type(e), str(e)))
-		return encData
-
-	def decryptCBC(self, key, iv, data, legacyPadding=False):
-		"""Decrypt data.
-		"""
-
-		# Check parameters.
-		if len(key) != 256 // 8:
-			raise PWManError("AES: Invalid key length.")
-		if len(iv) != self.BLOCK_SIZE:
-			raise PWManError("AES: Invalid iv length.")
-		if len(data) <= 0:
-			raise PWManError("AES: Invalid data length.")
-
-		try:
-			if self.__cryptodome is not None:
-				# Use Cryptodome
-				cipher = self.__cryptodome.Cipher.AES.new(
-					key=key,
-					mode=self.__cryptodome.Cipher.AES.MODE_CBC,
-					iv=iv)
-				decData = cipher.decrypt(data)
-				if legacyPadding:
-					unpadData = self.__unpadLegacy(decData)
-				else:
-					unpadData = self.__cryptodome.Util.Padding.unpad(
-						padded_data=decData,
-						block_size=self.BLOCK_SIZE,
-						style="pkcs7")
-			elif self.__pyaes is not None:
-				# Use pyaes
-				mode = self.__pyaes.AESModeOfOperationCBC(key=key, iv=iv)
-				if legacyPadding:
-					padding = self.__pyaes.PADDING_NONE
-				else:
-					padding = self.__pyaes.PADDING_DEFAULT
-				dec = self.__pyaes.Decrypter(mode=mode, padding=padding)
-				decData = dec.feed(data)
-				decData += dec.feed()
-				if legacyPadding:
-					unpadData = self.__unpadLegacy(decData)
-				else:
-					unpadData = decData
-			else:
-				raise PWManError("AES-CBC: No implementation available.")
-		except PWManError as e:
-			raise e
-		except Exception as e:
-			raise PWManError("AES error: %s: %s" % (type(e), str(e)))
-		return unpadData
-
 	def encryptGCM(self, key, nonce, data, assocData):
 		"""Encrypt data with AES-256-GCM.
 		Returns a tuple (ciphertext, authTag).
@@ -249,6 +161,55 @@ class AES:
 			raise PWManError("AES-GCM error: %s: %s" % (type(e), str(e)))
 		return decData
 
+	def decryptCBC(self, key, iv, data, legacyPadding=False):
+		"""Decrypt data with AES-256-CBC.
+		"""
+
+		# Check parameters.
+		if len(key) != 256 // 8:
+			raise PWManError("AES: Invalid key length.")
+		if len(iv) != self.BLOCK_SIZE:
+			raise PWManError("AES: Invalid iv length.")
+		if len(data) <= 0:
+			raise PWManError("AES: Invalid data length.")
+
+		try:
+			if self.__cryptodome is not None:
+				# Use Cryptodome
+				cipher = self.__cryptodome.Cipher.AES.new(
+					key=key,
+					mode=self.__cryptodome.Cipher.AES.MODE_CBC,
+					iv=iv)
+				decData = cipher.decrypt(data)
+				if legacyPadding:
+					unpadData = self.__unpadLegacy(decData)
+				else:
+					unpadData = self.__cryptodome.Util.Padding.unpad(
+						padded_data=decData,
+						block_size=self.BLOCK_SIZE,
+						style="pkcs7")
+			elif self.__pyaes is not None:
+				# Use pyaes
+				mode = self.__pyaes.AESModeOfOperationCBC(key=key, iv=iv)
+				if legacyPadding:
+					padding = self.__pyaes.PADDING_NONE
+				else:
+					padding = self.__pyaes.PADDING_DEFAULT
+				dec = self.__pyaes.Decrypter(mode=mode, padding=padding)
+				decData = dec.feed(data)
+				decData += dec.feed()
+				if legacyPadding:
+					unpadData = self.__unpadLegacy(decData)
+				else:
+					unpadData = decData
+			else:
+				raise PWManError("AES-CBC: No implementation available.")
+		except PWManError as e:
+			raise e
+		except Exception as e:
+			raise PWManError("AES error: %s: %s" % (type(e), str(e)))
+		return unpadData
+
 	@staticmethod
 	def __unpadLegacy(data):
 		"""Strip legacy padding.
@@ -263,9 +224,7 @@ class AES:
 		inst = cls.get()
 		key = b"_keykey_" * 4
 		iv = b"iv" * 8
-		enc = inst.encryptCBC(key=key, iv=iv, data=b"pwman")
-		if enc != bytes.fromhex("cf73a286509e1265d26490a76dcbb2fd"):
-			raise PWManError("AES-CBC encrypt: Quick self test failed.")
+		enc = bytes.fromhex("cf73a286509e1265d26490a76dcbb2fd")
 		dec = inst.decryptCBC(key=key, iv=iv, data=enc)
 		if dec != b"pwman":
 			raise PWManError("AES-CBC decrypt: Quick self test failed.")
