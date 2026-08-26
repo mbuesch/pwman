@@ -3,6 +3,7 @@ name: Test
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 env:
   PWMAN_RAWGETPASS: 1
@@ -13,14 +14,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: sudo apt install python3-pyaes python3-pycryptodome python3-argon2 python3-cffi expect
-      - run: sh ./tests/run.sh
-      - run: python3 ./pwman --no-mlock --help
-      - run: expect -c "spawn python3 ./pwman --no-mlock -c ls ./tests/test_database_v1.db" -c "expect \"Master passphrase\" { send \"test\\r\"; exp_continue }" -c "catch wait res; exit [lindex \$res 3]"
-      - run: |
+
+      - name: Install dependencies
+        run: sudo apt install python3-pyaes python3-pycryptodome python3-argon2 python3-cffi expect
+
+      - name: Run tests
+        run: sh ./tests/run.sh
+
+      - name: Show help
+        run: python3 ./pwman --no-mlock --help
+
+      - name: Run basic read command
+        run: expect -c "spawn python3 ./pwman --no-mlock -c ls ./tests/test_database_v1.db" -c "expect \"Master passphrase\" { send \"test\\r\"; exp_continue }" -c "catch wait res; exit [lindex \$res 3]"
+
+      - name: Run example script with --call-pyfile
+        run: |
           cp ./tests/test_database_v1.db ./tests/test_database_v1.db.tmp
           expect -c "spawn python3 ./pwman --no-mlock --call-pyfile ./examplescript.py ./tests/test_database_v1.db.tmp" -c "expect \"Master passphrase\" { send \"test\\r\"; exp_continue }" -c "catch wait res; exit [lindex \$res 3]"
-      - run: |
+
+      - name: Run example script with --call-pymod
+        run: |
           cp ./tests/test_database_v1.db ./tests/test_database_v1.db.tmp
           expect -c "spawn python3 ./pwman --no-mlock --call-pymod examplescript.py ./tests/test_database_v1.db.tmp" -c "expect \"Master passphrase\" { send \"test\\r\"; exp_continue }" -c "catch wait res; exit [lindex \$res 3]"
 
