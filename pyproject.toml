@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pwman-python"
+description = "Commandline password manager"
+readme = "README.rst"
+license = "GPL-2.0-or-later"
+license-files = ["COPYING"]
+authors = [
+    {name = "Michael Büsch", email = "m@bues.ch"},
+]
+keywords = ["password", "manager", "command", "line", "TOTP", "2FA"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+]
+requires-python = ">=3.7"
+dynamic = ["version"]
+dependencies = [
+    "argon2-cffi",
+    "cffi",
+    "pycryptodomex",
+]
+
+[project.scripts]
+pwman = "libpwman.__main__:main"
+
+[project.urls]
+Homepage = "https://bues.ch/h/pwman"
+Repository = "https://bues.ch/cgit/pwman.git"
+
+[tool.setuptools.dynamic]
+version = {attr = "libpwman.version.VERSION_STRING"}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["libpwman*"]
+
+[tool.cxfreeze]
+executables = [{script = "pwman"}]
+
+[tool.cxfreeze.build_exe]
+packages = [
+    "readline",
+    "pyreadline3",
+    "curses",
+    "_curses",
+    "sqlite3",
+    "sqlite3.dump",
+]
+excludes = ["tkinter"]

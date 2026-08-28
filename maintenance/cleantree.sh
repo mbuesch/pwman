@@ -5,7 +5,7 @@ base="$basedir/.."
 
 set -e
 
-if ! [ -x "$base/setup.py" ]; then
+if ! [ -f "$base/pyproject.toml" ]; then
 	echo "basedir sanity check failed"
 	exit 1
 fi

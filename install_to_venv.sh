@@ -61,5 +61,5 @@ pip3 install pyaes || die "pip install pyaes failed."
 pip3 install argon2-cffi || die "pip install argon2-cffi failed."
 pip3 install argon2pure || die "pip install argon2pure failed."
 if [ $opt_install -ne 0 ]; then
-	./setup.py install || die "Failed to install pwman."
+	pip3 install . || die "Failed to install pwman."
 fi

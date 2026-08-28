@@ -66,10 +66,7 @@ exit /B 0
 
 :build_cxfreeze
     echo === Creating the cx_Freeze distribution
-    py setup.py ^
-        build ^
-        --build-base=%builddir% ^
-        build_exe ^
+    py -m cxfreeze build ^
         --build-exe=%bindir%
     if ERRORLEVEL 1 goto error_exe
     exit /B 0
