@@ -47,6 +47,10 @@ If you want to install pwman into a Python virtualenv, run the following command
 	. ./pwman-venv/bin/activate
 	pip3 install -U pwman-python
 
+It is recommended to have a `rustc` Rust compiler available in PATH before building/installing pwman.
+For the `argon2purers` fallback module to be available, a `rustc` Rust compiler must be available in PATH.
+If a Rust compiler is not available, the `argon2purers` option will be skipped, but pwman will still work fine if `argon2-cffi` is available.
+
 Run pwman
 =========
 
@@ -108,9 +112,12 @@ Environment variables that affect pwman operation are:
 +----------------------+--------------------------------------------+------------------------------+----------------+
 | Environment variable | Description                                | Possible values              | Default        |
 +======================+============================================+==============================+================+
-| PWMAN_CRYPTOLIB      | Select the crypto backend                  | "cryptodome", "pyaes"        | probe in order |
+| PWMAN_CRYPTOLIB      | Select the crypto backend                  | "cryptodome",                | probe in order |
+|                      |                                            | "pyaes"                      |                |
 +----------------------+--------------------------------------------+------------------------------+----------------+
-| PWMAN_ARGON2LIB      | Select the Argon2 backend                  | "argon2-cffi", "argon2pure"  | "argon2-cffi"  |
+| PWMAN_ARGON2LIB      | Select the Argon2 backend                  | "argon2-cffi",               | probe in order |
+|                      |                                            | "argon2purers",              | (except for    |
+|                      |                                            | "argon2pure"                 |  "argon2pure") |
 +----------------------+--------------------------------------------+------------------------------+----------------+
 | PWMAN_ARGON2MEM      | Set the amount of memory (in KiB) used     | Number of KiB,               | 131096         |
 |                      | for key derivation.                        | but not less than 24584.     |                |

@@ -45,6 +45,15 @@ class Argon2:
 			except ImportError as e:
 				pass
 
+		if argon2lib in ("", "argon2purers"):
+			# Try to use libpwman.crypto_fallback.argon2purers
+			try:
+				import libpwman.crypto_fallback.argon2purers as argon2pure
+				self.__argon2pure = argon2pure
+				return
+			except ImportError as e:
+				pass
+
 		if argon2lib == "argon2pure":
 			# Use argon2pure, but only if explicitly selected,
 			# because it's really really slow.
@@ -123,7 +132,7 @@ class Argon2:
 					version=0x13,
 				)
 			elif self.__argon2pure is not None:
-				# Use argon2pure.
+				# Use argon2pure or argon2purers.
 				# Avoid subprocesses:
 				# Do not use multiprocessing to keep all memory locked.
 				# Subprocesses do not inherit mlockall().
@@ -136,7 +145,7 @@ class Argon2:
 					parallelism=parallel,
 					tag_length=keyLen,
 					type_code=argon2pure.ARGON2ID,
-					threads=1, # no threads
+					threads=parallel,
 					use_threads=True, # no subprocesses
 					version=0x13,
 				)

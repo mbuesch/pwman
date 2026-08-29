@@ -6,3 +6,4 @@
 /dist/
 /pwman-venv/
 __pycache__/
+libpwman/crypto_fallback/argon2purers.so

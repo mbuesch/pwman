@@ -23,3 +23,4 @@ rm -rf doc/api
 rm -rf build dist .pybuild *.egg-info
 rm -f MANIFEST
 rm -f *.html
+rm -f libpwman/crypto_fallback/argon2purers.so
