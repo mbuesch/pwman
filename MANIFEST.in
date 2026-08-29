@@ -11,4 +11,3 @@ include install_to_venv.sh
 include pwman
 include pwman-memlock-limits.conf
 include pwman.cmd
-include requirements.txt
