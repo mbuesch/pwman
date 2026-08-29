@@ -117,7 +117,7 @@ Environment variables that affect pwman operation are:
 +----------------------+--------------------------------------------+------------------------------+----------------+
 | PWMAN_ARGON2LIB      | Select the Argon2 backend                  | "argon2-cffi",               | probe in order |
 |                      |                                            | "argon2purers",              | (except for    |
-|                      |                                            | "argon2pure"                 |  "argon2pure") |
+|                      |                                            | "argon2pure"                 | "argon2pure")  |
 +----------------------+--------------------------------------------+------------------------------+----------------+
 | PWMAN_ARGON2MEM      | Set the amount of memory (in KiB) used     | Number of KiB,               | 131096         |
 |                      | for key derivation.                        | but not less than 24584.     |                |
