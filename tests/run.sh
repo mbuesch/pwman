@@ -25,10 +25,6 @@ run_pyunit()
 		echo "==="
 		echo "= Running $interpreter, PWMAN_CRYPTOLIB=\"$PWMAN_CRYPTOLIB\", PWMAN_ARGON2LIB=\"$PWMAN_ARGON2LIB\""
 		echo "==="
-		if [ "$PWMAN_ARGON2LIB" = "argon2purers" ]; then
-			"$rootdir/libpwman/crypto_fallback/build-argon2purers.sh" ||\
-				die "Failed to build argon2purers"
-		fi
 		export PYTHONPATH="$rootdir/tests:$PYTHONPATH"
 		cd "$rootdir" || die "Failed to cd to rootdir."
 		"$interpreter" -m unittest --failfast --buffer --catch --verbose "$test_dir" ||\
@@ -59,6 +55,9 @@ run_testdir()
 	unset PWMAN_RAWGETPASS
 	unset PWMAN_CRYPTOLIB
 	unset PWMAN_ARGON2LIB
+
+	"$rootdir/libpwman/crypto_fallback/build-argon2purers.sh" ||\
+		die "Failed to build argon2purers"
 
 	run_pyunit python3 "$test_dir"
 

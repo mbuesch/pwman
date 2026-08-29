@@ -552,7 +552,7 @@ pub fn argon2(
         return Err("parallelism too small or too large");
     }
     if time_cost == 0 {
-        return Err("time_cost must be positive");
+        return Err("time_cost must be >0");
     }
     if memory_cost < 8 * parallelism {
         return Err("memory_cost must be >=8 times #lanes");
@@ -564,7 +564,7 @@ pub fn argon2(
         return Err("version not supported");
     }
     if tag_length == 0 {
-        return Err("tag_length must be positive");
+        return Err("tag_length must be >0");
     }
 
     let p_lanes = parallelism as usize;
