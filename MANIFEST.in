@@ -12,5 +12,5 @@ include pwman
 include pwman-memlock-limits.conf
 include pwman.cmd
 include README.html
-include README.rst
+include README.md
 exclude libpwman/crypto_fallback/argon2purers.so

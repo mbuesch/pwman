@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pwman-python"
 description = "Commandline password manager"
-readme = "README.rst"
+readme = "README.md"
 license = "GPL-2.0-or-later"
 license-files = ["COPYING"]
 authors = [
