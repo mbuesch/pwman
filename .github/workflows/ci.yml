@@ -22,7 +22,7 @@ jobs:
           key: rustup
 
       - name: Install dependencies
-        run: sudo apt install python3-pyaes python3-pycryptodome python3-argon2 python3-cffi expect
+        run: sudo apt install python3-pycryptodome python3-argon2 python3-cffi expect
 
       - name: Install Rust
         run: |

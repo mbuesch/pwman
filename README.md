@@ -78,12 +78,19 @@ The API documentation can be found in the [API documentation directory](doc/api/
 
 ## Crypto backends
 
-Pwman uses either [Cryptodome](https://pypi.org/project/pycryptodomex/) or [pyaes](https://pypi.org/project/pyaes/) for AES encryption.
-Therefore, either one of these Python modules has to be installed.
-Pwman first tries to use Cryptodome and then falls back to pyaes, if Cryptodome is not installed.
+The default backends used for cryptography are well established Python libraries:
 
-For key derivation either [argon2-cffi](https://pypi.org/project/argon2-cffi/), the included fallback `argon2purers` or [argon2pure](https://pypi.org/project/argon2pure/) can be used.
-Preferably `argon2-cffi` shall be installed.
+- Encryption: [Cryptodome](https://pypi.org/project/pycryptodomex/)
+- Key derivation: [argon2-cffi](https://pypi.org/project/argon2-cffi/)
+
+These are well tested, widely used and audited Python libraries for cryptography.
+Pwman will use these libraries, if they are installed and available.
+
+As an alternative, if the default libraries are not available, pwman can fall back to other encryption libraries that come bundled with pwman.
+The bundled libraries are also part of the pwman regression tests and are believed to be as secure and reliable as the default ones.
+
+The reason for having bundled fallback libraries is password database access availability.
+In case the default libraries are not installed or cannot be installed on the user's system, pwman will automatically use the bundled fallback libraries to ensure that encryption and decryption operations can still be performed and the password database can be accessed.
 
 ## Environment variables
 

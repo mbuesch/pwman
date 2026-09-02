@@ -7,7 +7,6 @@
 
 from libpwman.exception import PWManError
 from libpwman.util import getenv
-from libpwman.crypto_fallback.aesgcm import AESGCM
 
 __all__ = [
 	"AES",
@@ -32,8 +31,9 @@ class AES:
 		return cls.__singleton
 
 	def __init__(self):
-		self.__pyaes = None
 		self.__cryptodome = None
+		self.__pyaes = None
+		self.__aesgcm = None
 
 		cryptolib = getenv("PWMAN_CRYPTOLIB", "").lower().strip()
 
@@ -49,10 +49,12 @@ class AES:
 				pass
 
 		if cryptolib in ("", "pyaes"):
-			# Try to use pyaes
+			# Use the built-in aes+gcm. This should always succeed.
 			try:
-				import pyaes
+				from libpwman.crypto_fallback import pyaes
+				from libpwman.crypto_fallback import aesgcm
 				self.__pyaes = pyaes
+				self.__aesgcm = aesgcm
 				return
 			except ImportError as e:
 				pass
@@ -89,10 +91,11 @@ class AES:
 				cipher.update(assocData)
 				encData = cipher.encrypt(data)
 				tag = cipher.digest()
-			elif self.__pyaes is not None:
-				# Use pyaes and fallback-AESGCM
+			elif self.__pyaes is not None and self.__aesgcm is not None:
+				# Use built-in fallback pyaes and aesgcm
 				aes = self.__pyaes.AES(key)
-				aesgcm = AESGCM(lambda block: aes.encrypt(block))
+				aesgcm = self.__aesgcm.AESGCM(
+					encrypt_block=lambda block: aes.encrypt(block))
 				encData, tag = aesgcm.encrypt(
 					nonce=nonce,
 					plaintext=data,
@@ -138,10 +141,11 @@ class AES:
 					decData = cipher.decrypt_and_verify(data, tag)
 				except ValueError as e:
 					raise PWManError("AES-GCM: Authentication failed.")
-			elif self.__pyaes is not None:
+			elif self.__pyaes is not None and self.__aesgcm is not None:
 				# Use pyaes and fallback-AESGCM
 				aes = self.__pyaes.AES(key)
-				aesgcm = AESGCM(lambda block: aes.encrypt(block))
+				aesgcm = self.__aesgcm.AESGCM(
+					encrypt_block=lambda block: aes.encrypt(block))
 				try:
 					decData = aesgcm.decrypt(
 						nonce=nonce,
