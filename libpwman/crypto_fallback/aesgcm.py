@@ -218,7 +218,7 @@ class AESGCM:
 
     @classmethod
     def selfTest(cls):
-        import pyaes
+        from libpwman.crypto_fallback import pyaes
         from dataclasses import dataclass
         from pathlib import Path
         from typing import Optional
