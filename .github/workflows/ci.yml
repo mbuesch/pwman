@@ -50,8 +50,8 @@ jobs:
 
       - name: Build with MSRV
         run: |
-          rustup update 1.85
-          rustup default 1.85
+          rustup update 1.88
+          rustup default 1.88
           rustc --version
           sh ./libpwman/crypto_fallback/build-argon2purers.sh
 
