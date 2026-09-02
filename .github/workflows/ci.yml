@@ -48,4 +48,11 @@ jobs:
           cp ./tests/test_database_v1.db ./tests/test_database_v1.db.tmp
           expect -c "spawn python3 ./pwman --no-mlock --call-pymod examplescript.py ./tests/test_database_v1.db.tmp" -c "expect \"Master passphrase\" { send \"test\\r\"; exp_continue }" -c "catch wait res; exit [lindex \$res 3]"
 
+      - name: Build with MSRV
+        run: |
+          rustup update 1.85
+          rustup default 1.85
+          rustc --version
+          sh ./libpwman/crypto_fallback/build-argon2purers.sh
+
 # vim: ts=2 sw=2 expandtab
