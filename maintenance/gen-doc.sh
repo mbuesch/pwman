@@ -33,6 +33,8 @@ gen_pydoc()
 	local targetdoc="$srcdir/doc/api/$reldir"
 
 	if [ "$reldir" = "tests" -o \
+	     "$reldir" = "libpwman/crypto_fallback" -o \
+	     "$reldir" = "libpwman/crypto_fallback/pyaes" -o \
 	     "$basename" = "__init__" -o \
 	     "$basename" = "__main__" -o \
 	     "$basename" = "setup" -o \
