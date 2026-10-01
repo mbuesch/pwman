@@ -4,7 +4,7 @@
 # Simple password manager
 # Encrypted database
 #
-# Copyright (c) 2011-2023 Michael Büsch <m@bues.ch>
+# Copyright (c) 2011-2026 Michael Büsch <m@bues.ch>
 # Licensed under the GNU/GPL version 2 or later.
 #
 """
