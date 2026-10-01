@@ -21,13 +21,9 @@ call :install pyreadline3
 if ERRORLEVEL 1 exit /B 1
 call :install pycryptodomex
 if ERRORLEVEL 1 exit /B 1
-call :install pyaes
-if ERRORLEVEL 1 exit /B 1
 call :install cffi
 if ERRORLEVEL 1 exit /B 1
 call :install argon2-cffi
-if ERRORLEVEL 1 exit /B 1
-call :install argon2pure
 if ERRORLEVEL 1 exit /B 1
 call :install cx_Freeze
 if ERRORLEVEL 1 exit /B 1
