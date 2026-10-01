@@ -10,6 +10,7 @@ include examplescript.py
 include gitconfig.sh
 include install_to_venv.sh
 include libpwman/crypto_fallback/LICENSE-MIT
+include libpwman/crypto_fallback/README.md
 include libpwman/crypto_fallback/argon2pure.rs
 include libpwman/crypto_fallback/build-argon2purers.sh
 include pwman
